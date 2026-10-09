@@ -1,0 +1,13 @@
+node_modules
+.next
+dist
+.output
+.turbo
+.wxt
+coverage
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+apps/web/media

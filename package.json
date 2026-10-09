@@ -1,0 +1,20 @@
+{
+  "name": "zaviya",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @zaviya/web dev",
+    "dev:worker": "pnpm --filter @zaviya/worker dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "packageManager": "pnpm@10.18.0"
+}
