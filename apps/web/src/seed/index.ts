@@ -48,7 +48,8 @@ async function upsertUser(
 }
 
 function writeWorkerEnv(apiKey: string) {
-  const workerEnv = path.resolve(__dirname, '../../../../worker/.env')
+  // apps/web/src/seed → apps/worker/.env
+  const workerEnv = path.resolve(__dirname, '../../../worker/.env')
   let content = fs.existsSync(workerEnv) ? fs.readFileSync(workerEnv, 'utf8') : ''
   const set = (key: string, value: string) => {
     const re = new RegExp(`^${key}=.*$`, 'm')
@@ -56,7 +57,7 @@ function writeWorkerEnv(apiKey: string) {
     content = re.test(content) ? content.replace(re, line) : `${content.trimEnd()}\n${line}\n`
   }
   set('PAYLOAD_API_KEY', apiKey)
-  set('PAYLOAD_URL', process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
+  set('PAYLOAD_URL', process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3100')
   fs.mkdirSync(path.dirname(workerEnv), { recursive: true })
   fs.writeFileSync(workerEnv, content)
 }
