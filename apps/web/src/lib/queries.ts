@@ -206,6 +206,70 @@ export const getHomeFeed = cache(async (locale: Locale): Promise<HomeFeed> => {
   }
 })
 
+async function mapArticleFullFromDoc(doc: Article, locale: Locale): Promise<ArticleFull> {
+  const categoryRefObj = mapCategory(doc.category as Category, locale)
+  const card = await mapArticleCardAsync(doc, locale)
+  const author = mapAuthor(doc.author as Author | number | null, locale)
+  const tags = (Array.isArray(doc.tags) ? doc.tags : [])
+    .filter((t): t is Tag => typeof t === 'object' && t !== null)
+    .map((t) => ({
+      slug: t.slug,
+      name: typeof t.name === 'string' ? t.name : String(t.name),
+    }))
+  const updates = (doc.updates ?? []).map((u) => ({
+    at: u.at,
+    text:
+      locale === 'ur'
+        ? u.text?.ur ?? u.text?.en ?? ''
+        : u.text?.en ?? u.text?.ur ?? '',
+  }))
+  const corrections = (doc.corrections ?? []).map((c) => ({
+    at: c.at,
+    note: typeof c.note === 'string' ? c.note : String((c.note as Record<string, string> | undefined)?.[locale] ?? ''),
+  }))
+  const seoGroup = doc.seo
+  const og =
+    seoGroup?.ogImage && typeof seoGroup.ogImage === 'object'
+      ? (seoGroup.ogImage as Media).url ?? undefined
+      : undefined
+  return {
+    ...card,
+    category: categoryRefObj,
+    body: doc.body,
+    whatItMeans: doc.whatItMeans,
+    keyPoints: (doc.keyPoints ?? []).map((k) => k.point ?? '').filter(Boolean),
+    faqs: (doc.faqs ?? []).map((f) => ({ q: f.q, a: f.a })),
+    sources: (doc.sources ?? []).map((s) => ({
+      name: s.name,
+      url: s.url,
+      tier: s.tier as 1 | 2 | 3,
+      publishedAt: s.publishedAt ?? undefined,
+    })),
+    embeds: (doc.embeds ?? []).map((e) => ({
+      type: e.type as 'x' | 'instagram' | 'youtube',
+      url: e.url,
+    })),
+    tags,
+    updates,
+    corrections,
+    author: {
+      ...author,
+      bio:
+        typeof (doc.author as Author)?.bio === 'string'
+          ? ((doc.author as Author).bio as string)
+          : ((doc.author as Author)?.bio as Record<string, string> | undefined)?.[locale],
+    },
+    seo: {
+      metaTitle: typeof seoGroup?.metaTitle === 'string' ? seoGroup.metaTitle : undefined,
+      metaDescription:
+        typeof seoGroup?.metaDescription === 'string' ? seoGroup.metaDescription : undefined,
+      ogImage: og,
+      canonical: typeof seoGroup?.canonical === 'string' ? seoGroup.canonical : undefined,
+      noindex: seoGroup?.noindex ?? undefined,
+    },
+  }
+}
+
 export const getArticle = cache(
   async (locale: Locale, category: string, slug: string): Promise<ArticleFull | null> => {
     if (!(await hasPublishedArticles())) {
@@ -232,69 +296,29 @@ export const getArticle = cache(
     })
     const doc = result.docs[0]
     if (!doc) return null
-    const categoryRefObj = mapCategory(doc.category as Category, locale)
-    const card = await mapArticleCardAsync(doc, locale)
-    const author = mapAuthor(doc.author as Author | number | null, locale)
-    const tags = (Array.isArray(doc.tags) ? doc.tags : [])
-      .filter((t): t is Tag => typeof t === 'object' && t !== null)
-      .map((t) => ({
-        slug: t.slug,
-        name: typeof t.name === 'string' ? t.name : String(t.name),
-      }))
-    const updates = (doc.updates ?? []).map((u) => ({
-      at: u.at,
-      text:
-        locale === 'ur'
-          ? u.text?.ur ?? u.text?.en ?? ''
-          : u.text?.en ?? u.text?.ur ?? '',
-    }))
-    const corrections = (doc.corrections ?? []).map((c) => ({
-      at: c.at,
-      note: typeof c.note === 'string' ? c.note : String((c.note as Record<string, string> | undefined)?.[locale] ?? ''),
-    }))
-    const seoGroup = doc.seo
-    const og =
-      seoGroup?.ogImage && typeof seoGroup.ogImage === 'object'
-        ? (seoGroup.ogImage as Media).url ?? undefined
-        : undefined
-    return {
-      ...card,
-      category: categoryRefObj,
-      body: doc.body,
-      whatItMeans: doc.whatItMeans,
-      keyPoints: (doc.keyPoints ?? []).map((k) => k.point ?? '').filter(Boolean),
-      faqs: (doc.faqs ?? []).map((f) => ({ q: f.q, a: f.a })),
-      sources: (doc.sources ?? []).map((s) => ({
-        name: s.name,
-        url: s.url,
-        tier: s.tier as 1 | 2 | 3,
-        publishedAt: s.publishedAt ?? undefined,
-      })),
-      embeds: (doc.embeds ?? []).map((e) => ({
-        type: e.type as 'x' | 'instagram' | 'youtube',
-        url: e.url,
-      })),
-      tags,
-      updates,
-      corrections,
-      author: {
-        ...author,
-        bio:
-          typeof (doc.author as Author)?.bio === 'string'
-            ? (doc.author as Author).bio as string
-            : ((doc.author as Author)?.bio as Record<string, string> | undefined)?.[locale],
-      },
-      seo: {
-        metaTitle: typeof seoGroup?.metaTitle === 'string' ? seoGroup.metaTitle : undefined,
-        metaDescription:
-          typeof seoGroup?.metaDescription === 'string' ? seoGroup.metaDescription : undefined,
-        ogImage: og,
-        canonical: typeof seoGroup?.canonical === 'string' ? seoGroup.canonical : undefined,
-        noindex: seoGroup?.noindex ?? undefined,
-      },
-    }
+    return mapArticleFullFromDoc(doc, locale)
   },
 )
+
+export const getArticleBySlug = cache(async (locale: Locale, slug: string): Promise<ArticleFull | null> => {
+  if (!(await hasPublishedArticles())) {
+    const card = mockCards(locale).find((a) => a.slug === slug)
+    return card ? mockArticle(card) : null
+  }
+  const payload = await getPayloadClient()
+  const result = await payload.find({
+    collection: 'articles',
+    locale,
+    where: publishedAnd({ slug: { equals: slug } }),
+    sort: '-publishedAt',
+    limit: 1,
+    depth: 2,
+    overrideAccess: true,
+  })
+  const doc = result.docs[0]
+  if (!doc) return null
+  return mapArticleFullFromDoc(doc, locale)
+})
 
 export const getCategoryFeed = cache(
   async (locale: Locale, slug: string, page = 1): Promise<Paginated<ArticleCard> | null> => {

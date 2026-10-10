@@ -24,6 +24,7 @@ import { SocialPosts } from './collections/SocialPosts'
 import { AuditLog } from './collections/AuditLog'
 import { PromptVersions } from './collections/PromptVersions'
 import { MetricsDaily } from './collections/MetricsDaily'
+import { PushSubscriptions } from './collections/PushSubscriptions'
 import { Settings } from './globals/Settings'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
 
@@ -81,6 +82,7 @@ export default buildConfig({
     AuditLog,
     PromptVersions,
     MetricsDaily,
+    PushSubscriptions,
   ],
   globals: [Settings],
   localization: {
@@ -93,7 +95,7 @@ export default buildConfig({
   },
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
-  serverURL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+  serverURL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3100',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
@@ -101,6 +103,9 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
     },
+    // Keep false: onInit owns the pgvector `embedding` column; Drizzle push
+    // would otherwise prompt to drop it and hang the non-interactive server.
+    push: process.env.PAYLOAD_DATABASE_PUSH === 'true',
   }),
   sharp,
   plugins,

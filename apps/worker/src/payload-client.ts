@@ -281,7 +281,7 @@ export class PayloadClient {
     credit?: string
     license: string
     isAiGenerated?: boolean
-  }): Promise<{ id: string }> {
+  }): Promise<{ id: string; url?: string | null }> {
     const form = new FormData()
     form.append('file', file)
     form.append('_payload', JSON.stringify(meta))
@@ -296,10 +296,15 @@ export class PayloadClient {
       logger.warn({ status: res.status, text }, 'media upload failed')
       throw new Error(`Media upload failed (${res.status})`)
     }
-    const doc = (await res.json()) as { doc?: { id?: string }; id?: string }
+    const doc = (await res.json()) as {
+      doc?: { id?: string; url?: string | null }
+      id?: string
+      url?: string | null
+    }
     const id = doc.doc?.id ?? doc.id
     if (!id) throw new Error('Media upload: missing id')
-    return { id }
+    const url = doc.doc?.url ?? doc.url ?? null
+    return { id: String(id), url }
   }
 }
 

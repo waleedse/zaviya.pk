@@ -6,6 +6,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter'
 import { SiteHeader } from '@/components/layout/SiteHeader'
 import type { ArticleCard, RateTick } from '@zaviya/shared'
 import { localePath, t } from '@/lib/i18n'
+import { PageviewBeacon } from '@/components/analytics/PageviewBeacon'
 
 export function FrontendShell({
   locale,
@@ -25,6 +26,7 @@ export function FrontendShell({
   const d = t(locale)
   return (
     <>
+      <PageviewBeacon locale={locale} />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-accent-fg">
         {d.skipToContent}
       </a>

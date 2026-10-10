@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zaviya Bridge — Options</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-weight: 600;
+      }
+      input[type='text'],
+      input[type='password'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem;
+      }
+      fieldset {
+        margin-top: 1.5rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 1rem;
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.5rem 1rem;
+      }
+      .hint {
+        color: #555;
+        font-size: 0.875rem;
+      }
+      #status {
+        margin-top: 1rem;
+        color: #0a0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Zaviya Bridge</h1>
+    <p class="hint">Connects to the local worker WebSocket bridge (default <code>ws://127.0.0.1:8787</code>).</p>
+
+    <label for="bridgeUrl">Bridge URL</label>
+    <input id="bridgeUrl" type="text" autocomplete="off" />
+
+    <label for="bridgeToken">Bridge token</label>
+    <input id="bridgeToken" type="password" autocomplete="off" />
+
+    <fieldset>
+      <legend>Platforms</legend>
+      <label><input type="checkbox" id="platformX" /> X (x.com)</label>
+      <label><input type="checkbox" id="platformInstagram" /> Instagram</label>
+      <label><input type="checkbox" id="platformFacebook" /> Facebook (heartbeat only — no bridge job type yet)</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Action delays (ms)</legend>
+      <label for="delayMin">Min</label>
+      <input id="delayMin" type="text" />
+      <label for="delayMax">Max</label>
+      <input id="delayMax" type="text" />
+      <p class="hint">Production: 20 000–90 000 ms per architecture doc. Lower values for local testing.</p>
+    </fieldset>
+
+    <button id="save">Save</button>
+    <p id="status" role="status"></p>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

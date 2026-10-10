@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { CATEGORIES, DATA_PAGES } from '@zaviya/shared'
+import { CATEGORIES, DATA_PAGES, SITE } from '@zaviya/shared'
 import { SEED_SOURCES } from './sources'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -45,6 +45,73 @@ async function upsertUser(
     overrideAccess: true,
   })
   return { user, apiKey }
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function heroPlaceholderSvg(title: string, accent: string, locale: 'en' | 'ur'): Buffer {
+  const dir = locale === 'ur' ? 'rtl' : 'ltr'
+  const brand = locale === 'ur' ? SITE.nameUr : SITE.name
+  const label = locale === 'ur' ? 'AI سے تیار کردہ پلیس ہولڈر' : 'AI-generated placeholder'
+  const safeTitle = escapeXml(title)
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f17"/>
+      <stop offset="55%" stop-color="#1a2133"/>
+      <stop offset="100%" stop-color="#121826"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="10" fill="${accent}"/>
+  <circle cx="1450" cy="780" r="220" fill="${accent}" opacity="0.12"/>
+  <text x="80" y="120" fill="#ecedee" font-family="Georgia, serif" font-size="42" font-weight="700">${escapeXml(brand)}</text>
+  <text x="80" y="420" fill="#ecedee" font-family="Georgia, serif" font-size="56" font-weight="700" direction="${dir}">${safeTitle}</text>
+  <text x="80" y="820" fill="#b8902b" font-family="Georgia, serif" font-size="22">${escapeXml(label)}</text>
+</svg>`
+  return Buffer.from(svg, 'utf8')
+}
+
+async function upsertHeroMedia(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  slug: string,
+  title: string,
+  accent: string,
+): Promise<number | undefined> {
+  const filename = `seed-hero-${slug}.svg`
+  const existing = await payload.find({
+    collection: 'media',
+    where: { filename: { equals: filename } },
+    limit: 1,
+    overrideAccess: true,
+  })
+  if (existing.docs[0]?.id) return existing.docs[0].id as number
+
+  const file = heroPlaceholderSvg(title, accent, 'en')
+  const doc = await payload.create({
+    collection: 'media',
+    data: {
+      alt: title,
+      credit: 'Zaviya',
+      license: 'ai-generated',
+      isAiGenerated: true,
+    },
+    file: {
+      data: file,
+      mimetype: 'image/svg+xml',
+      name: filename,
+      size: file.length,
+    },
+    overrideAccess: true,
+  })
+  return doc.id as number
 }
 
 function writeWorkerEnv(apiKey: string) {
@@ -430,13 +497,31 @@ async function seed() {
     })
     const categoryId = cat.docs[0]?.id
     if (!categoryId) continue
+    const categoryColor =
+      CATEGORIES.find((c) => c.slug === sample.category)?.color ?? '#0E7C5A'
+    const heroMediaId = await upsertHeroMedia(
+      payload,
+      sample.en.slug,
+      sample.en.title,
+      categoryColor,
+    )
     const existing = await payload.find({
       collection: 'articles',
       locale: 'en',
       where: { slug: { equals: sample.en.slug } },
       limit: 1,
     })
-    if (existing.docs[0]) continue
+    if (existing.docs[0]) {
+      if (heroMediaId && !existing.docs[0].heroImage) {
+        await payload.update({
+          collection: 'articles',
+          id: existing.docs[0].id,
+          data: { heroImage: heroMediaId },
+          overrideAccess: true,
+        })
+      }
+      continue
+    }
 
     const created = await payload.create({
       collection: 'articles',
@@ -451,6 +536,7 @@ async function seed() {
         faqs: [{ q: 'When does this take effect?', a: 'Immediately unless a specific date is stated.' }],
         category: categoryId,
         author: authorId,
+        ...(heroMediaId ? { heroImage: heroMediaId } : {}),
         workflow: 'published',
         priority: 'normal',
         sources: [{ name: 'Zaviya monitoring', url: 'https://zaviya.pk', tier: 2 }],

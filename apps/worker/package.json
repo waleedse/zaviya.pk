@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@zaviya/llm": "workspace:*",
     "@zaviya/shared": "workspace:*",
     "bullmq": "^6.3.12",
@@ -20,6 +21,7 @@
     "p-limit": "^7.3.3",
     "pino": "^10.4.0",
     "rss-parser": "^3.13.0",
+    "satori": "^0.47.1",
     "ws": "^8.22.0",
     "zod": "^3.25.76"
   },

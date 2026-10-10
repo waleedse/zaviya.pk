@@ -13,6 +13,8 @@ import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { revalidateDataTag } from '../../lib/revalidate'
 
+// Phase 2: Remotion reel render queue — see docs/GROWTH.md and lib/remotion-brief.ts
+
 const SERIES_TO_DATA_KEY: Record<string, string> = {
   gold_24k_tola: 'gold',
   gold_22k_tola: 'gold',
@@ -100,7 +102,7 @@ const pipelineEndpoints: Endpoint[] = [
       const schema = z.object({
         items: z.array(
           z.object({
-            sourceId: z.string(),
+            sourceId: z.union([z.string(), z.number()]).transform(String),
             externalId: z.string(),
             url: z.string(),
             title: z.string(),
@@ -121,7 +123,7 @@ const pipelineEndpoints: Endpoint[] = [
           collection: 'source-items',
           where: {
             and: [
-              { source: { equals: item.sourceId } },
+              { source: { equals: Number(item.sourceId) || item.sourceId } },
               { externalId: { equals: item.externalId } },
             ],
           },

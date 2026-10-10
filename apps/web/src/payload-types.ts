@@ -84,6 +84,7 @@ export interface Config {
     'audit-log': AuditLog;
     'prompt-versions': PromptVersion;
     'metrics-daily': MetricsDaily;
+    'push-subscriptions': PushSubscription;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -108,6 +109,7 @@ export interface Config {
     'audit-log': AuditLogSelect<false> | AuditLogSelect<true>;
     'prompt-versions': PromptVersionsSelect<false> | PromptVersionsSelect<true>;
     'metrics-daily': MetricsDailySelect<false> | MetricsDailySelect<true>;
+    'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -681,6 +683,24 @@ export interface MetricsDaily {
   createdAt: string;
 }
 /**
+ * Web Push subscription endpoints (VAPID keys in env).
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions".
+ */
+export interface PushSubscription {
+  id: number;
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  locale?: ('en' | 'ur') | null;
+  userAgent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -771,6 +791,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'metrics-daily';
         value: number | MetricsDaily;
+      } | null)
+    | ({
+        relationTo: 'push-subscriptions';
+        value: number | PushSubscription;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1238,6 +1262,23 @@ export interface MetricsDailySelect<T extends boolean = true> {
   fbReach?: T;
   igReach?: T;
   xImpressions?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "push-subscriptions_select".
+ */
+export interface PushSubscriptionsSelect<T extends boolean = true> {
+  endpoint?: T;
+  keys?:
+    | T
+    | {
+        p256dh?: T;
+        auth?: T;
+      };
+  locale?: T;
+  userAgent?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -21,7 +21,7 @@ import { LiveBadge } from '@/components/article/LiveBadge'
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
 import { ShareBar } from '@/components/article/ShareBar'
 import { KeyPoints } from '@/components/article/KeyPoints'
-import { RichTextBody } from '@/components/article/RichTextBody'
+import { ArticleBodyWithAds } from '@/components/article/ArticleBodyWithAds'
 import { WhatItMeans } from '@/components/article/WhatItMeans'
 import { LiveUpdates } from '@/components/article/LiveUpdates'
 import { FAQAccordion } from '@/components/article/FAQAccordion'
@@ -31,6 +31,7 @@ import { ArticleCard } from '@/components/article/ArticleCard'
 import { RateCard } from '@/components/data/RateCard'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { formatDateTime } from '@/lib/format'
+import { canBuildWebStory, webStoryPath } from '@/lib/web-story'
 import type { Locale } from '@zaviya/shared'
 import { Badge } from '@/components/ui/badge'
 
@@ -130,8 +131,16 @@ export default async function ArticlePage({ params }: Props) {
                 </>
               )}
             </div>
-            <div className="my-6">
+            <div className="my-6 flex flex-wrap items-center gap-4">
               <ShareBar locale={locale} title={article.title} path={publicPath} />
+              {canBuildWebStory(article) ? (
+                <Link
+                  href={localePath(locale, webStoryPath(slug))}
+                  className="text-sm font-medium text-accent underline-offset-2 hover:underline"
+                >
+                  {d.webStories}
+                </Link>
+              ) : null}
             </div>
             {article.image && (
               <figure className="mb-8">
@@ -147,8 +156,7 @@ export default async function ArticlePage({ params }: Props) {
               </figure>
             )}
             <KeyPoints points={article.keyPoints} locale={locale} />
-            <RichTextBody data={article.body} />
-            <AdSlot locale={locale} size="rectangle" />
+            <ArticleBodyWithAds data={article.body} locale={locale} />
             {article.whatItMeans != null ? <WhatItMeans body={article.whatItMeans} locale={locale} /> : null}
             <LiveUpdates locale={locale} updates={article.updates} isLive={article.isLive} />
             <FAQAccordion faqs={article.faqs} locale={locale} />

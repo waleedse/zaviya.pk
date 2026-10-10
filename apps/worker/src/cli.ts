@@ -31,7 +31,7 @@ async function run() {
     const runtime = await createWorkerRuntime(env, bridge, telegram)
     if (sourceId) {
       const { sources } = await payload.getSources()
-      const s = sources.find((x) => x.id === sourceId)
+      const s = sources.find((x) => String(x.id) === String(sourceId))
       if (!s) throw new Error('source not found')
       await runtime.queues.ingest.add('poll', {
         sourceId: s.id,

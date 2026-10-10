@@ -3,20 +3,11 @@ import type { PayloadClient } from '../payload-client.js'
 import type { Queue } from 'bullmq'
 import type { WriteResult } from './write.js'
 import { logger } from '../logger.js'
-import type { Priority } from '@zaviya/shared'
+import type { Priority, TriageResult } from '@zaviya/shared'
+import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 
-/** TODO: satori + @resvg/resvg-js branded cards (1080x1350, 1200x630). */
-export interface SocialCardRenderInput {
-  title: string
-  dek: string
-  category: string
-  locale: 'en' | 'ur'
-}
-
-export function renderSocialCard(_input: SocialCardRenderInput): null {
-  logger.debug('social card render stub — install satori to enable')
-  return null
-}
+export type { SocialCardRenderInput } from './social-card.js'
+export { renderSocialCard, renderSocialCardSet } from './social-card.js'
 
 async function generateGeminiImage(prompt: string, env: WorkerEnv): Promise<Blob | null> {
   if (!env.GEMINI_API_KEY) return null
@@ -44,11 +35,48 @@ async function generateGeminiImage(prompt: string, env: WorkerEnv): Promise<Blob
   return new Blob([buf], { type: inline.mimeType ?? 'image/png' })
 }
 
+function absoluteMediaUrl(baseUrl: string, url?: string | null): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const base = baseUrl.replace(/\/$/, '')
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`
+}
+
+async function uploadGeneratedPng(
+  payload: PayloadClient,
+  baseUrl: string,
+  png: Buffer,
+  alt: string,
+): Promise<{ id: string; url?: string } | null> {
+  try {
+    const uploaded = await payload.uploadMedia(new Blob([png], { type: 'image/png' }), {
+      alt,
+      license: 'ai-generated',
+      isAiGenerated: true,
+      credit: 'Zaviya AI',
+    })
+    return {
+      id: uploaded.id,
+      url: absoluteMediaUrl(baseUrl, uploaded.url),
+    }
+  } catch (e) {
+    logger.warn({ err: e }, 'generated PNG upload skipped')
+    return null
+  }
+}
+
 export async function processMediaJob(
   data: { clusterId: string; write: WriteResult; qaScore: number; priority: Priority },
   deps: { payload: PayloadClient; env: WorkerEnv; publishQueue: Queue },
 ): Promise<void> {
   let heroMediaId: string | undefined
+  const socialMediaUrls: string[] = []
+
+  const cluster = await deps.payload.getCluster(data.clusterId).catch(() => null)
+  const triage = cluster?.triage as TriageResult | undefined
+  const category = triage?.category ?? 'pakistan'
+  const accent = categoryAccentColor(category)
+
   // Default: do NOT reuse og:image from sources (license). AI generate if Gemini configured.
   const blob = await generateGeminiImage(data.write.en.imageBrief || data.write.en.title, deps.env)
   if (blob) {
@@ -65,12 +93,53 @@ export async function processMediaJob(
     }
   }
 
-  renderSocialCard({
-    title: data.write.en.title,
-    dek: data.write.en.dek,
-    category: 'news',
-    locale: 'en',
-  })
+  try {
+    const cardsEn = await renderSocialCardSet({
+      title: data.write.en.title,
+      dek: data.write.en.dek,
+      category,
+      categoryColor: accent,
+      locale: 'en',
+    })
+    const cardsUr = await renderSocialCardSet({
+      title: data.write.ur.title,
+      dek: data.write.ur.dek,
+      category,
+      categoryColor: accent,
+      locale: 'ur',
+    })
+
+    const [ogEn, portraitEn, portraitUr] = await Promise.all([
+      uploadGeneratedPng(
+        deps.payload,
+        deps.env.PAYLOAD_URL,
+        cardsEn.og,
+        `${data.write.en.title} — social OG card`,
+      ),
+      uploadGeneratedPng(
+        deps.payload,
+        deps.env.PAYLOAD_URL,
+        cardsEn.portrait,
+        `${data.write.en.title} — Instagram card (EN)`,
+      ),
+      uploadGeneratedPng(
+        deps.payload,
+        deps.env.PAYLOAD_URL,
+        cardsUr.portrait,
+        `${data.write.ur.title} — Instagram card (UR)`,
+      ),
+    ])
+
+    if (!heroMediaId && ogEn?.id) {
+      heroMediaId = ogEn.id
+    }
+
+    for (const u of [portraitEn?.url, portraitUr?.url, ogEn?.url]) {
+      if (u && !socialMediaUrls.includes(u)) socialMediaUrls.push(u)
+    }
+  } catch (e) {
+    logger.warn({ err: e }, 'social card render/upload skipped')
+  }
 
   await deps.publishQueue.add(
     'publish',
@@ -78,6 +147,7 @@ export async function processMediaJob(
       clusterId: data.clusterId,
       write: data.write,
       heroMediaId,
+      socialMediaUrls,
       qaScore: data.qaScore,
       priority: data.priority,
     },

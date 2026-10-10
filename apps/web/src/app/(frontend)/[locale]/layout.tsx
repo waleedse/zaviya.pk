@@ -5,6 +5,8 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { FrontendShell, defaultLangHref } from '@/components/layout/FrontendShell'
 import { getBreaking, getCategories, getRatesTicker } from '@/lib/queries'
 import { JsonLd } from '@/components/seo/JsonLd'
+import { AnalyticsScripts } from '@/components/analytics/AnalyticsScripts'
+import Script from 'next/script'
 import { organizationJsonLd, websiteJsonLd } from '@/lib/seo'
 import '../styles.css'
 
@@ -40,6 +42,15 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={`${inter.variable} ${newsreader.variable} ${locale === 'ur' ? `${gulzar.variable} ${nastaliq.variable}` : ''}`}>
       <body className="min-h-screen pb-16 md:pb-0">
+        <AnalyticsScripts />
+        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT ? (
+          <Script
+            id="adsense-global"
+            strategy="lazyOnload"
+            crossOrigin="anonymous"
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
+          />
+        ) : null}
         <ThemeProvider>
           <JsonLd data={[organizationJsonLd(), websiteJsonLd(locale)]} />
           <FrontendShell locale={locale} categories={categories} rates={rates} breaking={breaking} langHref={langHref}>

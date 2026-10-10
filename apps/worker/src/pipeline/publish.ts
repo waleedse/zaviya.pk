@@ -31,6 +31,7 @@ export async function processPublishJob(
     clusterId: string
     write: WriteResult
     heroMediaId?: string
+    socialMediaUrls?: string[]
     qaScore: number
     priority: Priority
     triage?: TriageResult
@@ -119,7 +120,7 @@ export async function processPublishJob(
         platform: platforms[i],
         priority: data.priority,
         copy: data.write.en.socialCopy,
-        mediaUrls: [],
+        mediaUrls: data.socialMediaUrls ?? [],
       },
       {
         delay: Math.max(0, (slots[i]?.getTime() ?? Date.now()) - Date.now()),

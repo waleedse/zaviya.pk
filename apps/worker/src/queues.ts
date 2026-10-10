@@ -221,6 +221,7 @@ export async function createWorkerRuntime(
           clusterId: string
           write: WriteResult
           heroMediaId?: string
+          socialMediaUrls?: string[]
           qaScore: number
           priority: Priority
         }
