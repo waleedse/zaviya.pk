@@ -69,6 +69,21 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    articles: Article;
+    categories: Category;
+    tags: Tag;
+    authors: Author;
+    pages: Page;
+    'data-pages': DataPage;
+    'data-points': DataPoint;
+    sources: Source;
+    'source-items': SourceItem;
+    'story-clusters': StoryCluster;
+    'review-queue': ReviewQueue;
+    'social-posts': SocialPost;
+    'audit-log': AuditLog;
+    'prompt-versions': PromptVersion;
+    'metrics-daily': MetricsDaily;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,18 +93,37 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    articles: ArticlesSelect<false> | ArticlesSelect<true>;
+    categories: CategoriesSelect<false> | CategoriesSelect<true>;
+    tags: TagsSelect<false> | TagsSelect<true>;
+    authors: AuthorsSelect<false> | AuthorsSelect<true>;
+    pages: PagesSelect<false> | PagesSelect<true>;
+    'data-pages': DataPagesSelect<false> | DataPagesSelect<true>;
+    'data-points': DataPointsSelect<false> | DataPointsSelect<true>;
+    sources: SourcesSelect<false> | SourcesSelect<true>;
+    'source-items': SourceItemsSelect<false> | SourceItemsSelect<true>;
+    'story-clusters': StoryClustersSelect<false> | StoryClustersSelect<true>;
+    'review-queue': ReviewQueueSelect<false> | ReviewQueueSelect<true>;
+    'social-posts': SocialPostsSelect<false> | SocialPostsSelect<true>;
+    'audit-log': AuditLogSelect<false> | AuditLogSelect<true>;
+    'prompt-versions': PromptVersionsSelect<false> | PromptVersionsSelect<true>;
+    'metrics-daily': MetricsDailySelect<false> | MetricsDailySelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
-  fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
-  locale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'ur') | ('en' | 'ur')[];
+  globals: {
+    settings: Setting;
+  };
+  globalsSelect: {
+    settings: SettingsSelect<false> | SettingsSelect<true>;
+  };
+  locale: 'en' | 'ur';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -122,14 +156,20 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
+  role: 'admin' | 'editor' | 'bot';
   updatedAt: string;
   createdAt: string;
+  enableAPIKey?: boolean | null;
+  apiKey?: string | null;
+  apiKeyIndex?: string | null;
+  hasAPIKey?: boolean | null;
   email: string;
   resetPasswordToken?: string | null;
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -147,8 +187,11 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
   alt: string;
+  credit?: string | null;
+  license?: ('own' | 'ai-generated' | 'handout' | 'wikimedia' | 'stock') | null;
+  isAiGenerated?: boolean | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -160,13 +203,489 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+  sizes?: {
+    thumb?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    card?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    hero?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    square?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+    portrait?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
+  };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "articles".
+ */
+export interface Article {
+  id: number;
+  title: string;
+  titleVariants?:
+    | {
+        variant?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  slug: string;
+  dek?: string | null;
+  keyPoints?:
+    | {
+        point?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  whatItMeans?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  faqs?:
+    | {
+        q: string;
+        a: string;
+        id?: string | null;
+      }[]
+    | null;
+  category: number | Category;
+  tags?: (number | Tag)[] | null;
+  author?: (number | null) | Author;
+  heroImage?: (number | null) | Media;
+  sources?:
+    | {
+        name: string;
+        url: string;
+        tier: number;
+        publishedAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  embeds?:
+    | {
+        type: 'x' | 'instagram' | 'youtube';
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  storyCluster?: (number | null) | StoryCluster;
+  isLive?: boolean | null;
+  updates?:
+    | {
+        at: string;
+        text?: {
+          en?: string | null;
+          ur?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  isBreaking?: boolean | null;
+  priority?: ('normal' | 'high' | 'breaking') | null;
+  workflow?: ('draft' | 'in_review' | 'approved' | 'published' | 'retracted') | null;
+  publishedAt?: string | null;
+  seo?: {
+    metaTitle?: string | null;
+    metaDescription?: string | null;
+    ogImage?: (number | null) | Media;
+    canonical?: string | null;
+    noindex?: boolean | null;
+  };
+  ai?: {
+    model?: string | null;
+    promptVersion?: string | null;
+    triageScore?: number | null;
+    qaScore?: number | null;
+    originality?: number | null;
+    generatedAt?: string | null;
+    tokens?: number | null;
+  };
+  corrections?:
+    | {
+        at: string;
+        note: string;
+        id?: string | null;
+      }[]
+    | null;
+  readingTime?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "categories".
+ */
+export interface Category {
+  id: number;
+  name: string;
+  slug: 'pakistan' | 'world' | 'business' | 'tech-telecom' | 'autos' | 'cricket' | 'education-jobs' | 'trending';
+  color: string;
+  description?: string | null;
+  order?: number | null;
+  showInNav?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags".
+ */
+export interface Tag {
+  id: number;
+  name: string;
+  slug: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "authors".
+ */
+export interface Author {
+  id: number;
+  name: string;
+  slug: string;
+  role?: string | null;
+  bio?: string | null;
+  avatar?: (number | null) | Media;
+  socials?:
+    | {
+        platform: string;
+        url: string;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-clusters".
+ */
+export interface StoryCluster {
+  id: number;
+  headline: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  itemCount?: number | null;
+  distinctSources?: number | null;
+  /**
+   * Best (most trusted) tier in cluster: minimum numeric tier (1 = official/wire).
+   */
+  maxTier?: number | null;
+  status: 'new' | 'triaged' | 'rejected' | 'in_review' | 'writing' | 'published' | 'updated';
+  triage?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  article?: (number | null) | Article;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages".
+ */
+export interface Page {
+  id: number;
+  title: string;
+  slug: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-pages".
+ */
+export interface DataPage {
+  id: number;
+  key: 'gold' | 'usd-pkr' | 'petrol';
+  title: string;
+  slug: string;
+  intro?: string | null;
+  faqs?:
+    | {
+        q: string;
+        a: string;
+        id?: string | null;
+      }[]
+    | null;
+  latestSnapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-points".
+ */
+export interface DataPoint {
+  id: number;
+  series:
+    | 'gold_24k_tola'
+    | 'gold_22k_tola'
+    | 'usd_interbank'
+    | 'usd_open_buy'
+    | 'usd_open_sell'
+    | 'petrol_super'
+    | 'hsd'
+    | 'kerosene';
+  city?: string | null;
+  value: number;
+  unit: string;
+  source: string;
+  observedAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sources".
+ */
+export interface Source {
+  id: number;
+  key: string;
+  name: string;
+  url: string;
+  type: 'rss' | 'gnews' | 'x_account' | 'x_list' | 'data';
+  trustTier: number;
+  language?: ('en' | 'ur' | 'mixed') | null;
+  categoryHint?: string | null;
+  pollIntervalSec?: number | null;
+  enabled?: boolean | null;
+  lastPolledAt?: string | null;
+  etag?: string | null;
+  robotsOk?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "source-items".
+ */
+export interface SourceItem {
+  id: number;
+  source: number | Source;
+  externalId: string;
+  url: string;
+  title: string;
+  summary?: string | null;
+  contentText?: string | null;
+  publishedAt: string;
+  lang?: ('en' | 'ur') | null;
+  cluster?: (number | null) | StoryCluster;
+  hash?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-queue".
+ */
+export interface ReviewQueue {
+  id: number;
+  cluster: number | StoryCluster;
+  article?: (number | null) | Article;
+  reason: string;
+  flags?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  telegramMessageId?: string | null;
+  decision?: ('approve' | 'reject' | 'hold' | 'edit') | null;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "social-posts".
+ */
+export interface SocialPost {
+  id: number;
+  article: number | Article;
+  platform: 'facebook' | 'instagram' | 'x' | 'whatsapp';
+  format: 'link' | 'card' | 'carousel' | 'reel' | 'text';
+  copy: string;
+  mediaUrls?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  status: 'queued' | 'posting' | 'posted' | 'failed' | 'deleted';
+  scheduledAt?: string | null;
+  postedAt?: string | null;
+  externalId?: string | null;
+  via?: ('api' | 'extension') | null;
+  idempotencyKey: string;
+  error?: string | null;
+  metrics?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-log".
+ */
+export interface AuditLog {
+  id: number;
+  entity: string;
+  entityId: string;
+  action: string;
+  actor: string;
+  payload?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  at: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "prompt-versions".
+ */
+export interface PromptVersion {
+  id: number;
+  key: 'triage' | 'write_en' | 'write_ur' | 'qa' | 'social_copy';
+  version: number;
+  template: string;
+  active?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "metrics-daily".
+ */
+export interface MetricsDaily {
+  id: number;
+  article: number | Article;
+  date: string;
+  gscImpressions?: number | null;
+  gscClicks?: number | null;
+  gscCtr?: number | null;
+  gscPosition?: number | null;
+  pageviews?: number | null;
+  fbReach?: number | null;
+  igReach?: number | null;
+  xImpressions?: number | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
-  id: string;
+  id: number;
   key: string;
   data:
     | {
@@ -183,20 +702,80 @@ export interface PayloadKv {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'articles';
+        value: number | Article;
+      } | null)
+    | ({
+        relationTo: 'categories';
+        value: number | Category;
+      } | null)
+    | ({
+        relationTo: 'tags';
+        value: number | Tag;
+      } | null)
+    | ({
+        relationTo: 'authors';
+        value: number | Author;
+      } | null)
+    | ({
+        relationTo: 'pages';
+        value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'data-pages';
+        value: number | DataPage;
+      } | null)
+    | ({
+        relationTo: 'data-points';
+        value: number | DataPoint;
+      } | null)
+    | ({
+        relationTo: 'sources';
+        value: number | Source;
+      } | null)
+    | ({
+        relationTo: 'source-items';
+        value: number | SourceItem;
+      } | null)
+    | ({
+        relationTo: 'story-clusters';
+        value: number | StoryCluster;
+      } | null)
+    | ({
+        relationTo: 'review-queue';
+        value: number | ReviewQueue;
+      } | null)
+    | ({
+        relationTo: 'social-posts';
+        value: number | SocialPost;
+      } | null)
+    | ({
+        relationTo: 'audit-log';
+        value: number | AuditLog;
+      } | null)
+    | ({
+        relationTo: 'prompt-versions';
+        value: number | PromptVersion;
+      } | null)
+    | ({
+        relationTo: 'metrics-daily';
+        value: number | MetricsDaily;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -206,10 +785,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -229,7 +808,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -240,13 +819,19 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
   updatedAt?: T;
   createdAt?: T;
+  enableAPIKey?: T;
+  apiKey?: T;
+  apiKeyIndex?: T;
+  hasAPIKey?: T;
   email?: T;
   resetPasswordToken?: T;
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -263,6 +848,9 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  credit?: T;
+  license?: T;
+  isAiGenerated?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -274,6 +862,384 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+  sizes?:
+    | T
+    | {
+        thumb?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        card?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        hero?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        square?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        portrait?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "articles_select".
+ */
+export interface ArticlesSelect<T extends boolean = true> {
+  title?: T;
+  titleVariants?:
+    | T
+    | {
+        variant?: T;
+        id?: T;
+      };
+  slug?: T;
+  dek?: T;
+  keyPoints?:
+    | T
+    | {
+        point?: T;
+        id?: T;
+      };
+  body?: T;
+  whatItMeans?: T;
+  faqs?:
+    | T
+    | {
+        q?: T;
+        a?: T;
+        id?: T;
+      };
+  category?: T;
+  tags?: T;
+  author?: T;
+  heroImage?: T;
+  sources?:
+    | T
+    | {
+        name?: T;
+        url?: T;
+        tier?: T;
+        publishedAt?: T;
+        id?: T;
+      };
+  embeds?:
+    | T
+    | {
+        type?: T;
+        url?: T;
+        id?: T;
+      };
+  storyCluster?: T;
+  isLive?: T;
+  updates?:
+    | T
+    | {
+        at?: T;
+        text?:
+          | T
+          | {
+              en?: T;
+              ur?: T;
+            };
+        id?: T;
+      };
+  isBreaking?: T;
+  priority?: T;
+  workflow?: T;
+  publishedAt?: T;
+  seo?:
+    | T
+    | {
+        metaTitle?: T;
+        metaDescription?: T;
+        ogImage?: T;
+        canonical?: T;
+        noindex?: T;
+      };
+  ai?:
+    | T
+    | {
+        model?: T;
+        promptVersion?: T;
+        triageScore?: T;
+        qaScore?: T;
+        originality?: T;
+        generatedAt?: T;
+        tokens?: T;
+      };
+  corrections?:
+    | T
+    | {
+        at?: T;
+        note?: T;
+        id?: T;
+      };
+  readingTime?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "categories_select".
+ */
+export interface CategoriesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  color?: T;
+  description?: T;
+  order?: T;
+  showInNav?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tags_select".
+ */
+export interface TagsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "authors_select".
+ */
+export interface AuthorsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  role?: T;
+  bio?: T;
+  avatar?: T;
+  socials?:
+    | T
+    | {
+        platform?: T;
+        url?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages_select".
+ */
+export interface PagesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  body?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-pages_select".
+ */
+export interface DataPagesSelect<T extends boolean = true> {
+  key?: T;
+  title?: T;
+  slug?: T;
+  intro?: T;
+  faqs?:
+    | T
+    | {
+        q?: T;
+        a?: T;
+        id?: T;
+      };
+  latestSnapshot?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-points_select".
+ */
+export interface DataPointsSelect<T extends boolean = true> {
+  series?: T;
+  city?: T;
+  value?: T;
+  unit?: T;
+  source?: T;
+  observedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sources_select".
+ */
+export interface SourcesSelect<T extends boolean = true> {
+  key?: T;
+  name?: T;
+  url?: T;
+  type?: T;
+  trustTier?: T;
+  language?: T;
+  categoryHint?: T;
+  pollIntervalSec?: T;
+  enabled?: T;
+  lastPolledAt?: T;
+  etag?: T;
+  robotsOk?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "source-items_select".
+ */
+export interface SourceItemsSelect<T extends boolean = true> {
+  source?: T;
+  externalId?: T;
+  url?: T;
+  title?: T;
+  summary?: T;
+  contentText?: T;
+  publishedAt?: T;
+  lang?: T;
+  cluster?: T;
+  hash?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "story-clusters_select".
+ */
+export interface StoryClustersSelect<T extends boolean = true> {
+  headline?: T;
+  firstSeenAt?: T;
+  lastSeenAt?: T;
+  itemCount?: T;
+  distinctSources?: T;
+  maxTier?: T;
+  status?: T;
+  triage?: T;
+  article?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "review-queue_select".
+ */
+export interface ReviewQueueSelect<T extends boolean = true> {
+  cluster?: T;
+  article?: T;
+  reason?: T;
+  flags?: T;
+  telegramMessageId?: T;
+  decision?: T;
+  decidedBy?: T;
+  decidedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "social-posts_select".
+ */
+export interface SocialPostsSelect<T extends boolean = true> {
+  article?: T;
+  platform?: T;
+  format?: T;
+  copy?: T;
+  mediaUrls?: T;
+  status?: T;
+  scheduledAt?: T;
+  postedAt?: T;
+  externalId?: T;
+  via?: T;
+  idempotencyKey?: T;
+  error?: T;
+  metrics?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-log_select".
+ */
+export interface AuditLogSelect<T extends boolean = true> {
+  entity?: T;
+  entityId?: T;
+  action?: T;
+  actor?: T;
+  payload?: T;
+  at?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "prompt-versions_select".
+ */
+export interface PromptVersionsSelect<T extends boolean = true> {
+  key?: T;
+  version?: T;
+  template?: T;
+  active?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "metrics-daily_select".
+ */
+export interface MetricsDailySelect<T extends boolean = true> {
+  article?: T;
+  date?: T;
+  gscImpressions?: T;
+  gscClicks?: T;
+  gscCtr?: T;
+  gscPosition?: T;
+  pageviews?: T;
+  fbReach?: T;
+  igReach?: T;
+  xImpressions?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -314,6 +1280,88 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings".
+ */
+export interface Setting {
+  id: number;
+  thresholds: {
+    publish: number;
+    review: number;
+  };
+  dailyCaps?: {
+    facebook?: number | null;
+    instagram?: number | null;
+    x?: number | null;
+  };
+  publishWindow?: {
+    start?: string | null;
+    end?: string | null;
+  };
+  minIntervalMin?: number | null;
+  activeModels?: {
+    triage?: string | null;
+    write_en?: string | null;
+    write_ur?: string | null;
+    qa?: string | null;
+    embed?: string | null;
+  };
+  killSwitch?: boolean | null;
+  lastHeartbeat?: string | null;
+  lastHeartbeatMeta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "settings_select".
+ */
+export interface SettingsSelect<T extends boolean = true> {
+  thresholds?:
+    | T
+    | {
+        publish?: T;
+        review?: T;
+      };
+  dailyCaps?:
+    | T
+    | {
+        facebook?: T;
+        instagram?: T;
+        x?: T;
+      };
+  publishWindow?:
+    | T
+    | {
+        start?: T;
+        end?: T;
+      };
+  minIntervalMin?: T;
+  activeModels?:
+    | T
+    | {
+        triage?: T;
+        write_en?: T;
+        write_ur?: T;
+        qa?: T;
+        embed?: T;
+      };
+  killSwitch?: T;
+  lastHeartbeat?: T;
+  lastHeartbeatMeta?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

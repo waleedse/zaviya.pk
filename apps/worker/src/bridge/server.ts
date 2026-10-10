@@ -1,0 +1,99 @@
+import { WebSocketServer, WebSocket } from 'ws'
+import { BridgeJobSchema, BridgeMessageSchema, type BridgeJob } from '@zaviya/shared'
+import { logger } from '../logger.js'
+
+interface Pending {
+  resolve: (v: unknown) => void
+  reject: (e: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+export class BridgeServer {
+  private wss: WebSocketServer | null = null
+  private socket: WebSocket | null = null
+  private authenticated = false
+  private tabs: Record<string, boolean> = {}
+  private pending = new Map<string, Pending>()
+
+  constructor(
+    private readonly port: number,
+    private readonly token?: string,
+  ) {}
+
+  start(): void {
+    if (!this.token) {
+      logger.info('Extension bridge disabled — BRIDGE_TOKEN not set')
+      return
+    }
+    this.wss = new WebSocketServer({ host: '127.0.0.1', port: this.port })
+    this.wss.on('connection', (ws) => {
+      ws.on('message', (raw) => this.onMessage(ws, raw.toString()))
+      ws.on('close', () => {
+        if (this.socket === ws) {
+          this.socket = null
+          this.authenticated = false
+        }
+      })
+    })
+    logger.info({ port: this.port }, 'Extension bridge listening')
+  }
+
+  stop(): void {
+    this.wss?.close()
+    this.wss = null
+  }
+
+  isConnected(platform: string): boolean {
+    return Boolean(this.authenticated && this.socket && this.tabs[platform])
+  }
+
+  private onMessage(ws: WebSocket, raw: string): void {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return
+    }
+    const msg = BridgeMessageSchema.safeParse(parsed)
+    if (!msg.success) return
+
+    const data = msg.data
+    if ('type' in data && data.type === 'hello') {
+      if (this.token && data.token === this.token) {
+        this.authenticated = true
+        this.socket = ws
+        ws.send(JSON.stringify({ type: 'hello', ok: true }))
+      } else {
+        ws.close(4001, 'unauthorized')
+      }
+      return
+    }
+    if ('type' in data && data.type === 'heartbeat') {
+      this.tabs = data.tabs
+      return
+    }
+    if ('id' in data && 'ok' in data) {
+      const p = this.pending.get(data.id)
+      if (!p) return
+      clearTimeout(p.timer)
+      this.pending.delete(data.id)
+      if (data.ok) p.resolve(data.result)
+      else p.reject(new Error(data.error))
+    }
+  }
+
+  send(job: BridgeJob, timeoutMs = 120_000): Promise<unknown> {
+    if (!this.socket || !this.authenticated) {
+      return Promise.reject(new Error('bridge not connected'))
+    }
+    const parsed = BridgeJobSchema.parse(job)
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(parsed.id)
+        reject(new Error('bridge job timeout'))
+      }, timeoutMs)
+      this.pending.set(parsed.id, { resolve, reject, timer })
+      this.socket!.send(JSON.stringify(parsed))
+    })
+  }
+}

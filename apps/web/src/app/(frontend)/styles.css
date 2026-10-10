@@ -1,164 +1,187 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-urdu-display: var(--font-gulzar), var(--font-nastaliq), serif;
+  --font-urdu-sans: var(--font-nastaliq), serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-breaking: var(--breaking);
+  --color-gold: var(--gold);
+  --color-up: var(--up);
+  --color-down: var(--down);
+
+  --radius-card: 14px;
+  --radius-image: 10px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
+  --text-display: clamp(2.75rem, 2rem + 2.5vw, 4rem);
+  --text-h1: clamp(2rem, 1.5rem + 1.5vw, 3rem);
+  --text-h2: clamp(1.5rem, 1.25rem + 0.75vw, 2rem);
+  --text-h3: clamp(1.1875rem, 1.1rem + 0.35vw, 1.375rem);
+  --text-body: clamp(1.0625rem, 1rem + 0.2vw, 1.1875rem);
+  --text-small: 0.875rem;
+}
+
 :root {
-  --font-mono: 'Roboto Mono', monospace;
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f2f1ec;
+  --fg: #0b0f17;
+  --fg-muted: #5b6170;
+  --border: #e4e2da;
+  --accent: #0e7c5a;
+  --accent-fg: #ffffff;
+  --breaking: #d7263d;
+  --gold: #b8902b;
+  --up: #12805c;
+  --down: #c0392b;
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  --bg: #0b0f17;
+  --surface: #121826;
+  --surface-2: #1a2133;
+  --fg: #ecedee;
+  --fg-muted: #9aa3b2;
+  --border: #232b3d;
+  --accent: #2bb38a;
+  --accent-fg: #04130d;
+  --breaking: #ff4d5e;
+  --gold: #e0b94f;
+  --up: #3dd68c;
+  --down: #ff6b5e;
 }
 
-html {
-  font-size: 18px;
-  line-height: 32px;
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-  background: rgb(0, 0, 0);
-  -webkit-font-smoothing: antialiased;
-}
+  html {
+    @apply scroll-smooth;
+  }
 
-html,
-body,
-#app {
-  height: 100%;
-}
+  body {
+    @apply bg-bg text-fg antialiased;
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.65;
+  }
 
-body {
-  font-family: system-ui;
-  font-size: 18px;
-  line-height: 32px;
+  [dir='rtl'] body {
+    font-family: var(--font-urdu-sans);
+    font-size: calc(var(--text-body) * 1.15);
+    line-height: 2;
+  }
 
-  margin: 0;
-  color: rgb(1000, 1000, 1000);
+  [dir='rtl'] h1,
+  [dir='rtl'] h2,
+  [dir='rtl'] h3,
+  [dir='rtl'] .font-display {
+    font-family: var(--font-urdu-display);
+    line-height: 1.6;
+    letter-spacing: 0;
+  }
 
-  @media (max-width: 1024px) {
-    font-size: 15px;
-    line-height: 24px;
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-h1 {
-  margin: 40px 0;
-  font-size: 64px;
-  line-height: 70px;
-  font-weight: bold;
-
-  @media (max-width: 1024px) {
-    margin: 24px 0;
-    font-size: 42px;
-    line-height: 42px;
+@layer utilities {
+  .container-page {
+    @apply mx-auto w-full max-w-[1280px] px-4 md:px-6;
   }
 
-  @media (max-width: 768px) {
-    font-size: 38px;
-    line-height: 38px;
+  .card-surface {
+    @apply rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)] transition-[transform,border-color] duration-200 ease-out;
   }
 
-  @media (max-width: 400px) {
-    font-size: 32px;
-    line-height: 32px;
-  }
-}
-
-p {
-  margin: 24px 0;
-
-  @media (max-width: 1024px) {
-    margin: calc(var(--base) * 0.75) 0;
-  }
-}
-
-a {
-  color: currentColor;
-
-  &:focus {
-    opacity: 0.8;
-    outline: none;
+  .card-surface:hover {
+    @apply -translate-y-0.5 border-accent/40;
   }
 
-  &:active {
-    opacity: 0.7;
-    outline: none;
-  }
-}
-
-svg {
-  vertical-align: middle;
-}
-
-.home {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  height: 100vh;
-  padding: 45px;
-  max-width: 1024px;
-  margin: 0 auto;
-  overflow: hidden;
-
-  @media (max-width: 400px) {
-    padding: 24px;
+  .kicker-text {
+    @apply text-[12px] font-semibold uppercase tracking-[0.08em];
   }
 
-  .content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex-grow: 1;
+  [dir='rtl'] .kicker-text {
+    @apply normal-case tracking-normal text-[13px];
+  }
 
-    h1 {
-      text-align: center;
+  .line-clamp-headline {
+    @apply line-clamp-3;
+  }
+
+  [dir='rtl'] .line-clamp-headline {
+    @apply line-clamp-2;
+  }
+
+  .prose-article {
+    @apply max-w-[68ch] text-fg;
+  }
+
+  .prose-article p {
+    @apply mb-6;
+  }
+
+  .ticker-scroll {
+    animation: ticker 40s linear infinite;
+  }
+
+  .ticker-scroll:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes ticker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
     }
   }
 
-  .links {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    a {
-      text-decoration: none;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-    }
-
-    .admin {
-      color: rgb(0, 0, 0);
-      background: rgb(1000, 1000, 1000);
-      border: 1px solid rgb(0, 0, 0);
-    }
-
-    .docs {
-      color: rgb(1000, 1000, 1000);
-      background: rgb(0, 0, 0);
-      border: 1px solid rgb(1000, 1000, 1000);
-    }
+  [dir='rtl'] .ticker-scroll {
+    animation-name: ticker-rtl;
   }
 
-  .footer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    @media (max-width: 1024px) {
-      flex-direction: column;
-      gap: 6px;
+  @keyframes ticker-rtl {
+    from {
+      transform: translateX(0);
     }
-
-    p {
-      margin: 0;
-    }
-
-    .codeLink {
-      text-decoration: none;
-      padding: 0 0.5rem;
-      background: rgb(60, 60, 60);
-      border-radius: 4px;
+    to {
+      transform: translateX(50%);
     }
   }
 }

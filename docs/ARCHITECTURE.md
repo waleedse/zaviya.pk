@@ -222,15 +222,59 @@ The types live in `packages/shared/src/types.ts`. The UI only ever imports from 
 - Sitemaps: `/sitemap.xml` (index), `/news-sitemap.xml` (last 48 hours, Google News format), and per-locale sitemaps.
 - IndexNow ping on publish. RSS at `/rss.xml` and `/ur/rss.xml`.
 
-### 5.5 Payload REST endpoints used by the worker
-The worker authenticates with an API key on a `bots` user (`Authorization: users API-Key <key>`).
-- `POST /api/articles` and `PATCH /api/articles/:id` (with `?locale=ur` for the Urdu version)
-- `POST /api/media` (multipart)
-- `GET /api/articles?where[slug][equals]=...`
-- Custom endpoints:
-  - `POST /api/pipeline/internal-links`: given keywords, returns the 5 best internal URLs
-  - `POST /api/pipeline/title-check`: checks a title against existing titles and returns a similarity score
-  - `POST /api/pipeline/retract/:id`: unpublishes the article and returns the social posts to delete
+### 5.5 Pipeline API contract (worker → Payload)
+
+The worker never touches Postgres directly. It only uses these HTTP endpoints, authenticated as a user with `role: 'bot'`:
+
+```
+Authorization: users API-Key <key>
+```
+
+Every pipeline endpoint lives under `/api/pipeline/*` (a Payload custom endpoint on the root config). Each one returns `401` unless the user's role is `bot` or `admin`. Bodies are JSON and validated with Zod, and a validation failure returns `400 {error, issues}`.
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/pipeline/sources` | – | `{ sources: [{id, key, name, url, type, trustTier, language, categoryHint, pollIntervalSec, etag, lastPolledAt}] }` (enabled only) |
+| PATCH | `/api/pipeline/sources/:id` | `{ etag?, lastPolledAt? }` | `{ ok: true }` |
+| POST | `/api/pipeline/source-items` | `{ items: [{ sourceId, externalId, url, title, summary?, contentText?, publishedAt, lang, hash }] }` | `{ inserted: [{id, externalId}], skipped: number }` (unique on sourceId+externalId) |
+| POST | `/api/pipeline/cluster-match` | `{ sourceItemId, embedding: number[768], windowHours?: 48, threshold?: 0.83 }` | `{ clusterId, isNew, similarity }`. The server stores the embedding, then joins the nearest cluster or creates one, updating itemCount, distinctSources and maxTier |
+| GET | `/api/pipeline/clusters/:id` | – | `{ id, headline, status, itemCount, distinctSources, maxTier, triage, article, items: [{id, title, url, summary, contentText, publishedAt, source:{name, trustTier}}] }` |
+| PATCH | `/api/pipeline/clusters/:id` | `{ status?, triage?, article? }` | `{ ok: true }` |
+| POST | `/api/pipeline/articles` | see `PipelineArticleInput` below | `{ id, status, urls: { en?, ur? } }`. Creates the article, or updates it if `articleId` is given |
+| POST | `/api/pipeline/articles/:id/live-update` | `{ at, text: { en?, ur? } }` | `{ ok: true }`. Prepends to `updates`, sets `isLive` |
+| POST | `/api/pipeline/review` | `{ clusterId, articleId?, reason, flags: string[] }` | `{ id }` |
+| PATCH | `/api/pipeline/review/:id` | `{ decision, decidedBy, telegramMessageId? }` | `{ ok: true, clusterId, articleId }` |
+| POST | `/api/pipeline/internal-links` | `{ keywords: string[], locale, limit?: 5 }` | `{ links: [{ title, url }] }` |
+| POST | `/api/pipeline/title-check` | `{ title, locale }` | `{ maxSimilarity: 0..1, closest?: { title, url } }` (trigram / token Jaccard against the last 90 days) |
+| POST | `/api/pipeline/retract/:id` | `{ reason }` | `{ socialPosts: [{ id, platform, externalId }] }`. Sets status `retracted` and unpublishes |
+| POST | `/api/pipeline/data-points` | `{ points: [{ series, city?, value, unit, source, observedAt }] }` | `{ inserted }`, then revalidates the matching data page |
+| POST | `/api/pipeline/social-posts` | `{ idempotencyKey, article, platform, format, copy, mediaUrls, status, scheduledAt?, postedAt?, externalId?, via?, error? }` | `{ id, created: boolean }` (upsert by idempotencyKey) |
+| GET | `/api/pipeline/settings` | – | the `settings` global |
+| POST | `/api/pipeline/heartbeat` | `{ version, queues: Record<string, {waiting, active, failed}> }` | `{ ok: true, killSwitch: boolean }` |
+| POST | `/api/media` | multipart (`file`, `_payload` = JSON `{alt, credit, license, isAiGenerated}`) | standard Payload doc |
+
+```ts
+// PipelineArticleInput
+{
+  articleId?: string            // update when present
+  clusterId?: string
+  category: CategorySlug
+  priority: 'normal'|'high'|'breaking'
+  isBreaking?: boolean
+  isLive?: boolean
+  status: 'draft'|'in_review'|'published'
+  heroMediaId?: string
+  sources: { name, url, tier: 1|2|3, publishedAt? }[]
+  embeds?: { type: 'x'|'instagram'|'youtube', url }[]
+  ai: { model, promptVersion, triageScore?, qaScore?, originality?, generatedAt }
+  locales: Partial<Record<'en'|'ur', {
+    title: string, titleVariants: string[], slug: string, dek: string,
+    keyPoints: string[], bodyMarkdown: string, whatItMeans: string,
+    faqs: {q,a}[], tags: string[], metaDescription?: string, altText?: string
+  }>>
+}
+```
+The server converts `bodyMarkdown` and `whatItMeans` from Markdown to Lexical using `convertMarkdownToLexical` from `@payloadcms/richtext-lexical`. Tags are found by slug or created if missing.
 
 ## 6. Worker (apps/worker)
 

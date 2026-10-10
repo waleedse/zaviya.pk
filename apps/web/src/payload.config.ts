@@ -1,26 +1,99 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { s3Storage } from '@payloadcms/storage-s3'
 import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import { sql } from '@payloadcms/db-postgres'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { Articles } from './collections/Articles'
+import { Categories } from './collections/Categories'
+import { Tags } from './collections/Tags'
+import { Authors } from './collections/Authors'
+import { Pages } from './collections/Pages'
+import { DataPages } from './collections/DataPages'
+import { DataPoints } from './collections/DataPoints'
+import { Sources } from './collections/Sources'
+import { SourceItems } from './collections/SourceItems'
+import { StoryClusters } from './collections/StoryClusters'
+import { ReviewQueue } from './collections/ReviewQueue'
+import { SocialPosts } from './collections/SocialPosts'
+import { AuditLog } from './collections/AuditLog'
+import { PromptVersions } from './collections/PromptVersions'
+import { MetricsDaily } from './collections/MetricsDaily'
+import { Settings } from './globals/Settings'
+import { pipelineEndpointsExport } from './endpoints/pipeline'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+const r2Enabled =
+  Boolean(process.env.R2_ACCOUNT_ID) &&
+  Boolean(process.env.R2_ACCESS_KEY_ID) &&
+  Boolean(process.env.R2_SECRET_ACCESS_KEY) &&
+  Boolean(process.env.R2_BUCKET)
+
+const plugins = r2Enabled
+  ? [
+      s3Storage({
+        collections: { media: true },
+        bucket: process.env.R2_BUCKET!,
+        config: {
+          credentials: {
+            accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+          },
+          region: 'auto',
+          endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        },
+      }),
+    ]
+  : []
+
 export default buildConfig({
   admin: {
     user: Users.slug,
+    meta: {
+      title: 'Zaviya Admin',
+    },
     importMap: {
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media],
+  collections: [
+    Users,
+    Media,
+    Articles,
+    Categories,
+    Tags,
+    Authors,
+    Pages,
+    DataPages,
+    DataPoints,
+    Sources,
+    SourceItems,
+    StoryClusters,
+    ReviewQueue,
+    SocialPosts,
+    AuditLog,
+    PromptVersions,
+    MetricsDaily,
+  ],
+  globals: [Settings],
+  localization: {
+    locales: [
+      { label: 'English', code: 'en' },
+      { label: 'اردو', code: 'ur', rtl: true },
+    ],
+    defaultLocale: 'en',
+    fallback: false,
+  },
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
+  serverURL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
@@ -30,5 +103,33 @@ export default buildConfig({
     },
   }),
   sharp,
-  plugins: [],
+  plugins,
+  endpoints: pipelineEndpointsExport,
+  onInit: async (payload) => {
+    try {
+      const drizzle = payload.db.drizzle
+      await drizzle.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`)
+      await drizzle.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`)
+
+      await drizzle.execute(sql`
+        DO $$ BEGIN
+          ALTER TABLE source_items ADD COLUMN embedding vector(768);
+        EXCEPTION
+          WHEN duplicate_column THEN NULL;
+        END $$
+      `)
+
+      await drizzle.execute(sql`
+        CREATE INDEX IF NOT EXISTS source_items_embedding_hnsw_idx
+        ON source_items USING hnsw (embedding vector_cosine_ops)
+      `)
+
+      await drizzle.execute(sql`
+        CREATE INDEX IF NOT EXISTS articles_locales_title_trgm_idx
+        ON articles_locales USING gin (title gin_trgm_ops)
+      `)
+    } catch (err) {
+      payload.logger.error({ err }, 'onInit vector/trgm setup failed (may retry on next boot)')
+    }
+  },
 })
