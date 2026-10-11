@@ -41,14 +41,14 @@ services:
       dockerfile: infra/web.Dockerfile
       network: host
       args:
-        BUILD_DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@127.0.0.1:5434/zaviya
+        BUILD_DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@127.0.0.1:5434/${DB_NAME:-zaviya}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL}
         NEXT_PUBLIC_WHATSAPP_CHANNEL_URL: ${NEXT_PUBLIC_WHATSAPP_CHANNEL_URL:-}
         NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
     restart: unless-stopped
     env_file: ${ENV_DIR:-../../env}/web.env
     environment:
-      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/zaviya
+      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/${DB_NAME:-zaviya}
       NODE_ENV: production
     ports:
       - '127.0.0.1:3100:3000'
