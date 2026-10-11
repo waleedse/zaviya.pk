@@ -1,4 +1,5 @@
 import { getPayloadClient } from '@/lib/payload'
+import { newsSitemapEntry } from '@/lib/news-sitemap'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 const publicationName = 'Zaviya'
@@ -12,6 +13,8 @@ export async function GET() {
     const articles = await payload.find({
       collection: 'articles',
       locale,
+      // Never show English text under /ur: a missing translation must come back empty so it is skipped.
+      fallbackLocale: false,
       where: {
         and: [
           { _status: { equals: 'published' } },
@@ -25,23 +28,8 @@ export async function GET() {
       overrideAccess: true,
     })
     for (const a of articles.docs) {
-      const cat =
-        typeof a.category === 'object' && a.category ? (a.category as { slug: string }).slug : 'news'
-      const slug = String(a.slug ?? '')
-      const loc = locale === 'ur' ? `${siteUrl}/ur/${cat}/${slug}` : `${siteUrl}/${cat}/${slug}`
-      const lang = locale === 'ur' ? 'ur' : 'en'
-      urls.push(`
-  <url>
-    <loc>${escapeXml(loc)}</loc>
-    <news:news>
-      <news:publication>
-        <news:name>${publicationName}</news:name>
-        <news:language>${lang}</news:language>
-      </news:publication>
-      <news:publication_date>${a.publishedAt ?? a.createdAt}</news:publication_date>
-      <news:title>${escapeXml(String(a.title ?? ''))}</news:title>
-    </news:news>
-  </url>`)
+      const entry = newsSitemapEntry(a, locale, siteUrl, publicationName)
+      if (entry) urls.push(entry)
     }
   }
 
@@ -53,8 +41,4 @@ export async function GET() {
   return new Response(xml, {
     headers: { 'Content-Type': 'application/xml; charset=utf-8' },
   })
-}
-
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
