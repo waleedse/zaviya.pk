@@ -72,5 +72,12 @@ done
 echo "$RELEASE" > "$STATE/current"
 echo "$NEXT" > "$STATE/colour"
 echo "$(date -u +%FT%TZ) $RELEASE $SHA ok ($NEXT)" >> "$STATE/history.log"
+# Each release is several GB: keep only this release and the previous one (for rollback).
+for repo in zaviya-web zaviya-worker zaviya-agents; do
+  docker images "$repo" --format '{{.Tag}}' | while read -r tag; do
+    [ "$tag" = "$RELEASE" ] || [ "$tag" = "$PREVIOUS" ] || docker rmi "$repo:$tag" >/dev/null 2>&1 || true
+  done
+done
 docker image prune -f >/dev/null
-echo "==> $RELEASE is live on $NEXT"
+docker builder prune -f --filter until=24h >/dev/null 2>&1 || true
+echo "==> $RELEASE is live on $NEXT ($(df -h / | awk 'NR==2 {print $4}') disk free)"
