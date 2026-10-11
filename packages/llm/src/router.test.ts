@@ -16,7 +16,8 @@ describe('LLMRouter', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            candidates: [{ content: { parts: [{ text: '{"decision":"reject"}' }] } }],
+            id: 'int_1',
+            steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"decision":"reject"}' }] }],
           }),
           { status: 200 },
         ),

@@ -38,7 +38,7 @@ export function embeddingToPgVector(embedding: number[]): string {
   return `[${embedding.join(',')}]`
 }
 
-const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3100').replace(/\/$/, '')
 
 export async function articlePublicUrls(
   payload: PayloadRequest['payload'],

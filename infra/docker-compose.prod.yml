@@ -1,0 +1,55 @@
+# VPS stack: Postgres (pgvector) + Zaviya web + Caddy (HTTPS).
+# The worker runs on the Mac and talks to the web app over HTTPS only.
+#   cd infra && docker compose -f docker-compose.prod.yml --env-file ../apps/web/.env.production up -d --build
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zaviya
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: zaviya
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U zaviya']
+      interval: 10s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web.Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://zaviya.pk}
+        NEXT_PUBLIC_WHATSAPP_CHANNEL_URL: ${NEXT_PUBLIC_WHATSAPP_CHANNEL_URL:-}
+        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+    restart: unless-stopped
+    env_file: ../apps/web/.env.production
+    environment:
+      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/zaviya
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Local media storage when R2 is not configured
+      - media:/app/apps/web/media
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:

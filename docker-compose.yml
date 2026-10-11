@@ -1,0 +1,93 @@
+# Zaviya on this Mac, all in Docker: website + admin, worker, Postgres and Redis.
+#   docker compose up -d --build        start / rebuild everything
+#   docker compose logs -f worker       follow the worker
+#   docker compose down                 stop (data stays in the volumes)
+# Website: http://localhost:3000   Admin: http://localhost:3000/admin
+# The Chrome extension still runs in your browser and connects to ws://127.0.0.1:8787.
+name: zaviya
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zaviya
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: zaviya
+    ports:
+      # Only this Mac can reach it (5433 so it never clashes with a Homebrew Postgres on 5432)
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U zaviya']
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6380:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/web.Dockerfile
+      # Pre-rendering reads the database: start postgres first, then build
+      network: host
+      args:
+        BUILD_DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@127.0.0.1:5433/zaviya
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://zaviya.pk}
+        NEXT_PUBLIC_WHATSAPP_CHANNEL_URL: ${NEXT_PUBLIC_WHATSAPP_CHANNEL_URL:-}
+        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+    restart: unless-stopped
+    env_file: apps/web/.env
+    environment:
+      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/zaviya
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      # Uploaded images live on the Mac, so they survive rebuilds
+      - ./apps/web/media:/app/apps/web/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/robots.txt').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      start_period: 60s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/worker.Dockerfile
+    restart: unless-stopped
+    env_file: apps/worker/.env
+    environment:
+      PAYLOAD_URL: http://web:3000
+      # Media links handed to the browser extension must open from the Mac
+      PUBLIC_MEDIA_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379
+      BRIDGE_HOST: 0.0.0.0
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:8787:8787'
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:

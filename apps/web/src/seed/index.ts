@@ -369,13 +369,14 @@ async function seed() {
     data: {
       thresholds: { publish: 0.72, review: 0.5 },
       dailyCaps: { facebook: 15, instagram: 8, x: 12 },
-      publishWindow: { start: '08:00', end: '00:00' },
-      minIntervalMin: 45,
+      publishWindow: { start: '00:00', end: '24:00' },
+      minIntervalMin: 20,
+      // Free hybrid: local model for short JSON jobs, Gemini free tier (rotating models) for writing.
       activeModels: {
-        triage: 'ollama:qwen3:4b',
-        write_en: 'ollama:qwen3:8b',
-        write_ur: 'ollama:qalb:8b-q4',
-        qa: 'ollama:qwen3:4b',
+        triage: 'ollama:qwen3:8b',
+        write_en: 'gemini:gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview',
+        write_ur: 'gemini:gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview',
+        qa: 'ollama:qwen3:8b',
         embed: 'ollama:nomic-embed-text',
       },
       killSwitch: false,
@@ -417,38 +418,7 @@ async function seed() {
     }
   }
 
-  const seriesSeed = [
-    { series: 'gold_24k_tola' as const, base: 412500, unit: 'PKR', source: 'APSGJA' },
-    { series: 'usd_interbank' as const, base: 281.4, unit: 'PKR', source: 'SBP' },
-    { series: 'usd_open_sell' as const, base: 283.1, unit: 'PKR', source: 'FAP' },
-    { series: 'petrol_super' as const, base: 254.6, unit: 'PKR', source: 'OGRA' },
-  ]
-  for (const s of seriesSeed) {
-    for (let d = 0; d < 30; d++) {
-      const observedAt = new Date(Date.now() - d * 86_400_000).toISOString()
-      const jitter = 1 + Math.sin(d / 4) * 0.008
-      const value = Math.round(s.base * jitter * (s.series.includes('usd') ? 1000 : 1)) / (s.series.includes('usd') ? 1000 : 1)
-      const dup = await payload.find({
-        collection: 'data-points',
-        where: {
-          and: [{ series: { equals: s.series } }, { observedAt: { equals: observedAt } }],
-        },
-        limit: 1,
-      })
-      if (!dup.docs[0]) {
-        await payload.create({
-          collection: 'data-points',
-          data: {
-            series: s.series,
-            value,
-            unit: s.unit,
-            source: s.source,
-            observedAt,
-          },
-        })
-      }
-    }
-  }
+  // Rates come only from the worker's real fetchers; never seed invented numbers.
 
   const sampleArticles = [
     {
@@ -489,7 +459,8 @@ async function seed() {
     },
   ]
 
-  for (const sample of sampleArticles) {
+  // Sample stories are invented; only load them for local demos (ZAVIYA_DEMO_DATA=1).
+  for (const sample of process.env.ZAVIYA_DEMO_DATA === '1' ? sampleArticles : []) {
     const cat = await payload.find({
       collection: 'categories',
       where: { slug: { equals: sample.category } },

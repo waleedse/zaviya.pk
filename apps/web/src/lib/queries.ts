@@ -17,7 +17,7 @@ import {
   type RateTick,
   type RateSeries,
 } from '@zaviya/shared'
-import { categoryRef, mockArticle, mockCards, mockDataPage, mockRates, articleHref } from './mock'
+import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './mock'
 import { getPayloadClient } from './payload'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
@@ -41,10 +41,17 @@ function paginate<T>(items: T[], page: number, size = PAGE_SIZE): Paginated<T> {
   return { docs: items.slice((p - 1) * size, p * size), page: p, totalPages, totalDocs: items.length }
 }
 
+/** Files served by this app are referenced by path, so next/image and any domain work the same. */
+function localMediaPath(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  const m = /^https?:\/\/[^/]+(\/api\/media\/.*)$/.exec(url)
+  return m ? m[1] : url
+}
+
 function mapMedia(m: Media | number | null | undefined, locale: Locale): ImageRef | undefined {
   if (!m || typeof m === 'number') return undefined
   const alt = typeof m.alt === 'string' ? m.alt : (m.alt as Record<string, string> | undefined)?.[locale] ?? ''
-  const url = m.url ?? ''
+  const url = localMediaPath(m.url) ?? ''
   const sizes = m.sizes
   return {
     url,
@@ -55,11 +62,11 @@ function mapMedia(m: Media | number | null | undefined, locale: Locale): ImageRe
     isAiGenerated: m.isAiGenerated ?? undefined,
     sizes: sizes
       ? {
-          thumb: sizes.thumb?.url ?? undefined,
-          card: sizes.card?.url ?? undefined,
-          hero: sizes.hero?.url ?? undefined,
-          square: sizes.square?.url ?? undefined,
-          portrait: sizes.portrait?.url ?? undefined,
+          thumb: localMediaPath(sizes.thumb?.url),
+          card: localMediaPath(sizes.card?.url),
+          hero: localMediaPath(sizes.hero?.url),
+          square: localMediaPath(sizes.square?.url),
+          portrait: localMediaPath(sizes.portrait?.url),
         }
       : undefined,
   }
@@ -83,6 +90,11 @@ function mapAuthor(a: Author | number | null | undefined, locale: Locale) {
     role: a.role ?? undefined,
     avatar: mapMedia(a.avatar as Media | number | null, locale),
   }
+}
+
+/** Mock stories/rates are for local demos only; never show invented news on a real site. */
+function demoData(): boolean {
+  return process.env.ZAVIYA_DEMO_DATA === '1'
 }
 
 async function hasPublishedArticles(): Promise<boolean> {
@@ -173,37 +185,28 @@ export const getCategories = cache(async (locale: Locale): Promise<CategoryRef[]
   return CATEGORIES.map((c) => categoryRef(c.slug, locale))
 })
 
-export const getHomeFeed = cache(async (locale: Locale): Promise<HomeFeed> => {
-  if (!(await hasPublishedArticles())) {
-    const all = mockCards(locale)
-    const rails = CATEGORIES.map((c) => ({
-      category: categoryRef(c.slug, locale),
-      articles: all.filter((a) => a.category.slug === c.slug).slice(0, 4),
-    })).filter((r) => r.articles.length > 0)
-    return {
-      hero: all[0] ?? null,
-      secondary: all.slice(1, 4),
-      live: all.filter((a) => a.isLive),
-      latest: all.slice(0, 12),
-      explainers: all.filter((a) => a.category.slug === 'trending' || a.category.slug === 'business').slice(0, 3),
-      mostRead: all.slice(3, 13),
-      rails,
-    }
-  }
-  const all = await loadPublishedCards(locale, 80)
+/** The front page holds a lot of stories: lead, 4 seconds, a 30-story latest river and 6-story section rails. */
+function homeFeedFrom(all: ArticleCard[], locale: Locale): HomeFeed {
   const rails = CATEGORIES.map((c) => ({
     category: categoryRef(c.slug, locale),
-    articles: all.filter((a) => a.category.slug === c.slug).slice(0, 4),
+    articles: all.filter((a) => a.category.slug === c.slug).slice(0, 6),
   })).filter((r) => r.articles.length > 0)
   return {
     hero: all[0] ?? null,
-    secondary: all.slice(1, 4),
+    secondary: all.slice(1, 5),
     live: all.filter((a) => a.isLive),
-    latest: all.slice(0, 12),
+    latest: all.slice(0, 40),
     explainers: all.filter((a) => a.category.slug === 'trending' || a.category.slug === 'business').slice(0, 3),
     mostRead: all.slice(3, 13),
     rails,
   }
+}
+
+export const getHomeFeed = cache(async (locale: Locale): Promise<HomeFeed> => {
+  if (demoData() && !(await hasPublishedArticles())) {
+    return homeFeedFrom(mockCards(locale), locale)
+  }
+  return homeFeedFrom(await loadPublishedCards(locale, 120), locale)
 })
 
 async function mapArticleFullFromDoc(doc: Article, locale: Locale): Promise<ArticleFull> {
@@ -230,7 +233,7 @@ async function mapArticleFullFromDoc(doc: Article, locale: Locale): Promise<Arti
   const seoGroup = doc.seo
   const og =
     seoGroup?.ogImage && typeof seoGroup.ogImage === 'object'
-      ? (seoGroup.ogImage as Media).url ?? undefined
+      ? localMediaPath((seoGroup.ogImage as Media).url)
       : undefined
   return {
     ...card,
@@ -272,7 +275,7 @@ async function mapArticleFullFromDoc(doc: Article, locale: Locale): Promise<Arti
 
 export const getArticle = cache(
   async (locale: Locale, category: string, slug: string): Promise<ArticleFull | null> => {
-    if (!(await hasPublishedArticles())) {
+    if (demoData() && !(await hasPublishedArticles())) {
       const card = mockCards(locale).find((a) => a.slug === slug && a.category.slug === category)
       return card ? mockArticle(card) : null
     }
@@ -301,7 +304,7 @@ export const getArticle = cache(
 )
 
 export const getArticleBySlug = cache(async (locale: Locale, slug: string): Promise<ArticleFull | null> => {
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     const card = mockCards(locale).find((a) => a.slug === slug)
     return card ? mockArticle(card) : null
   }
@@ -323,7 +326,7 @@ export const getArticleBySlug = cache(async (locale: Locale, slug: string): Prom
 export const getCategoryFeed = cache(
   async (locale: Locale, slug: string, page = 1): Promise<Paginated<ArticleCard> | null> => {
     if (!CATEGORIES.some((c) => c.slug === slug)) return null
-    if (!(await hasPublishedArticles())) {
+    if (demoData() && !(await hasPublishedArticles())) {
       return paginate(mockCards(locale).filter((a) => a.category.slug === (slug as CategorySlug)), page)
     }
     const payload = await getPayloadClient()
@@ -374,10 +377,10 @@ export const getTagFeed = cache(
         ? tagDoc.name
         : slug
       : slug
-    if (!(await hasPublishedArticles())) {
+    if (demoData() && !(await hasPublishedArticles())) {
       return { tag: { slug, name: tagName }, feed: paginate(mockCards(locale), page) }
     }
-    if (!tagDoc) return { tag: { slug, name: tagName }, feed: paginate([], page) }
+    if (!tagDoc) return null
     const result = await payload.find({
       collection: 'articles',
       locale,
@@ -414,7 +417,7 @@ export const getAuthor = cache(async (locale: Locale, slug: string, page = 1): P
   const author = authors.docs[0]
   if (!author) {
     if (slug !== 'zaviya-desk') return null
-    if (!(await hasPublishedArticles())) {
+    if (demoData() && !(await hasPublishedArticles())) {
       return {
         slug,
         name: locale === 'ur' ? 'زاویہ ڈیسک' : 'Zaviya Desk',
@@ -430,7 +433,7 @@ export const getAuthor = cache(async (locale: Locale, slug: string, page = 1): P
   }
   const bio =
     typeof author.bio === 'string' ? author.bio : (author.bio as Record<string, string> | undefined)?.[locale]
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     return {
       slug: author.slug,
       name: author.name,
@@ -471,7 +474,7 @@ export const getAuthor = cache(async (locale: Locale, slug: string, page = 1): P
 })
 
 export const getRelated = cache(async (locale: Locale, articleId: string, limit = 4): Promise<ArticleCard[]> => {
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     const all = mockCards(locale)
     const self = all.find((a) => a.id === articleId)
     return all
@@ -512,7 +515,7 @@ export const getRelated = cache(async (locale: Locale, articleId: string, limit 
 })
 
 export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> => {
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).filter((a) => a.isBreaking || a.isLive)
   }
   const payload = await getPayloadClient()
@@ -533,7 +536,7 @@ export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> 
 })
 
 export const getLive = cache(async (locale: Locale): Promise<ArticleCard[]> => {
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).filter((a) => a.isLive)
   }
   const payload = await getPayloadClient()
@@ -551,8 +554,36 @@ export const getLive = cache(async (locale: Locale): Promise<ArticleCard[]> => {
   return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
 })
 
+/** Tags used most across the latest stories: the site's own "trending now" list. */
+export const getTrendingTags = cache(async (locale: Locale, limit = 10): Promise<{ slug: string; name: string; count: number }[]> => {
+  if (demoData() && !(await hasPublishedArticles())) return []
+  const payload = await getPayloadClient()
+  const since = new Date(Date.now() - 3 * 86_400_000).toISOString()
+  const result = await payload.find({
+    collection: 'articles',
+    locale,
+    where: publishedAnd({ publishedAt: { greater_than: since } }),
+    sort: '-publishedAt',
+    limit: 120,
+    depth: 1,
+    overrideAccess: true,
+    select: { tags: true },
+  })
+  const counts = new Map<string, { slug: string; name: string; count: number }>()
+  for (const doc of result.docs) {
+    for (const tag of Array.isArray(doc.tags) ? doc.tags : []) {
+      if (typeof tag !== 'object' || !tag?.slug) continue
+      const name = typeof tag.name === 'string' ? tag.name : String(tag.name ?? tag.slug)
+      const cur = counts.get(tag.slug) ?? { slug: tag.slug, name, count: 0 }
+      cur.count += 1
+      counts.set(tag.slug, cur)
+    }
+  }
+  return [...counts.values()].filter((t) => t.count > 1).sort((a, b) => b.count - a.count).slice(0, limit)
+})
+
 export const getMostRead = cache(async (locale: Locale, limit = 10): Promise<ArticleCard[]> => {
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).slice(2, 2 + limit)
   }
   const cards = await loadPublishedCards(locale, limit + 5)
@@ -573,18 +604,18 @@ async function latestPoint(series: RateSeries): Promise<DataPoint | null> {
   return r.docs[0] ?? null
 }
 
-function rateLabel(series: RateSeries): string {
-  const labels: Record<RateSeries, string> = {
-    gold_24k_tola: 'Gold 24K / tola',
-    gold_22k_tola: 'Gold 22K / tola',
-    usd_interbank: 'USD interbank',
-    usd_open_buy: 'USD open buy',
-    usd_open_sell: 'USD open market',
-    petrol_super: 'Petrol / litre',
-    hsd: 'HSD / litre',
-    kerosene: 'Kerosene / litre',
+function rateLabel(series: RateSeries, locale: Locale = 'en'): string {
+  const labels: Record<RateSeries, [string, string]> = {
+    gold_24k_tola: ['Gold 24K / tola', 'سونا 24 قیراط / تولہ'],
+    gold_22k_tola: ['Gold 22K / tola', 'سونا 22 قیراط / تولہ'],
+    usd_interbank: ['Dollar (market)', 'ڈالر (مارکیٹ)'],
+    usd_open_buy: ['Dollar open buy', 'ڈالر اوپن خرید'],
+    usd_open_sell: ['Dollar open market', 'ڈالر اوپن مارکیٹ'],
+    petrol_super: ['Petrol / litre', 'پیٹرول / لیٹر'],
+    hsd: ['Diesel / litre', 'ڈیزل / لیٹر'],
+    kerosene: ['Kerosene / litre', 'مٹی کا تیل / لیٹر'],
   }
-  return labels[series]
+  return labels[series][locale === 'ur' ? 1 : 0]
 }
 
 function rateHref(series: RateSeries): string {
@@ -593,10 +624,10 @@ function rateHref(series: RateSeries): string {
   return '/petrol-price-today-pakistan'
 }
 
-export const getRatesTicker = cache(async (): Promise<RateTick[]> => {
+export const getRatesTicker = cache(async (locale: Locale = 'en'): Promise<RateTick[]> => {
   const payload = await getPayloadClient()
   const count = await payload.find({ collection: 'data-points', limit: 1, depth: 0 })
-  if (count.totalDocs === 0) return mockRates()
+  if (count.totalDocs === 0) return demoData() ? mockRates() : []
 
   const ticks: RateTick[] = []
   for (const series of TICKER_SERIES) {
@@ -622,7 +653,7 @@ export const getRatesTicker = cache(async (): Promise<RateTick[]> => {
     })
     ticks.push({
       series,
-      label: rateLabel(series),
+      label: rateLabel(series, locale),
       value,
       unit: latest.unit,
       change: Math.round(change * 100) / 100,
@@ -632,11 +663,27 @@ export const getRatesTicker = cache(async (): Promise<RateTick[]> => {
       spark: history.docs.map((p) => p.value).reverse(),
     })
   }
-  return ticks.length ? ticks : mockRates()
+  return ticks.length || !demoData() ? ticks : mockRates()
 })
+
+const DATA_SOURCES: Record<DataPageKey, { en: string; ur: string }> = {
+  gold: {
+    en: 'International spot gold price (gold-api.com) converted to PKR at the market exchange rate. Local Sarafa rates can differ by a premium.',
+    ur: 'بین الاقوامی سونے کی قیمت (gold-api.com) کو مارکیٹ ریٹ پر روپے میں تبدیل کیا گیا۔ مقامی صرافہ ریٹ میں فرق ہو سکتا ہے۔',
+  },
+  'usd-pkr': {
+    en: 'Market mid-rate: exchangerate-api.com · Open market buy/sell: forex.pk',
+    ur: 'مارکیٹ ریٹ: exchangerate-api.com · اوپن مارکیٹ خرید و فروخت: forex.pk',
+  },
+  petrol: {
+    en: 'Government-notified prices as reported by at least two Pakistani news outlets.',
+    ur: 'حکومت کی جانب سے اعلان کردہ قیمتیں، کم از کم دو پاکستانی خبر رساں اداروں کی رپورٹ کے مطابق۔',
+  },
+}
 
 export const getDataPage = cache(async (locale: Locale, key: DataPageKey): Promise<DataPageFull> => {
   const payload = await getPayloadClient()
+  const def = DATA_PAGES.find((d) => d.key === key)!
   const dp = await payload.find({
     collection: 'data-pages',
     where: { key: { equals: key } },
@@ -644,55 +691,38 @@ export const getDataPage = cache(async (locale: Locale, key: DataPageKey): Promi
     locale,
     depth: 0,
   })
-  const pointsCount = await payload.find({ collection: 'data-points', limit: 1 })
-  if (pointsCount.totalDocs === 0 || !dp.docs[0]) return mockDataPage(locale, key)
-
-  const page = dp.docs[0] as DataPage
-  const headlineSeries =
-    key === 'gold' ? 'gold_24k_tola' : key === 'usd-pkr' ? 'usd_interbank' : 'petrol_super'
-  const ticker = await getRatesTicker()
-  const headline = ticker.find((t) => t.series === headlineSeries) ?? ticker[0]
-  const days = 30
-  const since = new Date(Date.now() - days * 86_400_000).toISOString()
-  const historyPoints = await payload.find({
-    collection: 'data-points',
-    where: {
-      and: [{ series: { equals: headlineSeries } }, { observedAt: { greater_than: since } }],
-    },
-    sort: 'observedAt',
-    limit: 500,
-  })
+  const page = dp.docs[0] as DataPage | undefined
+  const headlineSeries: RateSeries = key === 'gold' ? 'gold_24k_tola' : key === 'usd-pkr' ? 'usd_open_sell' : 'petrol_super'
+  const ticker = await getRatesTicker(locale)
+  const headline = ticker.find((t) => t.series === headlineSeries) ?? (key === 'usd-pkr' ? ticker.find((t) => t.series === 'usd_interbank') : undefined) ?? null
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
+  const historyPoints = headline
+    ? await payload.find({
+        collection: 'data-points',
+        where: { and: [{ series: { equals: headline.series } }, { observedAt: { greater_than: since } }] },
+        sort: 'observedAt',
+        limit: 500,
+      })
+    : { docs: [] as DataPoint[] }
   return {
     key,
-    slug: page.slug,
-    title: page.title,
-    intro: typeof page.intro === 'string' ? page.intro : undefined,
-    faqs: (page.faqs ?? []).map((f) => ({ q: f.q, a: f.a })),
-    updatedAt: page.updatedAt ?? headline.observedAt,
-    source:
-      key === 'gold'
-        ? 'All Pakistan Sarafa Gems & Jewellers Association'
-        : key === 'usd-pkr'
-          ? 'State Bank of Pakistan / Forex Association of Pakistan'
-          : 'OGRA / Finance Division',
+    slug: page?.slug ?? def.slug,
+    title: (typeof page?.title === 'string' && page.title) || (locale === 'ur' ? def.ur : def.en),
+    intro: typeof page?.intro === 'string' ? page.intro : undefined,
+    faqs: (page?.faqs ?? []).map((f) => ({ q: f.q, a: f.a })),
+    updatedAt: headline?.observedAt ?? page?.updatedAt ?? new Date().toISOString(),
+    source: DATA_SOURCES[key][locale],
     headline,
-    table: Array.isArray(page.latestSnapshot)
-      ? (page.latestSnapshot as DataPageFull['table'])
-      : mockDataPage(locale, key).table,
-    history: [
-      {
-        series: headlineSeries,
-        points: historyPoints.docs.map((p) => ({ t: p.observedAt, v: p.value })),
-      },
-    ],
-    cities: key === 'gold' ? mockDataPage(locale, key).cities : undefined,
-    related: (await loadPublishedCards(locale, 8)).filter((a) => a.category.slug === 'business').slice(0, 4),
+    table: Array.isArray(page?.latestSnapshot) ? (page!.latestSnapshot as DataPageFull['table']) : [],
+    history: headline ? [{ series: headline.series, points: historyPoints.docs.map((p) => ({ t: p.observedAt, v: p.value })) }] : [],
+    cities: undefined,
+    related: (await loadPublishedCards(locale, 12)).filter((a) => a.category.slug === 'business').slice(0, 4),
   }
 })
 
 export const search = cache(async (locale: Locale, q: string, page = 1): Promise<Paginated<ArticleCard>> => {
   const needle = q.trim().toLowerCase()
-  if (!(await hasPublishedArticles())) {
+  if (demoData() && !(await hasPublishedArticles())) {
     const hits = needle
       ? mockCards(locale).filter(
           (a) => a.title.toLowerCase().includes(needle) || a.dek?.toLowerCase().includes(needle),

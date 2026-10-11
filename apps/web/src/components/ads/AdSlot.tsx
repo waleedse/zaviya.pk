@@ -48,18 +48,14 @@ export function AdSlot({
     }
   }, [client])
 
+  // Ads stay off until AdSense approves the site: no placeholders, no reserved space.
+  if (!client) return null
+
   return (
     <aside className={cn('my-8 flex flex-col items-center', className)} aria-label={d.advertisement}>
       <span className="mb-1 text-[10px] uppercase tracking-wider text-fg-muted">{d.advertisement}</span>
-      <div
-        className={cn(
-          'flex w-full max-w-[728px] items-center justify-center rounded-md border border-dashed border-border bg-surface-2/50',
-          !client && spec.minH,
-        )}
-        style={client ? undefined : { minHeight: spec.h }}
-      >
-        {client ? (
-          <ins
+      <div className="flex w-full max-w-[728px] items-center justify-center">
+        <ins
             className="adsbygoogle block w-full"
             data-ad-placement={placement}
             style={{ display: 'block', minHeight: spec.h }}
@@ -69,9 +65,6 @@ export function AdSlot({
             data-full-width-responsive={adSlot ? undefined : 'true'}
             data-adtest={process.env.NODE_ENV === 'development' ? 'on' : undefined}
           />
-        ) : (
-          <div className="px-4 text-center text-xs text-fg-muted">728×{spec.h}</div>
-        )}
       </div>
     </aside>
   )

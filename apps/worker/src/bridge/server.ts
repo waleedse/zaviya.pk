@@ -18,6 +18,8 @@ export class BridgeServer {
   constructor(
     private readonly port: number,
     private readonly token?: string,
+    /** 127.0.0.1 on a Mac; 0.0.0.0 inside Docker so the published port reaches it */
+    private readonly host = '127.0.0.1',
   ) {}
 
   start(): void {
@@ -25,7 +27,7 @@ export class BridgeServer {
       logger.info('Extension bridge disabled — BRIDGE_TOKEN not set')
       return
     }
-    this.wss = new WebSocketServer({ host: '127.0.0.1', port: this.port })
+    this.wss = new WebSocketServer({ host: this.host, port: this.port, maxPayload: 32 * 1024 * 1024 })
     this.wss.on('connection', (ws) => {
       ws.on('message', (raw) => this.onMessage(ws, raw.toString()))
       ws.on('close', () => {
@@ -41,6 +43,11 @@ export class BridgeServer {
   stop(): void {
     this.wss?.close()
     this.wss = null
+  }
+
+  /** Extension is connected and authenticated (it opens platform tabs itself when needed). */
+  isOnline(): boolean {
+    return Boolean(this.authenticated && this.socket)
   }
 
   isConnected(platform: string): boolean {
@@ -63,6 +70,7 @@ export class BridgeServer {
         this.authenticated = true
         this.socket = ws
         ws.send(JSON.stringify({ type: 'hello', ok: true }))
+        logger.info({ version: data.version }, 'extension connected')
       } else {
         ws.close(4001, 'unauthorized')
       }
@@ -74,7 +82,11 @@ export class BridgeServer {
     }
     if ('id' in data && 'ok' in data) {
       const p = this.pending.get(data.id)
-      if (!p) return
+      if (!p) {
+        // Finished after we gave up: still log why, so extension problems are visible.
+        logger.warn({ jobId: data.id, ok: data.ok, err: data.ok ? undefined : data.error }, 'bridge job answered after timeout')
+        return
+      }
       clearTimeout(p.timer)
       this.pending.delete(data.id)
       if (data.ok) p.resolve(data.result)

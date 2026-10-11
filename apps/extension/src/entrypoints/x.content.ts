@@ -1,4 +1,4 @@
-import { scrapeTimelinePosts, postTweet, detectCheckpoint } from '../lib/x-dom'
+import { scrapeTimelinePosts, scrapeTrends, postTweet, detectCheckpoint, waitForSelector } from '../lib/x-dom'
 
 export default defineContentScript({
   matches: ['*://x.com/*', '*://twitter.com/*'],
@@ -21,6 +21,7 @@ async function handle(msg: {
   mediaUrls?: string[]
   delayMinMs?: number
   delayMaxMs?: number
+  limit?: number
 }): Promise<unknown> {
   const delayMinMs = msg.delayMinMs ?? 2_000
   const delayMaxMs = msg.delayMaxMs ?? 5_000
@@ -35,6 +36,19 @@ async function handle(msg: {
     window.scrollTo(0, document.body.scrollHeight)
     await new Promise((r) => setTimeout(r, 2_000))
     return { posts: scrapeTimelinePosts(msg.sinceId) }
+  }
+
+  if (msg.action === 'x.scrape') {
+    // The background navigated this tab; give the timeline time to render, then scroll once for more.
+    await waitForSelector('article[data-testid="tweet"]')
+    window.scrollTo(0, document.body.scrollHeight)
+    await new Promise((r) => setTimeout(r, 2_000))
+    return { posts: scrapeTimelinePosts(msg.sinceId, msg.limit ?? 20) }
+  }
+
+  if (msg.action === 'x.trends') {
+    await waitForSelector('[data-testid="trend"]')
+    return { trends: scrapeTrends(msg.limit ?? 30) }
   }
 
   if (msg.action === 'x.post') {

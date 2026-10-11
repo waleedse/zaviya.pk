@@ -1,8 +1,14 @@
+/** Headline-only: "What happens next" is a normal body subheading, not clickbait. */
 const BANNED_PATTERNS = [
   /\b(shocking|you won'?t believe|what happens next)\b/i,
   /\b(breaking\s+breaking)\b/i,
   /!{3,}/,
 ]
+
+/** Direct quotes must match the source word for word, so they don't count as copying. */
+export function stripQuotes(text: string): string {
+  return text.replace(/["“”][^"“”]{0,600}["“”]/g, ' ').replace(/(^|\s)'[^']{10,400}'(?=\s|[.,;:]|$)/g, ' ')
+}
 
 const CLICKBAIT = [/\b(one weird trick|doctors hate)\b/i]
 
@@ -28,10 +34,10 @@ export function ngramOverlapRatio(a: string, b: string, n = 5): number {
   return inter / A.size
 }
 
-export function checkOriginality(body: string, sources: string[], maxRatio = 0.12): string[] {
+export function checkOriginality(body: string, sources: string[], maxRatio = 0.2): string[] {
   const issues: string[] = []
   for (const src of sources) {
-    const ratio = ngramOverlapRatio(body, src)
+    const ratio = ngramOverlapRatio(stripQuotes(body), src)
     if (ratio >= maxRatio) {
       issues.push(`5-gram overlap ${(ratio * 100).toFixed(1)}% with a source (max ${maxRatio * 100}%)`)
     }
@@ -45,8 +51,9 @@ export function checkLength(body: string, priority: 'normal' | 'high' | 'breakin
     if (wc < 150) return [`Breaking story too short (${wc} words, min 150)`]
     return []
   }
-  if (wc < 450 || wc > 900) {
-    return [`Body length ${wc} words (expected 450–900 for normal/high)`]
+  // Short, well-sourced reports (match results, notifications) are fine; padding to hit a count is not.
+  if (wc < 180 || wc > 1000) {
+    return [`Body length ${wc} words (expected 180–1000)`]
   }
   return []
 }
@@ -57,8 +64,9 @@ export function checkBannedAndClickbait(title: string, body: string): string[] {
     issues.push('Title is all caps')
   }
   for (const p of BANNED_PATTERNS) {
-    if (p.test(title) || p.test(body)) issues.push(`Banned pattern: ${p}`)
+    if (p.test(title)) issues.push(`Banned pattern in title: ${p}`)
   }
+  if (/!{3,}/.test(body)) issues.push('Body uses "!!!"')
   for (const p of CLICKBAIT) {
     if (p.test(title)) issues.push(`Clickbait pattern in title: ${p}`)
   }

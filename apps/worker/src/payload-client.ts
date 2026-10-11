@@ -15,6 +15,13 @@ export interface PipelineSource {
   lastPolledAt?: string | null
 }
 
+/** Queued from the admin Control Room, delivered with the heartbeat response. */
+export interface WorkerCommand {
+  id: string
+  kind: 'write' | 'triage' | 'pause' | 'resume' | 'discover' | 'ingest'
+  payload: { clusterId?: string }
+}
+
 export interface SourceItemInput {
   sourceId: string
   externalId: string
@@ -111,7 +118,7 @@ export class PayloadClient {
     return h
   }
 
-  private async request<T>(
+  async request<T>(
     method: string,
     path: string,
     body?: unknown,
@@ -247,8 +254,9 @@ export class PayloadClient {
       source: string
       observedAt: string
     }[],
+    snapshots: { key: string; table: { label: string; values: Record<string, number | string> }[] }[] = [],
   ) {
-    return this.request<{ inserted: number }>('POST', '/api/pipeline/data-points', { points })
+    return this.request<{ inserted: number }>('POST', '/api/pipeline/data-points', { points, snapshots })
   }
 
   upsertSocialPost(body: {
@@ -272,8 +280,12 @@ export class PayloadClient {
     return this.request<PipelineSettings>('GET', '/api/pipeline/settings')
   }
 
-  heartbeat(body: { version: string; queues: Record<string, { waiting: number; active: number; failed: number }> }) {
-    return this.request<{ ok: true; killSwitch: boolean }>('POST', '/api/pipeline/heartbeat', body)
+  heartbeat(body: {
+    version: string
+    queues: Record<string, { waiting: number; active: number; failed: number }>
+    [extra: string]: unknown
+  }) {
+    return this.request<{ ok: true; killSwitch: boolean; commands?: WorkerCommand[] }>('POST', '/api/pipeline/heartbeat', body)
   }
 
   async uploadMedia(file: Blob, meta: {
@@ -281,10 +293,15 @@ export class PayloadClient {
     credit?: string
     license: string
     isAiGenerated?: boolean
+    /** Descriptive file name (good for image SEO); extension is added from the MIME type */
+    filename?: string
   }): Promise<{ id: string; url?: string | null }> {
     const form = new FormData()
-    form.append('file', file)
-    form.append('_payload', JSON.stringify(meta))
+    const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/webp' ? 'webp' : 'png'
+    const base = (meta.filename ?? `zaviya-${Date.now()}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
+    const { filename: _omit, ...payloadMeta } = meta
+    form.append('file', file, `${base}.${ext}`)
+    form.append('_payload', JSON.stringify(payloadMeta))
     const res = await this.fetchFn(`${this.baseUrl}/api/media`, {
       method: 'POST',
       headers: this.headers(false),

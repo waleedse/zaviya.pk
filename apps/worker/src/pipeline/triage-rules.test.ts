@@ -48,6 +48,26 @@ describe('applyTriageRules', () => {
     expect(d.outcome).toBe('publish')
   })
 
+  it('defers (not reviews) a publishable story when the interval is not met', () => {
+    const now = new Date('2026-10-10T10:00:00.000Z')
+    const d = applyTriageRules(baseTriage, {
+      maxTier: 2,
+      distinctSources: 2,
+      settings: { minIntervalMin: 20 },
+      now,
+      lastPublishedAt: new Date(now.getTime() - 5 * 60_000).toISOString(),
+    })
+    expect(d.outcome).toBe('defer')
+    expect(d.retryInMs).toBeGreaterThanOrEqual(15 * 60_000)
+  })
+
+  it('does not block on "unverified" when credible sources exist', () => {
+    const d = applyTriageRules({ ...baseTriage, sensitivityFlags: ['unverified'] }, { maxTier: 2, distinctSources: 1, settings: {} })
+    expect(d.outcome).toBe('publish')
+    const r = applyTriageRules({ ...baseTriage, sensitivityFlags: ['unverified'] }, { maxTier: 3, distinctSources: 1, settings: {} })
+    expect(r.outcome).toBe('reject')
+  })
+
   it('computes weighted score with category weight', () => {
     const s = computeWeightedScore(baseTriage, { categoryWeights: { pakistan: 0.5 } })
     expect(s).toBeCloseTo((0.4 * 0.9 + 0.35 * 0.8 + 0.25 * 0.7) * 0.5)

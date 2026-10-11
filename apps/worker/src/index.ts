@@ -18,7 +18,7 @@ async function main() {
   const integrations = integrationStatus(env)
   logger.info({ integrations }, 'Zaviya worker starting')
 
-  const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN)
+  const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN, env.BRIDGE_HOST)
   bridge.start()
 
   let runtime: WorkerRuntime | null = null

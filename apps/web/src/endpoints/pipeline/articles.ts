@@ -63,9 +63,26 @@ async function markdownToLexical(req: PayloadRequest, markdown: string) {
   return convertMarkdownToLexical({ editorConfig, markdown })
 }
 
-async function resolveTags(payload: PayloadRequest['payload'], tagSlugs: string[]) {
+/** "Khyber Pakhtunkhwa" -> "khyber-pakhtunkhwa". The worker sends tag names, so URLs must be built here. */
+export function tagSlug(input: string): string {
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+}
+
+async function resolveTags(payload: PayloadRequest['payload'], tagInputs: string[]) {
   const ids: string[] = []
-  for (const slug of tagSlugs) {
+  const seen = new Set<string>()
+  for (const input of tagInputs) {
+    const slug = tagSlug(input)
+    if (!slug || seen.has(slug)) continue
+    seen.add(slug)
+    // Keep the writer's capitalisation for the display name ("PTI", "Khyber Pakhtunkhwa").
+    const displayName = /[A-Z\s]/.test(input.trim()) ? input.trim() : slug.replace(/-/g, ' ')
     const found = await payload.find({
       collection: 'tags',
       where: { slug: { equals: slug } },
@@ -77,7 +94,7 @@ async function resolveTags(payload: PayloadRequest['payload'], tagSlugs: string[
     } else {
       const created = await payload.create({
         collection: 'tags',
-        data: { slug, name: slug.replace(/-/g, ' ') },
+        data: { slug, name: displayName },
         overrideAccess: true,
       })
       ids.push(String(created.id))

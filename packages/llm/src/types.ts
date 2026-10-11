@@ -9,6 +9,8 @@ export interface Msg {
   toolCallId?: string
   /** When assistant message includes tool calls */
   toolCalls?: ToolCall[]
+  /** Gemini Interactions API: lets the next call continue this turn statefully */
+  interactionId?: string
 }
 
 export interface ToolCall {
@@ -34,6 +36,8 @@ export interface ChatResult {
   content: string
   toolCalls: ToolCall[]
   usage?: TokenUsage
+  /** Gemini Interactions API id of this turn */
+  interactionId?: string
   model: string
   provider: string
 }
@@ -53,16 +57,26 @@ export interface LLMProvider {
   health(): Promise<boolean>
 }
 
-export type LLMTask = 'triage' | 'write_en' | 'write_ur' | 'qa' | 'embed' | 'social'
+export type LLMTask = 'triage' | 'write_en' | 'write_ur' | 'qa' | 'embed' | 'social' | 'seo'
 
+/** Writing models: best first. Each model has its own free-tier quota, so the chain rotates when one runs out. */
+export const GEMINI_WRITER_CHAIN = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview'
+/** Cheap models for scoring, keyword research and QA. */
+export const GEMINI_LITE_CHAIN = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemma-4-26b-a4b-it'
+
+/**
+ * Free hybrid: short JSON jobs run on the local model; the free Gemini quota is saved for
+ * writing, and writing itself falls back to the local model when that quota runs out.
+ */
 export const DEFAULT_ACTIVE_MODELS: Record<LLMTask, string> = {
-  triage: 'ollama:qwen3:4b',
-  write_en: 'ollama:qwen3:8b',
-  write_ur: 'ollama:qalb:8b-q4',
-  qa: 'ollama:qwen3:4b',
+  triage: 'ollama:qwen3:8b',
+  write_en: `gemini:${GEMINI_WRITER_CHAIN}`,
+  write_ur: `gemini:${GEMINI_WRITER_CHAIN}`,
+  qa: 'ollama:qwen3:8b',
   embed: 'ollama:nomic-embed-text',
-  social: 'ollama:qwen3:4b',
+  social: 'ollama:qwen3:8b',
+  seo: 'ollama:qwen3:8b',
 }
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
 export const DEFAULT_GEMINI_EMBED_MODEL = 'gemini-embedding-001'

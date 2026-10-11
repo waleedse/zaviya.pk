@@ -7,14 +7,17 @@ export default defineConfig({
   modulesDir: 'modules',
   manifest: {
     name: 'Zaviya Bridge',
-    description: 'Local WebSocket bridge for Zaviya worker (X / Instagram / Facebook tabs)',
-    version: '0.1.0',
-    permissions: ['storage', 'tabs', 'alarms'],
+    description: 'Local bridge for the Zaviya worker: Gemini images, X/Instagram discovery and posting',
+    version: '0.2.9',
+    // debugger: trusted keyboard input for Gemini, which ignores script-made clicks and key presses
+    permissions: ['storage', 'tabs', 'alarms', 'debugger'],
     host_permissions: [
       '*://x.com/*',
       '*://twitter.com/*',
       '*://www.instagram.com/*',
       '*://*.facebook.com/*',
+      '*://gemini.google.com/*',
+      '*://*.googleusercontent.com/*',
     ],
   },
 })

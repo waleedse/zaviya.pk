@@ -10,12 +10,16 @@ export function PageviewBeacon({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     if (!pathname || pathname === lastSent.current) return
+    // The external referrer only applies to the landing page; later soft navigations are internal.
+    const isLanding = lastSent.current === null
     lastSent.current = pathname
 
+    const utmSource = new URLSearchParams(window.location.search).get('utm_source') ?? undefined
     const body = JSON.stringify({
       path: pathname,
       locale,
-      referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
+      referrer: isLanding ? document.referrer || undefined : window.location.origin + '/',
+      utmSource: isLanding ? utmSource : undefined,
     })
 
     if (navigator.sendBeacon) {

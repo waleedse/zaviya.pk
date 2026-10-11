@@ -1,18 +1,31 @@
 import Link from 'next/link'
-import type { CategoryRef } from '@zaviya/shared'
-import type { Locale } from '@zaviya/shared'
+import type { CategoryRef, Locale } from '@zaviya/shared'
 import { localePath } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
-export function Kicker({ category, locale, className }: { category: CategoryRef; locale: Locale; className?: string }) {
-  const href = localePath(locale, `/${category.slug}`)
+/** Category label. Inside a card link it must stay a span (no nested links). */
+export function Kicker({
+  category,
+  locale,
+  className,
+  asLink = false,
+}: {
+  category: CategoryRef
+  locale: Locale
+  className?: string
+  asLink?: boolean
+}) {
+  const cls = cn('kicker-text angle', className)
+  if (asLink) {
+    return (
+      <Link href={localePath(locale, `/${category.slug}`)} className={cn(cls, 'hover:underline')} style={{ color: category.color }}>
+        {category.name}
+      </Link>
+    )
+  }
   return (
-    <Link
-      href={href}
-      className={cn('kicker-text hover:underline', className)}
-      style={{ color: category.color }}
-    >
+    <span className={cls} style={{ color: category.color }}>
       {category.name}
-    </Link>
+    </span>
   )
 }

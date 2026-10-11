@@ -1,7 +1,8 @@
 import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 
-export const ZAVIYA_USER_AGENT = 'ZaviyaBot/0.1 (+https://zaviya.pk/p/about)'
+// Browser-compatible token so publisher CDNs don't 403 us, while still naming the bot honestly.
+export const ZAVIYA_USER_AGENT = 'Mozilla/5.0 (compatible; ZaviyaBot/1.0; +https://zaviya.pk/p/about)'
 const MAX_BYTES = 2 * 1024 * 1024
 const MAX_CHARS = 6000
 
@@ -9,10 +10,15 @@ export async function fetchArticleText(
   url: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<string | null> {
-  const res = await fetchFn(url, {
-    headers: { 'User-Agent': ZAVIYA_USER_AGENT },
-    signal: AbortSignal.timeout(20_000),
-  })
+  let res: Response
+  try {
+    res = await fetchFn(url, {
+      headers: { 'User-Agent': ZAVIYA_USER_AGENT },
+      signal: AbortSignal.timeout(20_000),
+    })
+  } catch {
+    return null
+  }
   if (!res.ok) return null
   const buf = await res.arrayBuffer()
   if (buf.byteLength > MAX_BYTES) return null

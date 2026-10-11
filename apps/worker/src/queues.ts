@@ -1,18 +1,23 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq'
-import { LLMRouter } from '@zaviya/llm'
+import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
 import type { WorkerEnv } from './config.js'
-import { PayloadClient } from './payload-client.js'
+import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
 import { processTriageJob } from './pipeline/triage.js'
 import { processWriteJob } from './pipeline/write.js'
 import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob } from './pipeline/media.js'
+import { HERO_BACKFILL_JOB, processHeroBackfill } from './pipeline/hero-backfill.js'
 import { processPublishJob } from './pipeline/publish.js'
 import { fetchRssFeed, toSourceItemInputs } from './ingest/rss.js'
 import { isAllowedByRobots } from './ingest/robots.js'
 import { fetchArticleText } from './ingest/extract.js'
 import { fetchCuratedTweets } from './ingest/x.js'
+import { fetchTrends, isTrendsUrl, trendsToSourceItems } from './ingest/trends.js'
+import { runDiscovery, X_TRENDS_KEY } from './ingest/discovery.js'
+import { runLearningJob } from './pipeline/learning.js'
+import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
@@ -22,6 +27,9 @@ import type { TelegramAlerts } from './telegram/bot.js'
 import { sendReviewCard } from './telegram/bot.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import type { WriteResult } from './pipeline/write.js'
+
+import { TRENDS_KEY } from './queues-keys.js'
+export { TRENDS_KEY }
 
 export const QUEUE_NAMES = [
   'ingest',
@@ -34,9 +42,13 @@ export const QUEUE_NAMES = [
   'social',
   'data',
   'metrics',
+  'discover',
 ] as const
 
 export type QueueName = (typeof QUEUE_NAMES)[number]
+
+/** Locks renew while a job runs; 3 min lets a restarted worker pick up interrupted jobs quickly. */
+const LONG_LOCK_MS = 3 * 60_000
 
 const defaultJobOpts = {
   attempts: 3,
@@ -53,7 +65,9 @@ export interface WorkerRuntime {
   telegram: TelegramAlerts
   queues: Record<QueueName, Queue>
   workers: Worker[]
+  redis: Redis
   paused: boolean
+  pausedByKillSwitch?: boolean
 }
 
 export function createConnection(env: WorkerEnv): ConnectionOptions {
@@ -70,6 +84,11 @@ export async function createWorkerRuntime(
   const router = new LLMRouter({
     ollamaUrl: env.OLLAMA_URL,
     geminiApiKey: env.GEMINI_API_KEY,
+    localModel: env.LOCAL_MODEL,
+    apiBaseUrl: env.LLM_API_BASE_URL,
+    apiKey: env.LLM_API_KEY,
+    apiFallbackModel: env.LLM_API_FALLBACK_MODEL,
+    apiLightModel: env.LLM_API_LIGHT_MODEL,
   })
 
   try {
@@ -79,9 +98,28 @@ export async function createWorkerRuntime(
     logger.warn({ err: e }, 'Could not load settings — using defaults')
   }
 
+  const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null })
+
   const queues = Object.fromEntries(
     QUEUE_NAMES.map((name) => [name, new Queue(name, { connection, defaultJobOptions: defaultJobOpts })]),
   ) as Record<QueueName, Queue>
+
+  /** Save new items, pull full text for articles, and queue them for clustering. */
+  const storeItems = async (inputs: SourceItemInput[]) => {
+    for (const item of inputs) {
+      if (item.contentText) continue
+      if (await isAllowedByRobots(item.url).catch(() => false)) {
+        const text = await fetchArticleText(item.url)
+        if (text) item.contentText = text
+      }
+    }
+    const res = await payload.postSourceItems(inputs)
+    for (const ins of res.inserted) {
+      const item = inputs.find((i) => i.externalId === ins.externalId)
+      if (item) await queues.embed.add('embed', { sourceItemId: ins.id, title: item.title, summary: item.summary })
+    }
+    return res
+  }
 
   const notifyReview = async (args: { clusterId: string; reviewId: string; summary: string }) => {
     await sendReviewCard(telegram, args)
@@ -110,29 +148,20 @@ export async function createWorkerRuntime(
           logger.debug({ type }, 'ingest type not rss — skip')
           return
         }
-        const feed = await fetchRssFeed(url, { etag })
-        if (!feed.notModified && feed.items.length) {
-          const inputs = toSourceItemInputs(sourceId, feed.items)
-          for (const item of inputs) {
-            if (await isAllowedByRobots(item.url)) {
-              const text = await fetchArticleText(item.url)
-              if (text) item.contentText = text
-            }
-          }
-          const res = await payload.postSourceItems(inputs)
-          for (const ins of res.inserted) {
-            const item = inputs.find((i) => i.externalId === ins.externalId)
-            if (item) {
-              await queues.embed.add('embed', {
-                sourceItemId: ins.id,
-                title: item.title,
-                summary: item.summary,
-              })
-            }
-          }
+        let inputs: SourceItemInput[] = []
+        let nextEtag: string | undefined
+        if (isTrendsUrl(url)) {
+          const trends = await fetchTrends(url)
+          await redis.set(TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends }))
+          inputs = trendsToSourceItems(sourceId, trends)
+        } else {
+          const feed = await fetchRssFeed(url, { etag })
+          nextEtag = feed.etag
+          if (!feed.notModified) inputs = toSourceItemInputs(sourceId, feed.items, lang)
         }
+        if (inputs.length) await storeItems(inputs)
         await payload.patchSource(sourceId, {
-          etag: feed.etag,
+          etag: nextEtag,
           lastPolledAt: new Date().toISOString(),
         })
       },
@@ -141,7 +170,7 @@ export async function createWorkerRuntime(
   )
 
   workers.push(
-    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage }), {
+    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage, minSources: env.TRIAGE_MIN_SOURCES }), {
       connection,
       concurrency: 2,
     }),
@@ -155,38 +184,53 @@ export async function createWorkerRuntime(
           router,
           payload,
           writeQueue: queues.write,
+          triageQueue: queues.triage,
           notifyReview,
+          autoApprove: env.AUTO_APPROVE,
         }),
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
-
-  const writeStore = new Map<string, WriteResult>()
 
   workers.push(
     new Worker(
       'write',
       async (job) => {
-        const { clusterId, attempt } = job.data as { clusterId: string; attempt?: number }
+        const { clusterId, attempt, feedback, priority } = job.data as {
+          clusterId: string
+          attempt?: number
+          feedback?: string[]
+          priority?: Priority
+        }
         if (job.name === 'write-retry' && attempt !== undefined) {
           logger.info({ clusterId, attempt }, 'write retry from QA')
         }
-        const result = await processWriteJob({ clusterId }, { router, payload, env })
+        let result: WriteResult | null
+        try {
+          result = await processWriteJob({ clusterId, feedback }, { router, payload, env, redis })
+        } catch (e) {
+          // Every model (cloud and local) unavailable: try again when the quota resets.
+          if (isQuotaExhausted(e)) {
+            await queues.write.add(job.name, job.data, { delay: Math.max(60_000, e.resetAt - Date.now()), priority: 4 })
+            logger.warn({ clusterId, retryAt: new Date(e.resetAt).toISOString() }, 'write deferred: no model available')
+            return
+          }
+          throw e
+        }
         if (!result) return
-        writeStore.set(clusterId, result)
         const triage = (job.data as { triage?: TriageResult }).triage
         await queues.qa.add(
           'qa',
           {
             clusterId,
             write: result,
-            priority: (triage?.suggestedPriority ?? 'normal') as Priority,
-            attempt: 0,
+            priority: priority ?? ((triage?.suggestedPriority ?? 'normal') as Priority),
+            attempt: attempt ?? 0,
           },
           { priority: 5 },
         )
       },
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -200,16 +244,20 @@ export async function createWorkerRuntime(
           writeQueue: queues.write,
           mediaQueue: queues.media,
           notifyReview,
+          autoApprove: env.AUTO_APPROVE,
         }),
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
   workers.push(
     new Worker(
       'media',
-      async (job) => processMediaJob(job.data, { payload, env, publishQueue: queues.publish }),
-      { connection, concurrency: 2 },
+      async (job) =>
+        job.name === HERO_BACKFILL_JOB
+          ? processHeroBackfill(job.data, { payload, env, mediaQueue: queues.media, bridge })
+          : processMediaJob(job.data, { payload, env, publishQueue: queues.publish, mediaQueue: queues.media, bridge }),
+      { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -231,7 +279,7 @@ export async function createWorkerRuntime(
           { payload, socialQueue: queues.social },
         )
       },
-      { connection, concurrency: 2 },
+      { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -267,7 +315,7 @@ export async function createWorkerRuntime(
           )
         }
       },
-      { connection, concurrency: 1 },
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -275,20 +323,48 @@ export async function createWorkerRuntime(
     new Worker(
       'data',
       async () => {
-        const points = await fetchRatePoints(env)
-        await postRatePoints(payload, points)
+        const rates = await fetchRatePoints(env, redis)
+        await postRatePoints(payload, rates)
+        return { points: rates.points.length, tables: rates.snapshots.map((x) => x.key) }
       },
-      { connection, concurrency: 2 },
+      { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
+    ),
+  )
+
+  workers.push(
+    new Worker(
+      'discover',
+      async () => {
+        if (!bridge.isOnline()) return { skipped: 'extension offline' }
+        const { sources } = await payload.getSources()
+        const xSource = sources.find((s) => s.key === 'x-discovery')
+        const igSource = sources.find((s) => s.key === 'instagram-discovery')
+        const list = (v?: string, sep = ',') => v?.split(sep).map((x) => x.trim()).filter(Boolean)
+        const result = await runDiscovery({
+          bridge,
+          xSourceId: xSource?.id,
+          igSourceId: igSource?.id,
+          xQueries: list(env.DISCOVERY_X_QUERIES, '||'),
+          igProfiles: list(env.DISCOVERY_IG_PROFILES),
+        })
+        if (result.xTrends.length) {
+          await redis.set(X_TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends: result.xTrends }))
+        }
+        if (result.items.length) await storeItems(result.items)
+        if (result.errors.some((e) => /checkpoint/.test(e))) {
+          await telegram.notify('⚠️ Extension hit a security checkpoint during discovery. Paused until next round.')
+        }
+        return { items: result.items.length, trends: result.xTrends.length, errors: result.errors.length }
+      },
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
   workers.push(
     new Worker(
       'metrics',
-      async () => {
-        logger.debug('metrics job stub — wire GSC/GA4/Meta insights')
-      },
-      { connection, concurrency: 1 },
+      async () => runLearningJob({ payload, router, telegram }),
+      { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -304,6 +380,7 @@ export async function createWorkerRuntime(
     telegram,
     queues,
     workers,
+    redis,
     paused: false,
   }
 }
@@ -311,29 +388,37 @@ export async function createWorkerRuntime(
 export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<void> {
   try {
     const { sources } = await runtime.payload.getSources()
+    const wanted = new Set(sources.map((s) => `ingest-${s.id}`))
+    // Drop schedulers for sources that were disabled or deleted since the last start.
+    for (const sched of await runtime.queues.ingest.getJobSchedulers()) {
+      if (sched.key && !wanted.has(sched.key)) await runtime.queues.ingest.removeJobScheduler(sched.key)
+    }
     for (const s of sources) {
-      await runtime.queues.ingest.add(
-        'poll',
-        { sourceId: s.id, url: s.url, type: s.type, etag: s.etag, lang: s.language },
-        {
-          repeat: { every: Math.max(60, s.pollIntervalSec) * 1000 },
-          jobId: `ingest-${s.id}`,
-        } as Parameters<Queue['add']>[2],
+      const data = { sourceId: s.id, url: s.url, type: s.type, etag: s.etag, lang: s.language }
+      await runtime.queues.ingest.upsertJobScheduler(
+        `ingest-${s.id}`,
+        { every: Math.max(60, s.pollIntervalSec) * 1000 },
+        { name: 'poll', data },
       )
+      // Schedulers wait one full interval before their first run; poll once now too.
+      await runtime.queues.ingest.add('poll', data, { jobId: `ingest-now-${s.id}-${Date.now()}` })
     }
   } catch (e) {
     logger.warn({ err: e }, 'Could not schedule ingest — Payload unavailable?')
   }
 
-  await runtime.queues.data.add(
-    'rates',
-    {},
-    { repeat: { every: 30 * 60 * 1000 }, jobId: 'data-rates' } as Parameters<Queue['add']>[2],
+  await runtime.queues.data.upsertJobScheduler('data-rates', { every: 30 * 60 * 1000 }, { name: 'rates', data: {} })
+  await runtime.queues.discover.upsertJobScheduler(
+    'discover-social',
+    { every: runtime.env.DISCOVERY_INTERVAL_MIN * 60 * 1000 },
+    { name: 'discover', data: {} },
   )
-  await runtime.queues.metrics.add(
-    'daily',
-    {},
-    { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: 'metrics-daily' } as Parameters<Queue['add']>[2],
+  await runtime.queues.discover.add('discover', {}, { delay: 60_000 })
+  await runtime.queues.data.add('rates', {})
+  await runtime.queues.metrics.upsertJobScheduler(
+    'metrics-daily',
+    { every: 24 * 60 * 60 * 1000 },
+    { name: 'daily', data: {} },
   )
 }
 
@@ -361,4 +446,5 @@ export async function getQueueStats(runtime: WorkerRuntime): Promise<string> {
 export async function shutdownRuntime(runtime: WorkerRuntime): Promise<void> {
   await Promise.all(runtime.workers.map((w) => w.close()))
   await Promise.all(Object.values(runtime.queues).map((q) => q.close()))
+  runtime.redis.disconnect()
 }

@@ -1,0 +1,15 @@
+# Keep secrets, local data and build output out of images
+**/node_modules
+**/.next
+**/.turbo
+**/.output
+**/.wxt
+**/coverage
+**/*.log
+**/.DS_Store
+**/.env
+**/.env.*
+!**/.env.example
+apps/web/media
+dist
+.git

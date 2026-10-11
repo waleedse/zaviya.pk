@@ -1,4 +1,4 @@
-export type PlatformKey = 'x' | 'instagram' | 'facebook'
+export type PlatformKey = 'x' | 'instagram' | 'facebook' | 'gemini'
 
 export interface ExtensionSettings {
   bridgeUrl: string
@@ -7,14 +7,17 @@ export interface ExtensionSettings {
   /** Delay before DOM actions (ms). Architecture target: 20_000–90_000 in production. */
   actionDelayMinMs: number
   actionDelayMaxMs: number
+  /** JSON overrides for Gemini selectors, e.g. {"sendButton": ["button.new-send"]} */
+  geminiSelectorsJson: string
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   bridgeUrl: 'ws://127.0.0.1:8787',
   bridgeToken: 'zaviya-dev-bridge',
-  platforms: { x: true, instagram: true, facebook: true },
+  platforms: { x: true, instagram: true, facebook: true, gemini: true },
   actionDelayMinMs: 2_000,
   actionDelayMaxMs: 5_000,
+  geminiSelectorsJson: '',
 }
 
 export async function getSettings(): Promise<ExtensionSettings> {

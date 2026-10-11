@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import Parser from 'rss-parser'
 import type { SourceItemInput } from '../payload-client.js'
+import { ZAVIYA_USER_AGENT } from './extract.js'
 
 const parser = new Parser({
   customFields: { item: ['content:encoded', 'content'] },
@@ -51,7 +52,7 @@ export async function fetchRssFeed(
   notModified: boolean
 }> {
   const fetchFn = opts?.fetchFn ?? fetch
-  const headers: Record<string, string> = { 'User-Agent': 'ZaviyaBot/0.1 (+https://zaviya.pk/p/about)' }
+  const headers: Record<string, string> = { 'User-Agent': ZAVIYA_USER_AGENT }
   if (opts?.etag) headers['If-None-Match'] = opts.etag
   if (opts?.lastModified) headers['If-Modified-Since'] = opts.lastModified
 
@@ -71,7 +72,7 @@ export async function fetchRssFeed(
   }
 }
 
-export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[]): SourceItemInput[] {
+export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[], lang?: string): SourceItemInput[] {
   return items.map((i) => ({
     sourceId,
     externalId: i.externalId,
@@ -79,7 +80,7 @@ export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[])
     title: i.title,
     summary: i.summary,
     publishedAt: i.publishedAt,
-    lang: i.lang,
+    lang: lang ?? i.lang,
     hash: i.hash,
   }))
 }

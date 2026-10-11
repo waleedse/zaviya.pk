@@ -24,3 +24,18 @@ describe('qa-checks', () => {
     expect(checkBannedAndClickbait('You wont believe this SHOCKING news!!!', 'body')).not.toEqual([])
   })
 })
+
+import { stripQuotes as _sq, checkBannedAndClickbait as _bc, checkOriginality as _co } from './qa-checks.js'
+describe('qa rule fixes', () => {
+  it('allows "What happens next" as a body subheading but not in the title', () => {
+    expect(_bc('Petrol price cut by Rs5', '## What happens next\nPrices apply from midnight.')).toEqual([])
+    expect(_bc('What happens next will shock you', 'x').length).toBeGreaterThan(0)
+  })
+  it('does not count direct quotes as copying', () => {
+    const quote = 'negligence in ensuring the safety of foreign nationals would not be tolerated at any cost whatsoever'
+    const src = `The IGP said ${quote} during the meeting.`
+    const body = `Police chiefs reviewed protection plans on Saturday. The IGP warned: "${quote}." Officers will audit permits.`
+    expect(_sq(body)).not.toContain('tolerated')
+    expect(_co(body, [src])).toEqual([])
+  })
+})

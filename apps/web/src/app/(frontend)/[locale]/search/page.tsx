@@ -8,7 +8,7 @@ export const revalidate = 60
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const locale = parseLocale((await params).locale)
-  return buildPageMetadata({ locale, title: t(locale).search, path: '/search', urPath: '/ur/search' })
+  return buildPageMetadata({ locale, title: t(locale).search, enPath: '/search', urPath: '/ur/search', noindex: true })
 }
 
 export default async function SearchPage({

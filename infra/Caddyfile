@@ -1,0 +1,14 @@
+# HTTPS certificates are issued automatically. Point the domains' DNS (A record) at the VPS first.
+zaviya.pk {
+	encode zstd gzip
+	reverse_proxy web:3000
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+www.zaviya.pk, thezaviya.com, www.thezaviya.com, thezavia.com, zavia.pk {
+	redir https://zaviya.pk{uri} permanent
+}

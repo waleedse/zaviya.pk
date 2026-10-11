@@ -31,7 +31,7 @@ export function Pagination({
   return (
     <nav className="mt-10 flex items-center justify-center gap-4" aria-label="Pagination">
       {page > 1 ? (
-        <Link href={link(page - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-4 text-sm hover:border-accent/40">
+        <Link href={link(page - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-border bg-surface px-4 text-sm font-bold hover:border-accent hover:text-accent">
           <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
           {d.page} {page - 1}
         </Link>
@@ -44,7 +44,7 @@ export function Pagination({
         {d.page} {page} {d.of} {totalPages}
       </span>
       {page < totalPages ? (
-        <Link href={link(page + 1)} className={cn('inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-4 text-sm hover:border-accent/40')}>
+        <Link href={link(page + 1)} className={cn('inline-flex min-h-11 items-center gap-1 rounded-xl border border-border bg-surface px-4 text-sm font-bold hover:border-accent hover:text-accent')}>
           {d.page} {page + 1}
           <ChevronRight className="h-4 w-4 rtl:rotate-180" />
         </Link>

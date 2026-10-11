@@ -26,6 +26,33 @@ function nextSocialSlots(now = new Date(), count = 3): Date[] {
   return slots.slice(0, count)
 }
 
+/** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
+export function publisherName(title: string, feedName: string): string {
+  if (!/google|discovery|extension/i.test(feedName)) return feedName
+  const m = / [-–] ([^-–]{2,40})$/.exec(title.trim())
+  return m ? m[1]!.trim() : feedName.replace(/^Google News — .*/, 'Google News')
+}
+
+/** Social posts found during discovery are embedded (officially supported), never re-hosted. */
+export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: string }[] {
+  const out: { type: 'x' | 'instagram'; url: string }[] = []
+  const seen = new Set<string>()
+  for (const u of urls) {
+    const x = /^https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[^/]+\/status\/(\d+)/.exec(u) ?? /^https?:\/\/x\.com\/i\/web\/status\/(\d+)/.exec(u)
+    if (x && !seen.has(x[1]!)) {
+      seen.add(x[1]!)
+      out.push({ type: 'x', url: `https://x.com/i/web/status/${x[1]}` })
+      continue
+    }
+    const ig = /^https?:\/\/(?:www\.)?instagram\.com\/(p|reel)\/([A-Za-z0-9_-]+)/.exec(u)
+    if (ig && !seen.has(ig[2]!)) {
+      seen.add(ig[2]!)
+      out.push({ type: 'instagram', url: `https://www.instagram.com/${ig[1]}/${ig[2]}/` })
+    }
+  }
+  return out.slice(0, 3)
+}
+
 export async function processPublishJob(
   data: {
     clusterId: string
@@ -45,7 +72,7 @@ export async function processPublishJob(
   if (triage?.isUpdateOfExisting && triage.existingArticleId) {
     await deps.payload.postLiveUpdate(triage.existingArticleId, {
       at: new Date().toISOString(),
-      text: { en: data.write.en.keyPoints[0], ur: data.write.ur.keyPoints[0] },
+      text: { en: data.write.en.keyPoints[0], ...(data.write.ur ? { ur: data.write.ur!.keyPoints[0] } : {}) },
     })
     await deps.payload.patchCluster(data.clusterId, { status: 'updated' })
     return { articleId: triage.existingArticleId }
@@ -53,11 +80,13 @@ export async function processPublishJob(
 
   const category = triage?.category ?? 'pakistan'
   const sources = cluster.items.map((i) => ({
-    name: i.source.name,
+    name: publisherName(i.title, i.source.name),
     url: i.url,
     tier: i.source.trustTier,
     publishedAt: i.publishedAt,
   }))
+
+  const embeds = embedsFromUrls(cluster.items.map((i) => i.url))
 
   let res: { id: string }
   try {
@@ -70,9 +99,10 @@ export async function processPublishJob(
       status: 'published',
       heroMediaId: data.heroMediaId,
       sources,
+      embeds,
       ai: {
-        model: 'router',
-        promptVersion: `${data.write.promptVersions.en}+${data.write.promptVersions.ur}`,
+        model: data.write.models ? `en=${data.write.models.en}${data.write.models.ur ? ` ur=${data.write.models.ur}` : ''}` : 'unknown',
+        promptVersion: data.write.ur ? `${data.write.promptVersions.en}+${data.write.promptVersions.ur}` : data.write.promptVersions.en,
         qaScore: data.qaScore,
         generatedAt: new Date().toISOString(),
       },
@@ -87,20 +117,22 @@ export async function processPublishJob(
           whatItMeans: data.write.en.whatItMeans,
           faqs: data.write.en.faqs,
           tags: data.write.en.tags,
+          metaDescription: data.write.en.metaDescription,
           altText: data.write.en.altText,
         },
-        ur: {
-          title: data.write.ur.title,
-          titleVariants: data.write.ur.titleOptions.filter((t) => t !== data.write.ur.title),
-          slug: data.write.ur.slug,
-          dek: data.write.ur.dek,
-          keyPoints: data.write.ur.keyPoints,
-          bodyMarkdown: data.write.ur.bodyMarkdown,
-          whatItMeans: data.write.ur.whatItMeans,
-          faqs: data.write.ur.faqs,
-          tags: data.write.ur.tags,
-          altText: data.write.ur.altText,
-        },
+        ...(data.write.ur ? { ur: {
+          title: data.write.ur!.title,
+          titleVariants: data.write.ur!.titleOptions.filter((t) => t !== data.write.ur!.title),
+          slug: data.write.ur!.slug,
+          dek: data.write.ur!.dek,
+          keyPoints: data.write.ur!.keyPoints,
+          bodyMarkdown: data.write.ur!.bodyMarkdown,
+          whatItMeans: data.write.ur!.whatItMeans,
+          faqs: data.write.ur!.faqs,
+          tags: data.write.ur!.tags,
+          metaDescription: data.write.ur!.metaDescription,
+          altText: data.write.ur!.altText,
+        } } : {}),
       },
     })
   } catch (e) {
@@ -109,6 +141,7 @@ export async function processPublishJob(
   }
 
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })
+  logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId) }, 'published')
 
   const slots = nextSocialSlots()
   const platforms = ['facebook', 'instagram', 'x'] as const

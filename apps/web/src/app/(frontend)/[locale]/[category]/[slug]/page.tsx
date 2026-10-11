@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { dataPageSlugToKey } from '@/lib/seo'
-import { getArticle, getRelated, getMostRead, getRatesTicker } from '@/lib/queries'
+import { getArticle, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import {
@@ -18,8 +18,9 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { ReadingProgress } from '@/components/layout/ReadingProgress'
 import { Kicker } from '@/components/article/Kicker'
 import { LiveBadge } from '@/components/article/LiveBadge'
-import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
-import { ShareBar } from '@/components/article/ShareBar'
+import { ShareBar, MobileShareBar } from '@/components/article/ShareBar'
+import { SocialEmbeds } from '@/components/article/SocialEmbeds'
+import { SectionHeader } from '@/components/home/SectionHeader'
 import { KeyPoints } from '@/components/article/KeyPoints'
 import { ArticleBodyWithAds } from '@/components/article/ArticleBodyWithAds'
 import { WhatItMeans } from '@/components/article/WhatItMeans'
@@ -28,12 +29,17 @@ import { FAQAccordion } from '@/components/article/FAQAccordion'
 import { SourcesList } from '@/components/article/SourcesList'
 import { AuthorBox } from '@/components/article/AuthorBox'
 import { ArticleCard } from '@/components/article/ArticleCard'
-import { RateCard } from '@/components/data/RateCard'
+import { ArticleToolbar } from '@/components/article/ArticleToolbar'
+import { AuthorAvatar } from '@/components/article/AuthorBox'
+import { NextPrayerCard } from '@/components/namaz/NextPrayerCard'
+import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
+import { todayForAllCities } from '@/lib/prayer-times'
+import { formatNumber } from '@/lib/format'
+import { BadgeCheck, Eye, TrendingUp } from 'lucide-react'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { formatDateTime } from '@/lib/format'
 import { canBuildWebStory, webStoryPath } from '@/lib/web-story'
 import type { Locale } from '@zaviya/shared'
-import { Badge } from '@/components/ui/badge'
 
 export const revalidate = 300
 
@@ -45,13 +51,16 @@ export async function generateMetadata({ params }: Props) {
   const locale = parseLocale(l)
   const article = await getArticle(locale, category, slug)
   if (!article) return {}
-  const path = locale === 'ur' ? article.href : article.href.replace(/^\/ur/, '')
+  const enPath = locale === 'en' ? article.href : article.alternateHref
+  const urPath = locale === 'ur' ? article.href : article.alternateHref
   return buildPageMetadata({
     locale,
     title: article.seo.metaTitle ?? article.title,
     description: article.seo.metaDescription ?? article.dek,
-    path,
-    urPath: article.alternateHref,
+    enPath,
+    urPath,
+    section: article.category.name,
+    tags: article.tags?.map((tg) => tg.name),
     ogImage: article.seo.ogImage ?? articleOgUrl(article),
     type: 'article',
     publishedTime: article.publishedAt,
@@ -68,13 +77,19 @@ export default async function ArticlePage({ params }: Props) {
   if (!article) notFound()
 
   const d = t(locale)
-  const [related, mostRead, rates] = await Promise.all([
-    getRelated(locale, article.id, 4),
-    getMostRead(locale, 5),
-    getRatesTicker(),
+  const isUr = locale === 'ur'
+  const [related, mostRead, rates, sameSection] = await Promise.all([
+    getRelated(locale, article.id, 6),
+    getMostRead(locale, 6),
+    getRatesTicker(locale),
+    getCategoryFeed(locale, article.category.slug, 1),
   ])
+  const relatedIds = new Set([article.id, ...related.map((a) => a.id)])
+  const moreFromSection = (sameSection?.docs ?? []).filter((a) => !relatedIds.has(a.id)).slice(0, 6)
+  const namaz = todayForAllCities()
+  const sourceCount = new Set(article.sources.map((s) => s.url)).size
 
-  const publicPath = locale === 'ur' ? article.href : article.href.replace(/^\/ur/, '') || article.href
+  const publicPath = article.href
 
   return (
     <>
@@ -91,116 +106,194 @@ export default async function ArticlePage({ params }: Props) {
           ...(article.isLive ? [liveBlogJsonLd(article)] : []),
         ]}
       />
-      <article className="container-page py-8">
-        <div className="grid gap-10 lg:grid-cols-12">
-          <div className="lg:col-span-8">
-            <Breadcrumbs
-              items={[
-                { label: d.nav.home, href: localePath(locale, '/') },
-                { label: article.category.name, href: localePath(locale, `/${category}`) },
-                { label: article.title },
-              ]}
-            />
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <Kicker category={article.category} locale={locale} />
-              {article.isLive && <LiveBadge locale={locale} />}
-              {article.alternateHref && <LanguageSwitch locale={locale} href={article.alternateHref} />}
-            </div>
-            <h1 className="font-display text-h1 font-semibold leading-[1.1]">{article.title}</h1>
-            {article.dek && <p className="mt-4 text-xl text-fg-muted">{article.dek}</p>}
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-              <span>{article.author.name}</span>
-              <span aria-hidden>·</span>
-              <span>
-                {d.published} {formatDateTime(article.publishedAt, locale)}
-              </span>
-              {article.updatedAt && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>
-                    {d.updated} {formatDateTime(article.updatedAt, locale)}
-                  </span>
-                </>
-              )}
-              {article.readingTime != null && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>
-                    {article.readingTime} {d.minRead}
-                  </span>
-                </>
-              )}
-            </div>
-            <div className="my-6 flex flex-wrap items-center gap-4">
-              <ShareBar locale={locale} title={article.title} path={publicPath} />
-              {canBuildWebStory(article) ? (
+      <article className="container-wide pb-10 pt-6 md:pt-8">
+        <Breadcrumbs
+          items={[
+            { label: d.nav.home, href: localePath(locale, '/') },
+            { label: article.category.name, href: localePath(locale, `/${category}`) },
+          ]}
+        />
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] xl:gap-14">
+          <div className="min-w-0">
+            <header className="max-w-[780px]">
+              <div className="mb-4 flex flex-wrap items-center gap-2.5">
                 <Link
-                  href={localePath(locale, webStoryPath(slug))}
-                  className="text-sm font-medium text-accent underline-offset-2 hover:underline"
+                  href={localePath(locale, `/${category}`)}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] hover:border-accent rtl:tracking-normal"
+                  style={{ color: article.category.color }}
                 >
-                  {d.webStories}
+                  <span className="h-2 w-2 rounded-full" style={{ background: article.category.color }} aria-hidden />
+                  {article.category.name}
                 </Link>
-              ) : null}
-            </div>
-            {article.image && (
-              <figure className="mb-8">
-                <div className="relative aspect-video overflow-hidden rounded-[var(--radius-image)] bg-surface-2">
-                  <Image src={article.image.url} alt={article.image.alt} fill priority className="object-cover" sizes="(max-width:1024px) 100vw, 720px" />
+                {article.isLive && <LiveBadge locale={locale} />}
+              </div>
+              <h1 className={`font-display text-[clamp(2.1rem,1.5rem+2.2vw,3.4rem)] font-extrabold ${isUr ? 'leading-[1.7]' : 'leading-[1.04]'}`}>{article.title}</h1>
+              {article.dek && <p className="mt-4 font-serif text-[1.3em] leading-snug text-fg-muted">{article.dek}</p>}
+
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-y border-border py-4">
+                <div className="flex items-center gap-3">
+                  <AuthorAvatar author={article.author} size={46} />
+                  <div className="text-sm leading-snug">
+                    <Link href={localePath(locale, `/author/${article.author.slug}`)} className="font-extrabold hover:text-accent">
+                      {article.author.name}
+                    </Link>
+                    <p className="mt-0.5 text-fg-subtle">
+                      <time dateTime={article.publishedAt}>{formatDateTime(article.publishedAt, locale)}</time>
+                      {article.updatedAt && new Date(article.updatedAt).getTime() - new Date(article.publishedAt).getTime() > 15 * 60_000 && (
+                        <>
+                          {' · '}
+                          {d.updated} <time dateTime={article.updatedAt}>{formatDateTime(article.updatedAt, locale)}</time>
+                        </>
+                      )}
+                      {article.readingTime ? ` · ${article.readingTime} ${d.minRead}` : ''}
+                    </p>
+                  </div>
                 </div>
-                {(article.image.credit || article.image.isAiGenerated) && (
-                  <figcaption className="mt-2 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-                    {article.image.credit}
-                    {article.image.isAiGenerated && <Badge variant="outline">AI-generated illustration</Badge>}
+                {sourceCount > 0 && (
+                  <a
+                    href="#sources"
+                    className="inline-flex items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 py-1.5 text-[13px] font-bold text-accent"
+                  >
+                    <BadgeCheck className="h-4 w-4" aria-hidden />
+                    {isUr ? `${sourceCount} ذرائع · انسانی جائزہ` : `Human-reviewed · ${sourceCount} source${sourceCount === 1 ? '' : 's'}`}
+                  </a>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <ArticleToolbar locale={locale} minutes={article.readingTime} />
+                <ShareBar locale={locale} title={article.title} path={publicPath} />
+              </div>
+              {article.alternateHref && (
+                <Link
+                  href={article.alternateHref}
+                  hrefLang={locale === 'en' ? 'ur' : 'en'}
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-surface-2 px-4 py-2 text-sm font-semibold hover:text-accent"
+                >
+                  {locale === 'en' ? 'یہ خبر اردو میں پڑھیں' : 'Read this story in English'} →
+                </Link>
+              )}
+            </header>
+
+            {article.image && (
+              <figure className="my-8">
+                <div className="relative aspect-video overflow-hidden rounded-[var(--radius-card)] bg-surface-2">
+                  <Image src={article.image.url} alt={article.image.alt} fill priority className="object-cover" sizes="(max-width:1024px) 100vw, 900px" />
+                </div>
+                {(article.image.credit || article.image.alt) && (
+                  <figcaption className="mt-2.5 flex flex-wrap justify-between gap-2 text-[13px] text-fg-subtle">
+                    <span>{article.image.alt}</span>
+                    {article.image.credit && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 font-semibold">{article.image.credit}</span>}
                   </figcaption>
                 )}
               </figure>
             )}
-            <KeyPoints points={article.keyPoints} locale={locale} />
-            <ArticleBodyWithAds data={article.body} locale={locale} />
-            {article.whatItMeans != null ? <WhatItMeans body={article.whatItMeans} locale={locale} /> : null}
-            <LiveUpdates locale={locale} updates={article.updates} isLive={article.isLive} />
-            <FAQAccordion faqs={article.faqs} locale={locale} />
-            <SourcesList sources={article.sources} locale={locale} />
-            {article.corrections.map((c, i) => (
-              <p key={i} className="my-4 text-sm text-fg-muted">
-                <strong>{d.corrections}:</strong> {c.note}
-              </p>
-            ))}
-            {article.tags.length > 0 && (
-              <div className="my-8 flex flex-wrap gap-2">
-                {article.tags.map((tag) => (
-                  <Link key={tag.slug} href={localePath(locale, `/tag/${tag.slug}`)} className="rounded-[var(--radius-pill)] border border-border px-3 py-1 text-sm hover:border-accent/40">
-                    {tag.name}
-                  </Link>
-                ))}
+
+            <div className="max-w-[760px]">
+              <KeyPoints points={article.keyPoints} locale={locale} />
+              <div id="article-body">
+                <ArticleBodyWithAds data={article.body} locale={locale} />
               </div>
-            )}
-            <AuthorBox author={article.author} locale={locale} />
-            <section className="mt-12">
-              <h2 className="mb-4 font-display text-h2 font-semibold">{d.related}</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {related.map((a) => (
-                  <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
-                ))}
-              </div>
-            </section>
-          </div>
-          <aside className="hidden space-y-6 lg:col-span-4 lg:block">
-            <div className="sticky top-32 space-y-6">
-              <h2 className="font-semibold">{d.mostRead}</h2>
-              {mostRead.map((a, i) => (
-                <ArticleCard key={a.id} article={a} locale={locale} variant="numbered" index={i} />
+              {article.whatItMeans != null ? <WhatItMeans body={article.whatItMeans} locale={locale} /> : null}
+              <SocialEmbeds embeds={article.embeds ?? []} locale={locale} />
+              <LiveUpdates locale={locale} updates={article.updates} isLive={article.isLive} />
+              <FAQAccordion faqs={article.faqs} locale={locale} />
+              <SourcesList sources={article.sources} locale={locale} />
+              {article.corrections.map((c, i) => (
+                <p key={i} className="my-4 rounded-2xl bg-surface-2 p-4 text-sm">
+                  <strong>{d.corrections}:</strong> {c.note}
+                </p>
               ))}
-              <div className="grid gap-2">
-                {rates.slice(0, 2).map((r) => (
-                  <RateCard key={r.series} rate={r} locale={locale} />
-                ))}
+              {article.tags.length > 0 && (
+                <div className="my-8 flex flex-wrap gap-2">
+                  {article.tags.map((tag) => (
+                    <Link key={tag.slug} href={localePath(locale, `/tag/${tag.slug}`)} className="chip">
+                      #{tag.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <div className="my-8 flex flex-wrap items-center gap-3 rounded-[22px] border border-border bg-surface p-4">
+                <span className="text-sm font-bold">{isUr ? 'یہ خبر شیئر کریں' : 'Share this story'}</span>
+                <ShareBar locale={locale} title={article.title} path={publicPath} />
+                {canBuildWebStory(article) ? (
+                  <Link href={localePath(locale, webStoryPath(slug))} className="ms-auto text-sm font-bold text-accent hover:underline">
+                    {d.webStories} →
+                  </Link>
+                ) : null}
               </div>
+              <AuthorBox author={article.author} locale={locale} />
+            </div>
+          </div>
+
+          <aside className="hidden lg:block">
+            <div className="sticky top-40 space-y-5">
+              <NextPrayerCard
+                locale={locale}
+                href={localePath(locale, '/namaz-timings')}
+                serverMinutes={namaz.minutes}
+                cities={namaz.cities.map((c) => ({ slug: c.city.slug, en: c.city.en, ur: c.city.ur, times: c.times }))}
+              />
+              {rates.length > 0 && (
+                <div className="rounded-[22px] bg-ink p-5 text-ink-muted">
+                  <p className="mb-2 flex items-center gap-2 font-extrabold text-ink-fg">
+                    <TrendingUp className="h-4 w-4 text-amber-300" aria-hidden />
+                    {isUr ? 'آج کے ریٹ' : 'Live rates'}
+                  </p>
+                  <div className="divide-y divide-ink-line">
+                    {rates.map((r) => (
+                      <Link key={r.series} href={isUr ? `/ur${r.href}` : r.href} className="flex justify-between gap-3 py-2.5 text-sm hover:text-ink-fg">
+                        <span>{r.label}</span>
+                        <b dir="ltr" className="text-white tabular-nums">
+                          {formatNumber(r.value)}
+                        </b>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {mostRead.length > 0 && (
+                <div className="card-surface p-5">
+                  <SectionHeader title={d.mostRead} icon={Eye} className="mb-1" />
+                  <div className="divide-y divide-border">
+                    {mostRead.map((a, i) => (
+                      <ArticleCard key={a.id} article={a} locale={locale} variant="numbered" index={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <WhatsAppCTA locale={locale} compact />
               <AdSlot locale={locale} size="skyscraper" />
             </div>
           </aside>
         </div>
+
+        {related.length > 0 && (
+          <section className="mt-14 border-t border-border pt-10">
+            <SectionHeader title={isUr ? 'اگلی خبر پڑھیں' : 'Read next'} />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((a) => (
+                <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
+              ))}
+            </div>
+          </section>
+        )}
+        {moreFromSection.length > 0 && (
+          <section className="mt-12">
+            <SectionHeader
+              title={`${d.moreFromCategory} ${article.category.name}`}
+              color={article.category.color}
+              href={localePath(locale, `/${category}`)}
+              linkLabel={d.seeAll}
+            />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {moreFromSection.map((a) => (
+                <ArticleCard key={a.id} article={a} locale={locale} variant="side" />
+              ))}
+            </div>
+          </section>
+        )}
       </article>
+      <MobileShareBar locale={locale} title={article.title} path={publicPath} />
     </>
   )
 }

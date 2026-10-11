@@ -533,7 +533,7 @@ export interface Source {
   key: string;
   name: string;
   url: string;
-  type: 'rss' | 'gnews' | 'x_account' | 'x_list' | 'data';
+  type: 'rss' | 'gnews' | 'x_account' | 'x_list' | 'instagram' | 'data';
   trustTier: number;
   language?: ('en' | 'ur' | 'mixed') | null;
   categoryHint?: string | null;

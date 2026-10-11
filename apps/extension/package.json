@@ -7,7 +7,8 @@
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
-    "typecheck": "tsc --noEmit && tsx scripts/verify-protocol.ts"
+    "typecheck": "tsc --noEmit && tsx scripts/verify-protocol.ts",
+    "postbuild": "mkdir -p ../../dist/zaviya-extension && rsync -a --delete .output/chrome-mv3/ ../../dist/zaviya-extension/"
   },
   "dependencies": {
     "@zaviya/shared": "workspace:*",

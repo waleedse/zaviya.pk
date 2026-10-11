@@ -10,17 +10,30 @@ import { TriageResultSchema } from '@zaviya/shared'
 import { zodToJsonSchema } from '@zaviya/llm'
 import { triageSystemPrompt, triageUserPrompt } from './prompts/triage.js'
 import { logger } from './logger.js'
+import { Queue } from 'bullmq'
+import { createConnection } from './queues.js'
+import { queueHeroBackfill } from './pipeline/hero-backfill.js'
 
 const cmd = process.argv[2]
 
 async function run() {
   const env = loadConfig()
   const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
-  const router = new LLMRouter({ ollamaUrl: env.OLLAMA_URL, geminiApiKey: env.GEMINI_API_KEY })
+  const router = new LLMRouter({ ollamaUrl: env.OLLAMA_URL, geminiApiKey: env.GEMINI_API_KEY, localModel: env.LOCAL_MODEL, apiBaseUrl: env.LLM_API_BASE_URL, apiKey: env.LLM_API_KEY, apiFallbackModel: env.LLM_API_FALLBACK_MODEL, apiLightModel: env.LLM_API_LIGHT_MODEL })
+
+  // Take stories without a Gemini image offline and queue an image for each (the running worker does the rest).
+  //   backfill-heroes --dry-run   only count them
+  if (cmd === 'backfill-heroes') {
+    const mediaQueue = new Queue('media', { connection: createConnection(env) })
+    const res = await queueHeroBackfill(payload, mediaQueue, { dryRun: process.argv.includes('--dry-run') })
+    console.log(JSON.stringify(res))
+    await mediaQueue.close()
+    return
+  }
 
   if (cmd === 'ingest-once') {
     const sourceId = process.argv[3]
-    const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN)
+    const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN, env.BRIDGE_HOST)
     const telegram = createTelegramBot(env, {
       payload,
       writeQueue: { add: async () => undefined } as never,
@@ -58,7 +71,7 @@ async function run() {
   if (cmd === 'triage') {
     const clusterId = process.argv[3]
     if (!clusterId) throw new Error('usage: triage <clusterId>')
-    const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN)
+    const bridge = new BridgeServer(env.BRIDGE_PORT, env.BRIDGE_TOKEN, env.BRIDGE_HOST)
     const telegram = createTelegramBot(env, {
       payload,
       writeQueue: { add: async () => undefined } as never,

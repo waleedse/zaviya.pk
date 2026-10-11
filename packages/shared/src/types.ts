@@ -126,7 +126,8 @@ export interface DataPageFull {
   faqs: FAQ[]
   updatedAt: string
   source: string
-  headline: RateTick
+  /** null until the first real data point arrives */
+  headline: RateTick | null
   table: { label: string; values: Record<string, number | string> }[]
   history: { series: RateSeries; points: { t: string; v: number }[] }[]
   cities?: { city: string; values: Record<string, number> }[]

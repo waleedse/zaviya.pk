@@ -12,6 +12,7 @@ import {
 import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { revalidateDataTag } from '../../lib/revalidate'
+import { getLearning, pacingStats, retitleArticle, runDailyLearning } from '../../lib/learning'
 
 // Phase 2: Remotion reel render queue — see docs/GROWTH.md and lib/remotion-brief.ts
 
@@ -551,11 +552,27 @@ const pipelineEndpoints: Endpoint[] = [
             observedAt: z.string(),
           }),
         ),
+        // Full rate tables for the data pages (all karats, other currencies...)
+        snapshots: z
+          .array(
+            z.object({
+              key: z.enum(['gold', 'usd-pkr', 'petrol']),
+              table: z.array(z.object({ label: z.string(), values: z.record(z.union([z.number(), z.string()])) })),
+            }),
+          )
+          .optional(),
       })
       const parsed = await parseJson(req, schema)
       if ('error' in parsed) return parsed.error
       let inserted = 0
       const keys = new Set<string>()
+      for (const snap of parsed.data.snapshots ?? []) {
+        const found = await req.payload.find({ collection: 'data-pages', where: { key: { equals: snap.key } }, limit: 1, overrideAccess: true })
+        if (found.docs[0]) {
+          await req.payload.update({ collection: 'data-pages', id: found.docs[0].id, data: { latestSnapshot: snap.table }, overrideAccess: true, req })
+          keys.add(snap.key)
+        }
+      }
       for (const pt of parsed.data.points) {
         await req.payload.create({
           collection: 'data-points',
@@ -630,7 +647,38 @@ const pipelineEndpoints: Endpoint[] = [
       const denied = guard(req)
       if (denied) return denied
       const settings = await req.payload.findGlobal({ slug: 'settings', overrideAccess: true })
-      return json(settings)
+      // Pacing and learned weights the triage rules need, alongside the editable settings.
+      const [pacing, categoryWeights] = await Promise.all([
+        pacingStats(req.payload),
+        getLearning<Record<string, number>>(req.payload, 'category_weights'),
+      ])
+      return json({
+        ...settings,
+        ...pacing,
+        categoryWeights: categoryWeights ?? {},
+        dailyCaps: { ...(settings.dailyCaps ?? {}), articles: Number(process.env.DAILY_ARTICLE_CAP ?? 60) },
+      })
+    },
+  },
+  {
+    path: '/pipeline/metrics/daily',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json(await runDailyLearning(req.payload))
+    },
+  },
+  {
+    path: '/pipeline/articles/:id/retitle',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ locale: z.enum(['en', 'ur']), title: z.string().min(20).max(110), reason: z.string() }))
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      return json(await retitleArticle(req.payload, id, parsed.data.locale, parsed.data.title, parsed.data.reason))
     },
   },
   {
@@ -639,19 +687,27 @@ const pipelineEndpoints: Endpoint[] = [
     handler: async (req) => {
       const denied = guard(req)
       if (denied) return denied
-      const schema = z.object({
-        version: z.string(),
-        queues: z.record(
-          z.object({
-            waiting: z.number(),
-            active: z.number(),
-            failed: z.number(),
-          }),
-        ),
-      })
+      const schema = z
+        .object({
+          version: z.string(),
+          queues: z.record(
+            z.object({
+              waiting: z.number(),
+              active: z.number(),
+              failed: z.number(),
+            }),
+          ),
+        })
+        .passthrough()
       const parsed = await parseJson(req, schema)
       if ('error' in parsed) return parsed.error
       const settings = await req.payload.findGlobal({ slug: 'settings', overrideAccess: true })
+      // Commands queued from the admin Control Room are handed to the worker here.
+      const commands = (await req.payload.db.drizzle.execute(sql`
+        UPDATE zaviya_commands SET done_at = now()
+        WHERE id IN (SELECT id FROM zaviya_commands WHERE done_at IS NULL ORDER BY created_at LIMIT 20)
+        RETURNING id, kind, payload
+      `)) as unknown as { rows: { id: string; kind: string; payload: Record<string, unknown> }[] }
       await req.payload.updateGlobal({
         slug: 'settings',
         data: {
@@ -661,7 +717,7 @@ const pipelineEndpoints: Endpoint[] = [
         overrideAccess: true,
         req,
       })
-      return json({ ok: true, killSwitch: Boolean(settings.killSwitch) })
+      return json({ ok: true, killSwitch: Boolean(settings.killSwitch), commands: commands.rows ?? [] })
     },
   },
 ]

@@ -23,6 +23,8 @@ export const WriterOutputSchema = z.object({
   titleOptions: z.array(z.string().min(20).max(110)).length(3),
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   dek: z.string().min(60).max(240),
+  /** Search snippet, 140-160 chars, includes the primary keyword */
+  metaDescription: z.string().max(170).optional(),
   keyPoints: z.array(z.string()).min(3).max(5),
   bodyMarkdown: z.string().min(400),
   whatItMeans: z.string().min(80),
@@ -50,8 +52,37 @@ export const BridgeJobSchema = z.discriminatedUnion('type', [
   z.object({ id: z.string(), type: z.literal('x.post'), payload: z.object({ text: z.string(), mediaUrls: z.array(z.string()).default([]) }) }),
   z.object({ id: z.string(), type: z.literal('x.readList'), payload: z.object({ listUrl: z.string(), sinceId: z.string().optional() }) }),
   z.object({ id: z.string(), type: z.literal('instagram.post'), payload: z.object({ caption: z.string(), mediaUrls: z.array(z.string()).min(1) }) }),
-  z.object({ id: z.string(), type: z.literal('gemini.image'), payload: z.object({ prompt: z.string() }) }),
+  z.object({ id: z.string(), type: z.literal('gemini.image'), payload: z.object({ prompt: z.string(), account: z.string().optional() }) }),
+  z.object({ id: z.string(), type: z.literal('x.search'), payload: z.object({ query: z.string(), limit: z.number().int().max(50).default(20) }) }),
+  z.object({ id: z.string(), type: z.literal('x.trending'), payload: z.object({}).default({}) }),
+  z.object({ id: z.string(), type: z.literal('instagram.readProfile'), payload: z.object({ username: z.string(), limit: z.number().int().max(24).default(9) }) }),
 ])
+
+/** Result of a `gemini.image` bridge job: the generated image as base64. */
+export const GeminiImageResultSchema = z.object({
+  base64: z.string().min(100),
+  mimeType: z.string().default('image/png'),
+  width: z.number().optional(),
+  height: z.number().optional(),
+})
+export type GeminiImageResult = z.infer<typeof GeminiImageResultSchema>
+
+/** A trending topic as scraped from x.com/explore. */
+export const XTrendSchema = z.object({
+  name: z.string(),
+  context: z.string().optional(),
+  postsLabel: z.string().optional(),
+})
+export type XTrend = z.infer<typeof XTrendSchema>
+
+/** Recent Instagram post as seen on a profile grid (discovery only; we embed, never copy media). */
+export const InstagramPostRefSchema = z.object({
+  shortcode: z.string(),
+  url: z.string(),
+  caption: z.string().default(''),
+  username: z.string(),
+})
+export type InstagramPostRef = z.infer<typeof InstagramPostRefSchema>
 export type BridgeJob = z.infer<typeof BridgeJobSchema>
 
 export const BridgeMessageSchema = z.union([

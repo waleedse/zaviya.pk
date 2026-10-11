@@ -1,13 +1,13 @@
 import { DATA_PAGES, SITE, type Locale } from '@zaviya/shared'
 import type { ArticleCard, ArticleFull, FAQ } from '@zaviya/shared'
 import type { Metadata } from 'next'
+import { urduEnabled } from './i18n'
 
-const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? 'https://zaviya.pk'
+export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://zaviya.pk').replace(/\/$/, '')
 
 export function absoluteUrl(path: string): string {
-  const base = siteUrl().replace(/\/$/, '')
   const p = path.startsWith('/') ? path : `/${path}`
-  return `${base}${p}`
+  return `${siteUrl()}${p === '/' ? '' : p}` || siteUrl()
 }
 
 export function localePublicPath(locale: Locale, path: string): string {
@@ -16,63 +16,130 @@ export function localePublicPath(locale: Locale, path: string): string {
   return clean ? `/${clean}` : '/'
 }
 
-export function hreflangAlternates(enPath: string, urPath?: string): Metadata['alternates'] {
-  const en = absoluteUrl(enPath)
-  const ur = absoluteUrl(urPath ?? `/ur${enPath === '/' ? '' : enPath}`)
-  return {
-    canonical: en,
-    languages: {
-      en,
-      ur,
-      'x-default': en,
-    },
-  }
+/** Canonical points at the page's own locale; hreflang lists only versions that exist. */
+export function hreflangAlternates(locale: Locale, enPath?: string, urPath?: string): Metadata['alternates'] {
+  const en = enPath ? absoluteUrl(enPath) : undefined
+  const ur = urPath ? absoluteUrl(urPath) : undefined
+  const canonical = (locale === 'ur' ? ur : en) ?? en ?? ur
+  const languages: Record<string, string> = {}
+  if (en) languages.en = en
+  if (ur) languages.ur = ur
+  if (en || ur) languages['x-default'] = (en ?? ur)!
+  return { canonical, languages }
 }
 
 export function baseRobots(): Metadata['robots'] {
-  return { index: true, follow: true, 'max-image-preview': 'large' }
+  return {
+    index: true,
+    follow: true,
+    'max-image-preview': 'large',
+    'max-snippet': -1,
+    'max-video-preview': -1,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+  }
 }
 
 export function buildPageMetadata(opts: {
   locale: Locale
   title: string
   description?: string
-  path: string
+  /** English URL path, if an English version exists */
+  enPath?: string
+  /** Urdu URL path, if an Urdu version exists */
   urPath?: string
   ogImage?: string
   type?: 'website' | 'article'
   publishedTime?: string
   modifiedTime?: string
+  section?: string
+  tags?: string[]
   noindex?: boolean
+  /** Use the title as-is, without the "| Zaviya" template */
+  absoluteTitle?: boolean
 }): Metadata {
-  const { locale, title, description, path, urPath, ogImage, type = 'website', publishedTime, modifiedTime, noindex } = opts
-  const enPath = locale === 'en' ? path : path.replace(/^\/ur/, '') || '/'
-  const canonicalPath = locale === 'ur' ? (urPath ?? path) : enPath
-  const url = absoluteUrl(canonicalPath)
+  const { locale, title, description, enPath, ogImage, type = 'website', publishedTime, modifiedTime } = opts
+  // English-only mode: English pages don't advertise Urdu versions, and Urdu pages stay out of Google.
+  const urPath = urduEnabled() || locale === 'ur' ? opts.urPath : undefined
+  const noindex = opts.noindex || (locale === 'ur' && !urduEnabled())
+  const alternates = hreflangAlternates(locale, enPath, urPath)
+  const url = alternates?.canonical as string | undefined
+  const image = ogImage?.startsWith('/') ? absoluteUrl(ogImage) : ogImage ?? absoluteUrl(`/api/og?${new URLSearchParams({ title: title.slice(0, 120) }).toString()}`)
 
   return {
-    title,
+    // Long headlines skip the " | Zaviya" suffix so Google shows them whole (~60 chars).
+    title: opts.absoluteTitle || title.length > 52 ? { absolute: title } : title,
     description,
-    alternates: hreflangAlternates(enPath, urPath),
-    robots: noindex ? { index: false, follow: false } : baseRobots(),
+    alternates,
+    robots: noindex ? { index: false, follow: true } : baseRobots(),
     openGraph: {
       title,
       description,
       url,
-      siteName: SITE.name,
+      siteName: locale === 'ur' ? SITE.nameUr : SITE.name,
       locale: locale === 'ur' ? 'ur_PK' : 'en_PK',
+      alternateLocale: locale === 'ur' ? ['en_PK'] : ['ur_PK'],
       type,
-      ...(ogImage ? { images: [{ url: ogImage, width: 1200, height: 630 }] } : {}),
+      images: [{ url: image, width: 1200, height: 630, alt: title }],
       ...(publishedTime ? { publishedTime } : {}),
       ...(modifiedTime ? { modifiedTime } : {}),
+      ...(opts.section ? { section: opts.section } : {}),
+      ...(opts.tags?.length ? { tags: opts.tags } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      ...(ogImage ? { images: [ogImage] } : {}),
+      images: [image],
     },
   }
+}
+
+/** Search-intent titles and descriptions for section fronts. */
+export const SECTION_SEO: Record<string, { en: { title: string; description: string }; ur: { title: string; description: string } }> = {
+  home: {
+    en: {
+      title: 'Zaviya: Latest Pakistan News Today, Breaking News in English & Urdu',
+      description:
+        'Latest Pakistan news today: breaking stories, politics, business, cricket, petrol, gold and dollar rates, explained clearly in English and Urdu by Zaviya.',
+    },
+    ur: {
+      title: 'زاویہ: پاکستان کی تازہ ترین خبریں، بریکنگ نیوز اردو میں',
+      description:
+        'پاکستان کی آج کی تازہ ترین خبریں، سیاست، کاروبار، کرکٹ، پیٹرول، سونے اور ڈالر کے ریٹ، آسان اردو میں۔',
+    },
+  },
+  pakistan: {
+    en: { title: 'Pakistan News Today: Politics, Government & National Updates', description: 'Latest Pakistan news: government decisions, politics, courts, provinces and national developments, with sources and what it means for you.' },
+    ur: { title: 'پاکستان کی خبریں: سیاست، حکومت اور قومی خبریں', description: 'پاکستان کی تازہ ترین خبریں: حکومتی فیصلے، سیاست، عدالتیں اور صوبائی خبریں، ذرائع کے ساتھ۔' },
+  },
+  world: {
+    en: { title: 'World News: International Stories That Matter to Pakistan', description: 'International news explained from a Pakistani angle: US, China, Middle East, Afghanistan, India and global markets.' },
+    ur: { title: 'عالمی خبریں: دنیا بھر کی اہم خبریں', description: 'دنیا بھر کی اہم خبریں پاکستانی زاویے سے: امریکہ، چین، مشرق وسطیٰ، افغانستان اور بھارت۔' },
+  },
+  business: {
+    en: { title: 'Business News Pakistan: Economy, SBP, Stocks, Petrol & Gold', description: 'Pakistan business and economy news: SBP policy rate, PSX, IMF, petrol prices, gold and dollar rates, budget and taxes.' },
+    ur: { title: 'کاروباری خبریں: معیشت، اسٹیٹ بینک، پیٹرول اور سونا', description: 'پاکستان کی معیشت کی خبریں: اسٹیٹ بینک، اسٹاک مارکیٹ، آئی ایم ایف، پیٹرول، سونے اور ڈالر کے ریٹ۔' },
+  },
+  'tech-telecom': {
+    en: { title: 'Tech News Pakistan: PTA, Mobiles, Internet & Startups', description: 'Pakistan technology news: PTA, mobile phones and prices, 5G, internet, freelancing, startups and digital payments.' },
+    ur: { title: 'ٹیکنالوجی کی خبریں: پی ٹی اے، موبائل اور انٹرنیٹ', description: 'پاکستان میں ٹیکنالوجی کی خبریں: پی ٹی اے، موبائل فون، فائیو جی، انٹرنیٹ اور فری لانسنگ۔' },
+  },
+  autos: {
+    en: { title: 'Auto News Pakistan: Car Prices, Bikes, EVs & Launches', description: 'Latest car and bike prices in Pakistan, new launches, EVs, auto financing and industry news.' },
+    ur: { title: 'گاڑیوں کی خبریں: قیمتیں، نئی گاڑیاں اور موٹر سائیکل', description: 'پاکستان میں گاڑیوں اور موٹر سائیکلوں کی قیمتیں، نئی لانچز اور آٹو انڈسٹری کی خبریں۔' },
+  },
+  cricket: {
+    en: { title: 'Cricket News: Pakistan Team, PSL, Scores & Schedules', description: 'Pakistan cricket news, PSL updates, match previews, squads, results and schedules.' },
+    ur: { title: 'کرکٹ کی خبریں: پاکستان ٹیم، پی ایس ایل اور شیڈول', description: 'پاکستان کرکٹ ٹیم، پی ایس ایل، میچز کے نتائج، اسکواڈ اور شیڈول کی تازہ خبریں۔' },
+  },
+  'education-jobs': {
+    en: { title: 'Education & Jobs Pakistan: Results, Admissions, Govt Jobs', description: 'Board results, admissions, scholarships, government jobs and education policy news in Pakistan.' },
+    ur: { title: 'تعلیم و نوکریاں: نتائج، داخلے اور سرکاری نوکریاں', description: 'بورڈ کے نتائج، داخلے، اسکالرشپس، سرکاری نوکریاں اور تعلیمی پالیسی کی خبریں۔' },
+  },
+  trending: {
+    en: { title: 'Trending in Pakistan Today: Viral Stories & Top Searches', description: 'What Pakistan is talking about today: trending topics, viral stories and top searches, explained.' },
+    ur: { title: 'پاکستان میں آج کیا ٹرینڈ کر رہا ہے', description: 'پاکستان میں آج کے ٹرینڈنگ موضوعات، وائرل خبریں اور سب سے زیادہ سرچ کی جانے والی خبریں۔' },
+  },
 }
 
 export function articleOgUrl(article: ArticleCard): string {
@@ -130,7 +197,7 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     '@type': 'NewsArticle',
     headline: article.title,
     description: article.dek,
-    image: article.image?.url ? [article.image.url] : [],
+    image: article.image?.url ? [article.image.url.startsWith('/') ? absoluteUrl(article.image.url) : article.image.url] : [],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt ?? article.publishedAt,
     author: {

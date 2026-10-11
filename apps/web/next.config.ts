@@ -9,7 +9,10 @@ const dirname = path.dirname(__filename)
 const nextConfig: NextConfig = {
   transpilePackages: ['@zaviya/shared'],
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'picsum.photos' }, { protocol: 'https', hostname: 'fastly.picsum.photos' }],
+    remotePatterns: [
+      // Cloudflare R2 public bucket for media in production
+      ...(process.env.R2_PUBLIC_URL ? [{ protocol: 'https' as const, hostname: new URL(process.env.R2_PUBLIC_URL).hostname }] : []),
+    ],
     localPatterns: [
       {
         pathname: '/api/media/file/**',

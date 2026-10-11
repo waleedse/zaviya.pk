@@ -1,3 +1,4 @@
+import type { InstagramPostRef } from '@zaviya/shared'
 import { randomDelay } from './delay'
 
 export function detectCheckpoint(): boolean {
@@ -35,4 +36,29 @@ export async function postInstagram(
   }
 
   throw new Error('instagram_media_upload_not_implemented')
+}
+
+/** Recent post links from a profile grid. Captions come from image alt text when Instagram provides it. */
+export async function readProfile(username: string, limit = 9): Promise<InstagramPostRef[]> {
+  if (detectCheckpoint()) throw new Error('checkpoint_detected')
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline && !document.querySelector('a[href*="/p/"], a[href*="/reel/"]')) {
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  const out: InstagramPostRef[] = []
+  const seen = new Set<string>()
+  for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/p/"], a[href*="/reel/"]'))) {
+    const m = a.getAttribute('href')?.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/)
+    if (!m || seen.has(m[2]!)) continue
+    seen.add(m[2]!)
+    const alt = a.querySelector('img')?.getAttribute('alt') ?? ''
+    out.push({
+      shortcode: m[2]!,
+      url: `https://www.instagram.com/${m[1]}/${m[2]}/`,
+      caption: alt.replace(/^Photo (by|shared by) [^.]+\.?\s*/i, '').trim(),
+      username,
+    })
+    if (out.length >= limit) break
+  }
+  return out
 }

@@ -1,10 +1,14 @@
 import type { MetadataRoute } from 'next'
 import { DATA_PAGES, CATEGORIES } from '@zaviya/shared'
 import { getPayloadClient } from '@/lib/payload'
+import { siteUrl as getSiteUrl } from '@/lib/seo'
+import { urduEnabled } from '@/lib/i18n'
+import { PK_CITIES } from '@/lib/prayer-times'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+export const revalidate = 600
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const siteUrl = getSiteUrl()
   const payload = await getPayloadClient()
   const entries: MetadataRoute.Sitemap = [
     { url: siteUrl, lastModified: new Date(), changeFrequency: 'hourly', priority: 1 },
@@ -12,16 +16,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   for (const c of CATEGORIES) {
-    entries.push({
-      url: `${siteUrl}/${c.slug}`,
-      changeFrequency: 'hourly',
-      priority: 0.8,
-    })
-    entries.push({
-      url: `${siteUrl}/ur/${c.slug}`,
-      changeFrequency: 'hourly',
-      priority: 0.8,
-    })
+    const languages = { en: `${siteUrl}/${c.slug}`, ur: `${siteUrl}/ur/${c.slug}` }
+    entries.push({ url: languages.en, changeFrequency: 'hourly', priority: 0.8, alternates: { languages } })
+    entries.push({ url: languages.ur, changeFrequency: 'hourly', priority: 0.8, alternates: { languages } })
   }
 
   for (const d of DATA_PAGES) {
@@ -31,6 +28,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     })
   }
+
+  // Daily tools: namaz timings for every city and the baby names finder.
+  entries.push({ url: `${siteUrl}/namaz-timings`, changeFrequency: 'daily', priority: 0.9 })
+  for (const c of PK_CITIES.slice(1)) {
+    entries.push({ url: `${siteUrl}/namaz-timings/${c.slug}`, changeFrequency: 'daily', priority: 0.8 })
+  }
+  entries.push({ url: `${siteUrl}/baby-names`, changeFrequency: 'weekly', priority: 0.8 })
 
   const pages = await payload.find({ collection: 'pages', limit: 50, depth: 0 })
   for (const p of pages.docs) {
@@ -76,9 +80,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: lastMod,
         changeFrequency: 'daily',
         priority: 0.7,
+        alternates: {
+          languages: {
+            ur: `${siteUrl}/ur/${cat}/${urSlug}`,
+            ...(enSlug ? { en: `${siteUrl}/${cat}/${enSlug}` } : {}),
+          },
+        },
       })
     }
   }
 
+  if (urduEnabled()) return entries
+  // English-only mode: list English URLs only, without Urdu alternates.
   return entries
+    .filter((e) => !e.url.startsWith(`${siteUrl}/ur`))
+    .map((e) => (e.alternates ? { ...e, alternates: undefined } : e))
 }

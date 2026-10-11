@@ -57,6 +57,7 @@ export async function runToolLoop<T>(
       role: 'assistant',
       content: result.content,
       toolCalls: result.toolCalls,
+      interactionId: result.interactionId,
     })
 
     for (const tc of result.toolCalls) {

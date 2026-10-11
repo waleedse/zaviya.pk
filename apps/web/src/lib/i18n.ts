@@ -51,7 +51,6 @@ const en = {
   themeDark: 'Dark mode',
   newsletter: { title: 'Morning briefing', desc: 'Top Pakistan stories in your inbox.', cta: 'Subscribe' },
   whatsapp: { title: 'Join our WhatsApp channel', desc: 'Breaking news and daily rates.', cta: 'Join channel' },
-  aiNote: 'AI-assisted, human-reviewed',
   notFound: { title: 'Page not found', desc: 'The story or page you are looking for may have moved.' },
   gold: 'Gold',
   dollar: 'Dollar',
@@ -106,7 +105,6 @@ const ur = {
   themeDark: 'ڈارک موڈ',
   newsletter: { title: 'صبح کا بریفنگ', desc: 'اہم پاکستان خبریں آپ کے ان باکس میں۔', cta: 'سبسکرائب' },
   whatsapp: { title: 'ہمارا واٹس ایپ چینل', desc: 'بریکنگ نیوز اور روزانہ ریٹ۔', cta: 'چینل جوائن کریں' },
-  aiNote: 'اے آئی مدد سے، انسانی جائزے کے ساتھ',
   notFound: { title: 'صفحہ نہیں ملا', desc: 'جو صفحہ یا خبر آپ ڈھونڈ رہے ہیں شاید منتقل ہو گئی ہو۔' },
   gold: 'سونا',
   dollar: 'ڈالر',
@@ -135,4 +133,9 @@ export function switchLocaleHref(currentLocale: Locale, alternateHref?: string, 
   if (!pathname) return currentLocale === 'en' ? '/ur' : '/'
   if (currentLocale === 'en') return `/ur${pathname === '/' ? '' : pathname}`
   return pathname.replace(/^\/ur/, '') || '/'
+}
+
+/** Urdu edition switch: off while the site runs English-only. Set NEXT_PUBLIC_URDU_ENABLED=true to bring it back. */
+export function urduEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_URDU_ENABLED === 'true'
 }

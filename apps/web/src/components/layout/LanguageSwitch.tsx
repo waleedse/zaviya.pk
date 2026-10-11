@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Locale } from '@zaviya/shared'
-import { t } from '@/lib/i18n'
+import { t, urduEnabled } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 export function LanguageSwitch({
@@ -12,6 +12,7 @@ export function LanguageSwitch({
   href: string
   className?: string
 }) {
+  if (!urduEnabled()) return null
   const d = t(locale)
   const label = locale === 'en' ? d.readInUrdu : d.readInEnglish
   return (

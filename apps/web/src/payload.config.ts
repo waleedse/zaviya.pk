@@ -27,6 +27,8 @@ import { MetricsDaily } from './collections/MetricsDaily'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { Settings } from './globals/Settings'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
+import { ANALYTICS_DDL } from './lib/analytics'
+import { LEARNING_DDL } from './lib/learning'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -59,6 +61,9 @@ export default buildConfig({
     user: Users.slug,
     meta: {
       title: 'Zaviya Admin',
+    },
+    components: {
+      beforeDashboard: ['/components/admin/ControlRoom#ControlRoom'],
     },
     importMap: {
       baseDir: path.resolve(dirname),
@@ -123,6 +128,9 @@ export default buildConfig({
           WHEN duplicate_column THEN NULL;
         END $$
       `)
+
+      await drizzle.execute(sql`ALTER TYPE enum_sources_type ADD VALUE IF NOT EXISTS 'instagram'`)
+      for (const stmt of [...ANALYTICS_DDL, ...LEARNING_DDL]) await drizzle.execute(stmt)
 
       await drizzle.execute(sql`
         CREATE INDEX IF NOT EXISTS source_items_embedding_hnsw_idx

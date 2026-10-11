@@ -1,4 +1,4 @@
-import type { XPost } from '@zaviya/shared'
+import type { XPost, XTrend } from '@zaviya/shared'
 import { XPostSchema } from '@zaviya/shared'
 import { randomDelay } from './delay'
 
@@ -37,7 +37,7 @@ export function scrapeTimelinePosts(sinceId?: string, limit = 30): XPost[] {
         author,
         text,
         url: `https://x.com/i/web/status/${id}`,
-        createdAt: new Date().toISOString(),
+        createdAt: article.querySelector('time')?.getAttribute('datetime') ?? new Date().toISOString(),
         mediaUrls,
       }),
     )
@@ -81,4 +81,34 @@ export async function postTweet(
   // Best-effort: read latest status id from timeline (may not be the new tweet).
   const first = scrapeTimelinePosts(undefined, 1)[0]
   return { externalId: first?.id }
+}
+
+/** Trend names from x.com/explore (uses the account's location setting, so set it to Pakistan). */
+export function scrapeTrends(limit = 30): XTrend[] {
+  const out: XTrend[] = []
+  for (const cell of Array.from(document.querySelectorAll('[data-testid="trend"]'))) {
+    if (out.length >= limit) break
+    const spans = Array.from(cell.querySelectorAll('span'))
+      .map((s) => s.textContent?.trim() ?? '')
+      .filter((t) => t && t !== '·')
+    // Typical order: "1", "Trending in Pakistan", "#Name", "12.3K posts"
+    const name = spans.find((t) => /^#/.test(t)) ?? spans.find((t) => !/^\d+$/.test(t) && !/trending|posts$/i.test(t))
+    if (!name) continue
+    out.push({
+      name,
+      context: spans.find((t) => /trending/i.test(t)),
+      postsLabel: spans.find((t) => /posts$/i.test(t)),
+    })
+  }
+  return out
+}
+
+/** Wait until at least one tweet (or trend) has rendered. */
+export async function waitForSelector(selector: string, timeoutMs = 15_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (document.querySelector(selector)) return true
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  return false
 }

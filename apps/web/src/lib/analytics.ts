@@ -1,0 +1,111 @@
+import { createHash } from 'node:crypto'
+import { sql } from '@payloadcms/db-postgres'
+import { getPayloadClient } from './payload'
+
+export type TrafficSource =
+  | 'google'
+  | 'discover'
+  | 'google-news'
+  | 'bing'
+  | 'facebook'
+  | 'instagram'
+  | 'whatsapp'
+  | 'x'
+  | 'youtube'
+  | 'push'
+  | 'internal'
+  | 'direct'
+  | 'other'
+
+const BOT_RE =
+  /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|whatsapp\/|telegrambot|preview|headless|lighthouse|pagespeed|curl|wget|python|node-fetch|axios|go-http|java\//i
+
+export function isBot(ua: string | null): boolean {
+  return !ua || BOT_RE.test(ua)
+}
+
+/** Where a visit came from, using the referrer first and utm_source as a hint. */
+export function classifySource(referrer: string | undefined, utmSource: string | undefined, siteHost: string): TrafficSource {
+  const utm = utmSource?.toLowerCase()
+  if (utm) {
+    if (utm.includes('whatsapp')) return 'whatsapp'
+    if (utm.includes('facebook') || utm === 'fb') return 'facebook'
+    if (utm.includes('instagram') || utm === 'ig') return 'instagram'
+    if (utm === 'x' || utm.includes('twitter')) return 'x'
+    if (utm.includes('push')) return 'push'
+  }
+  if (!referrer) return 'direct'
+  let host = ''
+  try {
+    host = new URL(referrer).hostname.replace(/^www\./, '')
+  } catch {
+    // android-app://com.google.android.googlequicksearchbox is Google Discover / the Google app
+    if (/googlequicksearchbox/.test(referrer)) return 'discover'
+    return 'other'
+  }
+  if (/googlequicksearchbox/.test(referrer)) return 'discover'
+  if (host === siteHost.replace(/^www\./, '')) return 'internal'
+  if (host === 'news.google.com') return 'google-news'
+  if (/(^|\.)google\.[a-z.]+$/.test(host)) return 'google'
+  if (/bing\.com$|duckduckgo\.com$|yahoo\.com$/.test(host)) return 'bing'
+  if (/facebook\.com$|fb\.com$|fb\.me$/.test(host)) return 'facebook'
+  if (/instagram\.com$/.test(host)) return 'instagram'
+  if (/whatsapp\.com$|wa\.me$|l\.wl\.co$/.test(host)) return 'whatsapp'
+  if (host === 't.co' || /(^|\.)x\.com$|twitter\.com$/.test(host)) return 'x'
+  if (/youtube\.com$|youtu\.be$/.test(host)) return 'youtube'
+  return 'other'
+}
+
+export function deviceFromUa(ua: string): 'mobile' | 'tablet' | 'desktop' {
+  if (/ipad|tablet/i.test(ua)) return 'tablet'
+  if (/mobi|android|iphone/i.test(ua)) return 'mobile'
+  return 'desktop'
+}
+
+/** Daily-rotating anonymous visitor id: counts uniques without cookies or stored IPs. */
+export function visitorId(ip: string, ua: string, day = new Date().toISOString().slice(0, 10)): string {
+  const salt = process.env.PAYLOAD_SECRET ?? 'zaviya'
+  return createHash('sha256').update(`${day}|${salt}|${ip}|${ua}`).digest('hex').slice(0, 16)
+}
+
+export async function recordPageview(row: {
+  path: string
+  locale?: string
+  source: TrafficSource
+  refHost?: string
+  device: string
+  country?: string
+  visitor: string
+}): Promise<void> {
+  const payload = await getPayloadClient()
+  await payload.db.drizzle.execute(sql`
+    INSERT INTO zaviya_pageviews (path, locale, source, ref_host, device, country, visitor)
+    VALUES (${row.path.slice(0, 500)}, ${row.locale ?? null}, ${row.source}, ${row.refHost ?? null}, ${row.device}, ${row.country ?? null}, ${row.visitor})
+  `)
+}
+
+/** Raw-SQL tables owned by the app (not Payload collections): created on boot. */
+export const ANALYTICS_DDL = [
+  sql`CREATE TABLE IF NOT EXISTS zaviya_pageviews (
+    id bigserial PRIMARY KEY,
+    ts timestamptz NOT NULL DEFAULT now(),
+    path text NOT NULL,
+    locale text,
+    source text NOT NULL,
+    ref_host text,
+    device text,
+    country text,
+    visitor text NOT NULL
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_ts_idx ON zaviya_pageviews (ts)`,
+  sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_path_ts_idx ON zaviya_pageviews (path, ts)`,
+  sql`CREATE TABLE IF NOT EXISTS zaviya_commands (
+    id bigserial PRIMARY KEY,
+    kind text NOT NULL,
+    payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_by text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    done_at timestamptz
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS zaviya_commands_pending_idx ON zaviya_commands (created_at) WHERE done_at IS NULL`,
+]

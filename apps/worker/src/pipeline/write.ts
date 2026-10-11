@@ -1,39 +1,31 @@
 import { WriterOutputSchema, type WriterOutput } from '@zaviya/shared'
-import type { LLMProvider, LLMTask, ToolDef } from '@zaviya/llm'
-import { runToolLoop, type LLMRouter } from '@zaviya/llm'
+import { isQuotaExhausted, zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
 import type { PayloadClient } from '../payload-client.js'
 import { writeEnSystemPrompt, WRITE_EN_PROMPT_VERSION } from '../prompts/write_en.js'
 import { writeUrSystemPrompt, WRITE_UR_PROMPT_VERSION } from '../prompts/write_ur.js'
 import { extractUrls } from './qa-checks.js'
 import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
+import type { Redis } from 'ioredis'
+import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
-  ur: WriterOutput & { title: string }
-  allowedUrls: Set<string>
+  /** Missing while the site runs English-only (WRITE_URDU=false) */
+  ur?: WriterOutput & { title: string }
+  allowedUrls: string[]
   promptVersions: { en: string; ur: string }
-}
-
-function routerProvider(router: LLMRouter, task: LLMTask, model: string): LLMProvider {
-  return {
-    id: 'router',
-    health: async () => true,
-    embed: async (m, input) => router.embed(task, input),
-    chat: (opts) =>
-      router.chat(task, {
-        messages: opts.messages,
-        tools: opts.tools,
-        format: opts.format,
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-        signal: opts.signal,
-      }).then((r) => ({ ...r, model: opts.model || model })),
-  }
+  seo?: SeoPlan
+  /** Which model actually wrote each locale (after any rotation/fallback) */
+  models?: { en: string; ur?: string }
 }
 
 function wrapSources(items: { id?: string; title: string; contentText?: string; summary?: string; url: string }[]) {
+  // ~12k characters of source text keeps the prompt inside a local model's 8k-token window.
+  const perItem = Math.max(1200, Math.floor(12_000 / Math.max(1, items.length)))
   return items
+    .slice(0, 8)
+    .map((it) => ({ ...it, contentText: it.contentText?.slice(0, perItem) }))
     .map(
       (it, i) =>
         `<source id="${it.id ?? i}">\n${it.title}\n${it.summary ?? ''}\n${it.contentText ?? ''}\nURL: ${it.url}\n</source>`,
@@ -41,121 +33,27 @@ function wrapSources(items: { id?: string; title: string; contentText?: string; 
     .join('\n\n')
 }
 
-export function buildWriterTools(deps: {
-  clusterId: string
-  payload: PayloadClient
-  env: WorkerEnv
-  allowDomains: Set<string>
-  urlLog: Set<string>
-}): ToolDef[] {
-  return [
-    {
-      name: 'web_search',
-      description: 'Search the web via SearXNG (top 8)',
-      parameters: {
-        type: 'object',
-        properties: { q: { type: 'string' }, lang: { type: 'string' } },
-        required: ['q'],
-      },
-      handler: async (args) => {
-        if (!deps.env.SEARXNG_URL) return { results: [], note: 'SearXNG not configured' }
-        const q = String(args.q ?? '')
-        const lang = String(args.lang ?? 'en')
-        const url = `${deps.env.SEARXNG_URL.replace(/\/$/, '')}/search?q=${encodeURIComponent(q)}&format=json&language=${lang}`
-        const res = await fetch(url, { signal: AbortSignal.timeout(12_000) })
-        if (!res.ok) return { error: res.status }
-        const data = (await res.json()) as { results?: { url: string; title: string }[] }
-        const results = (data.results ?? []).slice(0, 8)
-        for (const r of results) {
-          deps.urlLog.add(r.url)
-          try {
-            deps.allowDomains.add(new URL(r.url).hostname)
-          } catch {
-            /* ignore */
-          }
-        }
-        return { results }
-      },
-    },
-    {
-      name: 'fetch_url',
-      description: 'Fetch allowlisted URL text (max 6k chars)',
-      parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
-      handler: async (args) => {
-        const url = String(args.url ?? '')
-        let host = ''
-        try {
-          host = new URL(url).hostname
-        } catch {
-          return { error: 'invalid url' }
-        }
-        if (!deps.allowDomains.has(host)) return { error: 'domain not allowlisted' }
-        const { fetchArticleText } = await import('../ingest/extract.js')
-        const text = await fetchArticleText(url)
-        if (text) deps.urlLog.add(url)
-        return { text }
-      },
-    },
-    {
-      name: 'get_cluster_items',
-      description: 'All source texts for this cluster',
-      parameters: { type: 'object', properties: {} },
-      handler: async () => {
-        const c = await deps.payload.getCluster(deps.clusterId)
-        for (const it of c.items) deps.urlLog.add(it.url)
-        return { items: c.items }
-      },
-    },
-    {
-      name: 'get_internal_links',
-      description: 'Related articles on Zaviya',
-      parameters: {
-        type: 'object',
-        properties: { keywords: { type: 'array', items: { type: 'string' } }, locale: { type: 'string' } },
-        required: ['keywords', 'locale'],
-      },
-      handler: async (args) => {
-        const keywords = (args.keywords as string[]) ?? []
-        const locale = (args.locale === 'ur' ? 'ur' : 'en') as 'en' | 'ur'
-        const links = await deps.payload.internalLinks(keywords, locale)
-        for (const l of links.links) deps.urlLog.add(l.url)
-        return links
-      },
-    },
-    {
-      name: 'check_title',
-      description: 'Check title similarity vs recent articles',
-      parameters: {
-        type: 'object',
-        properties: { title: { type: 'string' }, locale: { type: 'string' } },
-        required: ['title'],
-      },
-      handler: async (args) => {
-        const title = String(args.title ?? '')
-        const locale = (args.locale === 'ur' ? 'ur' : 'en') as 'en' | 'ur'
-        return deps.payload.titleCheck(title, locale)
-      },
-    },
-    {
-      name: 'get_rate',
-      description: 'Latest PKR rate data-point (no dedicated endpoint — returns null unless wired)',
-      parameters: { type: 'object', properties: { series: { type: 'string' } }, required: ['series'] },
-      handler: async () => null,
-    },
-    {
-      name: 'get_trending_pk',
-      description: 'Google Trends daily RSS for Pakistan',
-      parameters: { type: 'object', properties: {} },
-      handler: async () => {
-        const res = await fetch('https://trends.google.com/trending/rss?geo=PK', {
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (!res.ok) return { error: res.status }
-        const xml = await res.text()
-        return { xml: xml.slice(0, 4000) }
-      },
-    },
-  ]
+function extractJson(text: string): string {
+  const t = text.trim()
+  if (t.startsWith('{')) return t
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(t)
+  if (fence?.[1]) return fence[1].trim()
+  const a = t.indexOf('{')
+  const b = t.lastIndexOf('}')
+  return a >= 0 && b > a ? t.slice(a, b + 1) : t
+}
+
+/** Related Zaviya stories the writer may link to (fetched up front instead of via tool calls). */
+async function internalLinksBlock(payload: PayloadClient, keywords: string[], locale: 'en' | 'ur', urlLog: Set<string>): Promise<string> {
+  if (!keywords.length) return ''
+  try {
+    const { links } = await payload.internalLinks(keywords.slice(0, 6), locale, 5)
+    if (!links.length) return ''
+    for (const l of links) urlLog.add(l.url)
+    return `\n\nRelated Zaviya articles you may link to where genuinely relevant (use the exact URLs):\n${links.map((l) => `- ${l.title}: ${l.url}`).join('\n')}`
+  } catch {
+    return ''
+  }
 }
 
 export function pickBestTitle(options: string[], checks: { maxSimilarity: number }[]): string {
@@ -191,97 +89,103 @@ async function runLocaleWrite(
   deps: {
     router: LLMRouter
     payload: PayloadClient
-    env: WorkerEnv
-    clusterId: string
     system: string
     userContent: string
-    allowDomains: Set<string>
     urlLog: Set<string>
     locale: 'en' | 'ur'
   },
-): Promise<WriterOutput & { title: string }> {
-  const ref = deps.router.getModelRef(task)
-  const model = ref.includes(':') ? ref.split(':').slice(1).join(':') : ref
-  const provider = routerProvider(deps.router, task, model)
-  const tools = buildWriterTools({
-    clusterId: deps.clusterId,
-    payload: deps.payload,
-    env: deps.env,
-    allowDomains: deps.allowDomains,
-    urlLog: deps.urlLog,
-  })
-  const { parsed } = await runToolLoop(provider, {
-    model,
-    messages: [
-      { role: 'system', content: deps.system },
-      { role: 'user', content: deps.userContent },
-    ],
-    tools,
-    outputSchema: WriterOutputSchema,
-  })
+): Promise<WriterOutput & { title: string; model: string }> {
+  const format = zodToJsonSchema(WriterOutputSchema, { target: 'openApi3' }) as Record<string, unknown>
+  const messages = [
+    { role: 'system' as const, content: deps.system },
+    { role: 'user' as const, content: deps.userContent },
+  ]
+  // One request per locale: the sources and links are already in the prompt.
+  const res = await deps.router.chat(task, { messages, format, temperature: 0.4, maxTokens: 8192, timeoutMs: 180_000 })
+  let model = `${res.provider}:${res.model}`
+  let parsed: WriterOutput
+  try {
+    parsed = WriterOutputSchema.parse(JSON.parse(extractJson(res.content)))
+  } catch (err) {
+    // One repair pass with the validation error, instead of discarding the draft.
+    const repair = await deps.router.chat(task, {
+      messages: [
+        ...messages,
+        { role: 'assistant', content: res.content },
+        { role: 'user', content: `That JSON is invalid: ${err instanceof Error ? err.message.slice(0, 800) : String(err)}. Return the corrected JSON only.` },
+      ],
+      format,
+      temperature: 0,
+      timeoutMs: 180_000,
+    })
+    model = `${repair.provider}:${repair.model}`
+    parsed = WriterOutputSchema.parse(JSON.parse(extractJson(repair.content)))
+  }
 
   const checks = await Promise.all(
     parsed.titleOptions.map((t) => deps.payload.titleCheck(t, deps.locale).catch(() => ({ maxSimilarity: 1 }))),
   )
   const title = pickBestTitle(parsed.titleOptions, checks)
   const bodyMarkdown = stripUnverifiedUrls(parsed.bodyMarkdown, deps.urlLog)
-  return { ...parsed, bodyMarkdown, title }
+  return { ...parsed, bodyMarkdown, title, model }
 }
 
 export async function processWriteJob(
-  data: { clusterId: string },
-  deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv },
+  data: { clusterId: string; feedback?: string[] },
+  deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv; redis?: Redis },
 ): Promise<WriteResult | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
-  const allowDomains = new Set<string>()
+  const seo = await researchSeo(cluster, deps)
+  if (seo) logger.info({ clusterId: data.clusterId, keyword: seo.plan.primaryKeyword, trends: seo.matchedTrends }, 'SEO plan ready')
   const urlLog = new Set<string>()
-  for (const it of cluster.items) {
-    urlLog.add(it.url)
-    try {
-      allowDomains.add(new URL(it.url).hostname)
-    } catch {
-      /* ignore */
-    }
-  }
+  for (const it of cluster.items) urlLog.add(it.url)
 
   const sourcesBlock = wrapSources(cluster.items)
-  let en: WriterOutput & { title: string }
-  let ur: WriterOutput & { title: string }
+  const feedbackBlock = data.feedback?.length
+    ? `\n\nA previous draft failed editorial QA. Fix every issue below:\n${data.feedback.map((f) => `- ${f}`).join('\n')}`
+    : ''
+  let en: WriterOutput & { title: string; model: string }
+  let ur: (WriterOutput & { title: string; model: string }) | undefined
+
+  const keywords = seo ? [seo.plan.primaryKeyword, ...seo.plan.secondaryKeywords] : [cluster.headline ?? cluster.items[0]?.title ?? '']
+  const linksEn = await internalLinksBlock(deps.payload, keywords.filter(Boolean), 'en', urlLog)
 
   try {
     en = await runLocaleWrite('write_en', {
       ...deps,
-      clusterId: data.clusterId,
       system: writeEnSystemPrompt(),
-      userContent: `Write the English article for this cluster.\n\n${sourcesBlock}`,
-      allowDomains,
+      userContent: `Write the English article for this cluster.\n\n${seo ? `${seoBrief(seo.plan, 'en')}\n\n` : ''}${sourcesBlock}${linksEn}${feedbackBlock}`,
       urlLog,
       locale: 'en',
     })
   } catch (e) {
-    logger.warn({ err: e }, 'write_en failed')
+    if (isQuotaExhausted(e)) throw e
+    logger.warn({ err: e instanceof Error ? e.message : e }, 'write_en failed')
     return null
   }
 
-  try {
+  if (deps.env.WRITE_URDU) try {
+    const linksUr = await internalLinksBlock(deps.payload, keywords.filter(Boolean), 'ur', urlLog)
     ur = await runLocaleWrite('write_ur', {
       ...deps,
-      clusterId: data.clusterId,
       system: writeUrSystemPrompt({ title: en.title, dek: en.dek }),
-      userContent: `Write the Urdu article using sources and the English reference.\n\n${sourcesBlock}`,
-      allowDomains,
+      userContent: `Write the Urdu article using sources and the English reference.\n\n${seo ? `${seoBrief(seo.plan, 'ur')}\n\n` : ''}${sourcesBlock}${linksUr}${feedbackBlock}`,
       urlLog,
       locale: 'ur',
     })
   } catch (e) {
-    logger.warn({ err: e }, 'write_ur failed')
+    if (isQuotaExhausted(e)) throw e
+    logger.warn({ err: e instanceof Error ? e.message : e }, 'write_ur failed')
     return null
   }
 
+  logger.info({ clusterId: data.clusterId, en: en.model, ur: ur?.model, title: en.title }, 'article written')
   return {
     en,
     ur,
-    allowedUrls: urlLog,
+    allowedUrls: [...urlLog],
     promptVersions: { en: WRITE_EN_PROMPT_VERSION, ur: WRITE_UR_PROMPT_VERSION },
+    seo: seo?.plan,
+    models: { en: en.model, ur: ur?.model },
   }
 }

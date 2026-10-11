@@ -27,6 +27,7 @@ export const Sources: CollectionConfig = {
         { label: 'Google News', value: 'gnews' },
         { label: 'X account', value: 'x_account' },
         { label: 'X list', value: 'x_list' },
+        { label: 'Instagram', value: 'instagram' },
         { label: 'Data', value: 'data' },
       ],
     },

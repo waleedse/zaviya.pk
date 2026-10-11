@@ -80,9 +80,13 @@ export class OllamaProvider implements LLMProvider {
     const body: Record<string, unknown> = {
       model: opts.model,
       stream: false,
+      // qwen3 "thinking" multiplies latency on CPU-only hosts; JSON tasks don't need it.
+      think: false,
+      keep_alive: '30m',
       messages: toOllamaMessages(opts.messages),
       options: {
         temperature: opts.temperature ?? 0.3,
+        // 8k keeps an 8B Q4 model under ~6.5 GB so it fits next to the worker and Chrome on a 16 GB Mac.
         num_ctx: 8192,
         num_predict: opts.maxTokens ?? 4096,
       },

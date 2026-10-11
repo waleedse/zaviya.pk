@@ -1,4 +1,4 @@
-import { postInstagram, detectCheckpoint } from '../lib/instagram-dom'
+import { postInstagram, readProfile, detectCheckpoint } from '../lib/instagram-dom'
 
 export default defineContentScript({
   matches: ['*://www.instagram.com/*'],
@@ -19,8 +19,14 @@ async function handle(msg: {
   mediaUrls?: string[]
   delayMinMs?: number
   delayMaxMs?: number
+  username?: string
+  limit?: number
 }): Promise<unknown> {
   if (detectCheckpoint()) throw new Error('checkpoint_detected')
+  if (msg.action === 'instagram.readProfile') {
+    if (!msg.username) throw new Error('missing_username')
+    return { posts: await readProfile(msg.username, msg.limit ?? 9) }
+  }
   if (msg.action === 'instagram.post') {
     return postInstagram(
       msg.caption ?? '',

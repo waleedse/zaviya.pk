@@ -25,6 +25,9 @@ const samples = [
     type: 'gemini.image',
     payload: { prompt: 'news card' },
   },
+  { id: 'job_6', type: 'x.search', payload: { query: 'Pakistan petrol', limit: 10 } },
+  { id: 'job_7', type: 'x.trending', payload: {} },
+  { id: 'job_8', type: 'instagram.readProfile', payload: { username: 'geonews', limit: 6 } },
 ]
 
 let failed = false

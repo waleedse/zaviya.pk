@@ -16,7 +16,7 @@ export function ReadingProgress() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[var(--header-offset,7rem)] z-50 h-0.5 bg-transparent md:top-28">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[3px] bg-transparent">
       <div className="h-full bg-accent transition-[width] duration-150" style={{ width: `${pct}%` }} />
     </div>
   )

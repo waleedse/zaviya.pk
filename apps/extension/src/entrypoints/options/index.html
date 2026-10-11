@@ -57,7 +57,22 @@
       <label><input type="checkbox" id="platformX" /> X (x.com)</label>
       <label><input type="checkbox" id="platformInstagram" /> Instagram</label>
       <label><input type="checkbox" id="platformFacebook" /> Facebook (heartbeat only — no bridge job type yet)</label>
+      <label><input type="checkbox" id="platformGemini" /> Gemini (hero images via gemini.google.com)</label>
     </fieldset>
+
+    <fieldset>
+      <legend>Gemini</legend>
+      <p class="hint">Stay signed in to gemini.google.com in this Chrome profile. The worker sends one prompt at a time.</p>
+      <label for="geminiSelectors">Selector overrides (JSON, optional)</label>
+      <textarea id="geminiSelectors" rows="4" style="width:100%;box-sizing:border-box;font-family:monospace" placeholder='{"sendButton": ["button.send-button"]}'></textarea>
+      <label for="testPrompt">Test prompt</label>
+      <input id="testPrompt" type="text" value="Minimal flat editorial illustration of a petrol pump at sunrise, emerald and gold tones, no text" />
+      <button id="testGemini" type="button">Test Gemini image</button>
+      <p id="testStatus" class="hint"></p>
+      <img id="testImage" alt="" style="max-width:100%;border-radius:8px;display:none" />
+    </fieldset>
+
+    <p class="hint">Worker connection: <strong id="conn">checking…</strong></p>
 
     <fieldset>
       <legend>Action delays (ms)</legend>

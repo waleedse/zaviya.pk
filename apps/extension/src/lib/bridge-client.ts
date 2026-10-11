@@ -6,7 +6,7 @@ import {
 import { getSettings, type PlatformKey } from './storage'
 import { scanOpenPlatforms } from './tabs'
 
-const EXTENSION_VERSION = '0.1.0'
+const EXTENSION_VERSION = '0.2.9'
 
 type JobHandler = (job: BridgeJob) => Promise<unknown>
 
@@ -27,6 +27,16 @@ export class BridgeClient {
         this.reconnect()
       }
     })
+  }
+
+  isAuthenticated(): boolean {
+    return this.authenticated
+  }
+
+  /** Called from the keep-alive alarm; reconnects if the socket died while the worker slept. */
+  ensureConnected(): void {
+    if (!this.running) return
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) void this.connect()
   }
 
   stop(): void {
@@ -169,11 +179,14 @@ function jobPlatform(job: BridgeJob): PlatformKey | null {
   switch (job.type) {
     case 'x.post':
     case 'x.readList':
+    case 'x.search':
+    case 'x.trending':
       return 'x'
     case 'instagram.post':
+    case 'instagram.readProfile':
       return 'instagram'
     case 'gemini.image':
-      return null
+      return 'gemini'
     default:
       return null
   }

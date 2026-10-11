@@ -2,13 +2,14 @@ import { notFound } from 'next/navigation'
 import { CATEGORIES, type Locale } from '@zaviya/shared'
 import DataPageView from '@/components/data/DataPageView'
 import { ArticleCard } from '@/components/article/ArticleCard'
-import { AdSlot } from '@/components/ads/AdSlot'
 import { Pagination } from '@/components/layout/Pagination'
-import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
+import { PageHero } from '@/components/layout/PageHero'
+import { ListingSidebar } from '@/components/layout/ListingSidebar'
+import { categoryIcon } from '@/lib/category-icons'
 import { getCategoryFeed, getDataPage, getMostRead } from '@/lib/queries'
 import { parseLocale, publicPath } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
-import { buildPageMetadata, dataPageSlugToKey } from '@/lib/seo'
+import { buildPageMetadata, dataPageSlugToKey, SECTION_SEO } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { breadcrumbJsonLd } from '@/lib/seo'
 
@@ -22,15 +23,24 @@ export async function generateMetadata({ params }: Props) {
   const dataKey = dataPageSlugToKey(category)
   if (dataKey) {
     const page = await getDataPage(locale, dataKey)
-    return buildPageMetadata({ locale, title: page.title, description: page.intro, path: `/${category}`, urPath: `/ur/${category}` })
+    return buildPageMetadata({
+      locale,
+      title: `${page.title}${page.headline ? ` (${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Karachi' })})` : ''}`,
+      description: (page.intro ?? page.source).slice(0, 160),
+      enPath: `/${category}`,
+      urPath: `/ur/${category}`,
+      // An empty rates page is thin content: keep it out of Google until real data exists.
+      noindex: !page.headline,
+    })
   }
   const cat = CATEGORIES.find((c) => c.slug === category)
   if (!cat) return {}
-  const name = locale === 'ur' ? cat.ur : cat.en
+  const seo = SECTION_SEO[category]?.[locale]
   return buildPageMetadata({
     locale,
-    title: name,
-    path: `/${category}`,
+    title: seo?.title ?? (locale === 'ur' ? cat.ur : cat.en),
+    description: seo?.description,
+    enPath: `/${category}`,
     urPath: `/ur/${category}`,
   })
 }
@@ -52,47 +62,60 @@ export default async function CategoryOrDataPage({ params, searchParams }: Props
   const name = locale === 'ur' ? catMeta.ur : catMeta.en
   const d = t(locale)
   const basePath = localePath(locale, `/${category}`)
-  const mostRead = await getMostRead(locale, 5)
-  const featured = feed.docs[0]
-  const rest = feed.docs.slice(1)
+  const mostRead = await getMostRead(locale, 6)
+  const featured = pageNum === 1 ? feed.docs[0] : undefined
+  const seconds = pageNum === 1 ? feed.docs.slice(1, 3) : []
+  const rest = pageNum === 1 ? feed.docs.slice(3) : feed.docs
+  const isUr = locale === 'ur'
 
   return (
-    <div className="container-page py-8">
+    <div className="pb-8">
       <JsonLd
         data={breadcrumbJsonLd([
           { name: d.nav.home, url: localePath(locale, '/') },
           { name, url: publicPath(locale, [category]) },
         ])}
       />
-      <Breadcrumbs items={[{ label: d.nav.home, href: localePath(locale, '/') }, { label: name }]} />
-      <header className="mb-8 border-t-4 pt-4" style={{ borderColor: catMeta.color }}>
-        <h1 className="font-display text-h1 font-semibold">{name}</h1>
-        <p className="mt-2 max-w-2xl text-fg-muted">
-          {locale === 'ur' ? `${name} سے متعلق تازہ ترین خبریں۔` : `Latest ${name} news and analysis for Pakistan.`}
-        </p>
-      </header>
+      <PageHero
+        title={name}
+        description={SECTION_SEO[category]?.[locale].description}
+        crumbs={[{ label: d.nav.home, href: localePath(locale, '/') }, { label: name }]}
+        icon={categoryIcon(category)}
+        color={catMeta.color}
+        eyebrow={isUr ? 'سیکشن' : 'Section'}
+        stats={feed.totalDocs ? [{ label: isUr ? 'خبریں' : 'stories', value: feed.totalDocs }] : undefined}
+      />
 
-      <div className="grid gap-10 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          {featured && (
-            <div className="mb-8">
-              <ArticleCard article={featured} locale={locale} variant="large" priority />
+      <div className="container-wide pt-8">
+        {feed.docs.length === 0 ? (
+          <p className="card-surface py-16 text-center text-fg-muted">{isUr ? 'اس سیکشن میں ابھی کوئی خبر نہیں۔' : 'No stories in this section yet.'}</p>
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="min-w-0 space-y-6">
+              {featured && (
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                  <ArticleCard article={featured} locale={locale} variant="lead" priority />
+                  {seconds.length > 0 && (
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
+                      {seconds.map((a) => (
+                        <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {rest.length > 0 && (
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {rest.map((a) => (
+                    <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
+                  ))}
+                </div>
+              )}
+              <Pagination locale={locale} page={feed.page} totalPages={feed.totalPages} basePath={basePath} />
             </div>
-          )}
-          <div className="grid gap-6 sm:grid-cols-2">
-            {rest.map((a) => (
-              <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
-            ))}
+            <ListingSidebar locale={locale} mostRead={mostRead} />
           </div>
-          <Pagination locale={locale} page={feed.page} totalPages={feed.totalPages} basePath={basePath} />
-        </div>
-        <aside className="lg:col-span-4">
-          <h2 className="mb-4 font-semibold">{d.mostRead}</h2>
-          {mostRead.map((a, i) => (
-            <ArticleCard key={a.id} article={a} locale={locale} variant="numbered" index={i} />
-          ))}
-          <AdSlot locale={locale} size="rectangle" />
-        </aside>
+        )}
       </div>
     </div>
   )

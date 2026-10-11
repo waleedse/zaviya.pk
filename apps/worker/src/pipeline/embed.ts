@@ -8,7 +8,7 @@ const DEBOUNCE_MS = 10 * 60 * 1000
 
 export async function processEmbedJob(
   data: { sourceItemId: string; title: string; summary?: string },
-  deps: { router: LLMRouter; payload: PayloadClient; triageQueue: Queue },
+  deps: { router: LLMRouter; payload: PayloadClient; triageQueue: Queue; minSources?: number },
 ): Promise<void> {
   const text = `${data.title}\n${data.summary ?? ''}`.trim()
   let embedding: number[][]
@@ -37,6 +37,11 @@ export async function processEmbedJob(
 
   const prev = triageDebounce.get(match.clusterId)
   const now = Date.now()
+  // Triage costs local CPU time: wait until a second outlet confirms the story (tier-1 wires excepted),
+  // and leave clusters alone while a decision on them is pending.
+  const corroborated = cluster.distinctSources >= (deps.minSources ?? 2) || cluster.maxTier === 1
+  if (!corroborated || ['rejected', 'in_review', 'writing'].includes(cluster.status)) return
+
   const itemCountChanged = !prev || prev.itemCount !== cluster.itemCount
   const debounceExpired = !prev || now - prev.at > DEBOUNCE_MS
   if (match.isNew || (itemCountChanged && debounceExpired)) {
