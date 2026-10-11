@@ -1,6 +1,6 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq'
 import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
-import type { WorkerEnv } from './config.js'
+import { subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
@@ -89,6 +89,7 @@ export async function createWorkerRuntime(
     apiKey: env.LLM_API_KEY,
     apiFallbackModel: env.LLM_API_FALLBACK_MODEL,
     apiLightModel: env.LLM_API_LIGHT_MODEL,
+    subscriptionChain: subscriptionChain(env),
   })
 
   try {

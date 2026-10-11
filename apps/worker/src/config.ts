@@ -1,3 +1,4 @@
+import { CliProvider, type LLMTask } from '@zaviya/llm'
 import { z } from 'zod'
 
 /** Treat blank env vars as unset so optional `.url()` fields don't fail. */
@@ -40,6 +41,16 @@ const envSchema = z.object({
   LLM_API_FALLBACK_MODEL: optionalStr,
   /** Cheap model on that API for triage/SEO/QA when LOCAL_MODEL=off, e.g. qwen/qwen3.7-flash */
   LLM_API_LIGHT_MODEL: optionalStr,
+  /** Cursor plan via `cursor-agent` (first writing engine when set) */
+  CURSOR_API_KEY: optionalStr,
+  CURSOR_MODEL: z.string().default('auto'),
+  /** Claude plan via `claude -p` (`claude setup-token`): writing engine after Cursor */
+  CLAUDE_CODE_OAUTH_TOKEN: optionalStr,
+  CLAUDE_WRITER_MODEL: z.string().default('haiku'),
+  /** Writer calls allowed per 5 hours, so the agents keep their share of the Claude plan */
+  CLAUDE_WRITER_MAX_CALLS_5H: z.coerce.number().min(0).default(40),
+  /** Tasks the subscription engines take, comma separated */
+  SUBSCRIPTION_TASKS: z.string().default('write_en,write_ur'),
   /** Local Ollama model for triage/SEO/QA and as the writing fallback ("off" to disable) */
   LOCAL_MODEL: z.string().default('qwen3:8b'),
   DISCOVERY_INTERVAL_MIN: z.coerce.number().min(5).default(20),
@@ -74,6 +85,8 @@ export function integrationStatus(env: WorkerEnv) {
   return {
     payload: Boolean(env.PAYLOAD_API_KEY),
     gemini: Boolean(env.GEMINI_API_KEY),
+    cursor: Boolean(env.CURSOR_API_KEY),
+    claude: Boolean(env.CLAUDE_CODE_OAUTH_TOKEN),
     searxng: Boolean(env.SEARXNG_URL),
     telegram: Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID),
     meta: Boolean(env.META_PAGE_ID && env.META_PAGE_TOKEN && env.IG_USER_ID),
@@ -82,4 +95,25 @@ export function integrationStatus(env: WorkerEnv) {
     bridge: Boolean(env.BRIDGE_TOKEN),
     goldRates: Boolean(env.GOLD_API_URL),
   }
+}
+
+/** Subscription engines for the LLM router, in order: Cursor first, then Claude. */
+export function subscriptionChain(env: WorkerEnv) {
+  const tasks = env.SUBSCRIPTION_TASKS.split(',').map((t) => t.trim()).filter(Boolean) as LLMTask[]
+  const chain: { provider: CliProvider; model: string; tasks: LLMTask[] }[] = []
+  if (env.CURSOR_API_KEY) {
+    chain.push({ provider: new CliProvider({ kind: 'cursor', env: { CURSOR_API_KEY: env.CURSOR_API_KEY } }), model: env.CURSOR_MODEL, tasks })
+  }
+  if (env.CLAUDE_CODE_OAUTH_TOKEN) {
+    chain.push({
+      provider: new CliProvider({
+        kind: 'claude',
+        env: { CLAUDE_CODE_OAUTH_TOKEN: env.CLAUDE_CODE_OAUTH_TOKEN },
+        maxCallsPer5h: env.CLAUDE_WRITER_MAX_CALLS_5H,
+      }),
+      model: env.CLAUDE_WRITER_MODEL,
+      tasks,
+    })
+  }
+  return chain
 }

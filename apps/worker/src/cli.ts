@@ -1,4 +1,4 @@
-import { loadConfig } from './config.js'
+import { loadConfig, subscriptionChain } from './config.js'
 import { PayloadClient } from './payload-client.js'
 import { LLMRouter } from '@zaviya/llm'
 import { createWorkerRuntime, shutdownRuntime } from './queues.js'
@@ -19,7 +19,7 @@ const cmd = process.argv[2]
 async function run() {
   const env = loadConfig()
   const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
-  const router = new LLMRouter({ ollamaUrl: env.OLLAMA_URL, geminiApiKey: env.GEMINI_API_KEY, localModel: env.LOCAL_MODEL, apiBaseUrl: env.LLM_API_BASE_URL, apiKey: env.LLM_API_KEY, apiFallbackModel: env.LLM_API_FALLBACK_MODEL, apiLightModel: env.LLM_API_LIGHT_MODEL })
+  const router = new LLMRouter({ ollamaUrl: env.OLLAMA_URL, geminiApiKey: env.GEMINI_API_KEY, localModel: env.LOCAL_MODEL, apiBaseUrl: env.LLM_API_BASE_URL, apiKey: env.LLM_API_KEY, apiFallbackModel: env.LLM_API_FALLBACK_MODEL, apiLightModel: env.LLM_API_LIGHT_MODEL, subscriptionChain: subscriptionChain(env) })
 
   // Take stories without a Gemini image offline and queue an image for each (the running worker does the rest).
   //   backfill-heroes --dry-run   only count them

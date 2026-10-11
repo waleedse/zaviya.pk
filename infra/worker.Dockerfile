@@ -5,6 +5,13 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable && corepack prepare pnpm@10.18.0 --activate \
   && apt-get update && apt-get install -y --no-install-recommends ca-certificates fonts-noto-core fonts-noto-extra \
   && rm -rf /var/lib/apt/lists/*
+# Subscription writing engines: Cursor CLI (cursor-agent) and Claude Code (claude -p)
+RUN apt-get update && apt-get install -y --no-install-recommends curl git \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm install -g @anthropic-ai/claude-code \
+  && (curl -fsSL https://cursor.com/install | bash) \
+  && ln -sf /root/.local/bin/cursor-agent /usr/local/bin/cursor-agent \
+  && claude --version && cursor-agent --version
 WORKDIR /app
 COPY . .
 # tsx runs the TypeScript directly, so dev dependencies are needed too

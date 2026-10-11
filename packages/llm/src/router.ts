@@ -2,6 +2,7 @@ import { GeminiProvider } from './gemini.js'
 import { OpenAICompatProvider } from './openai-compat.js'
 import { OllamaProvider } from './ollama.js'
 import { Semaphore } from './semaphore.js'
+import type { CliProvider } from './cli.js'
 import type { ChatResult, LLMProvider, LLMTask, Msg, ToolDef, JSONSchema } from './types.js'
 import { DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
 
@@ -24,6 +25,11 @@ export interface LLMRouterOptions {
   apiFallbackModel?: string
   /** Cheap model on that API for short JSON jobs when the local model is off (triage, SEO, QA) */
   apiLightModel?: string
+  /**
+   * Subscription CLIs tried first, in order, for the listed tasks (e.g. Cursor, then Claude Haiku
+   * for writing). A resting or failing engine is skipped and the normal chain takes over.
+   */
+  subscriptionChain?: { provider: CliProvider; model: string; tasks: LLMTask[] }[]
 }
 
 function parseModelRef(ref: string): { provider: 'ollama' | 'gemini' | 'api'; model: string } {
@@ -54,6 +60,7 @@ export class LLMRouter {
   private readonly api: OpenAICompatProvider | null
   private readonly apiFallbackModel?: string
   private readonly apiLightModel?: string
+  private readonly subscriptionChain: NonNullable<LLMRouterOptions['subscriptionChain']>
 
   constructor(opts: LLMRouterOptions = {}) {
     this.ollama = new OllamaProvider(opts.ollamaUrl)
@@ -64,6 +71,12 @@ export class LLMRouter {
     this.api = opts.apiBaseUrl && opts.apiKey ? new OpenAICompatProvider(opts.apiBaseUrl, opts.apiKey) : null
     this.apiFallbackModel = opts.apiFallbackModel
     this.apiLightModel = opts.apiLightModel
+    this.subscriptionChain = opts.subscriptionChain ?? []
+  }
+
+  /** Which subscription engines are usable right now (for the control room and agents). */
+  subscriptionStatus() {
+    return this.subscriptionChain.map((e) => ({ ...e.provider.status(), model: e.model, tasks: e.tasks }))
   }
 
   updateSettings(settings: RouterSettings): void {
@@ -131,6 +144,23 @@ export class LLMRouter {
       signal?: AbortSignal
     },
   ): Promise<ChatResult> {
+    // Plain-text jobs only: the CLIs do not take our tool definitions.
+    if (!opts.tools?.length) {
+      for (const engine of this.subscriptionChain) {
+        if (!engine.tasks.includes(task) || engine.provider.isResting()) continue
+        try {
+          return await engine.provider.chat({
+            model: engine.model,
+            messages: opts.messages,
+            format: opts.format,
+            signal: opts.signal ?? AbortSignal.timeout(Math.max(opts.timeoutMs ?? 0, 6 * 60_000)),
+          })
+        } catch {
+          // Resting, out of plan quota or a bad reply: next engine.
+        }
+      }
+    }
+
     const { primary, primaryModel } = await this.resolveProviders(task)
 
     // CPU-only local models are slow: give them far more time than a cloud call.
