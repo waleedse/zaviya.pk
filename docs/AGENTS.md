@@ -1,7 +1,24 @@
 # Zaviya: AI Team aur 24/7 Workflow
 
 > Maqsad: ek aisi newsroom aur product team jo khud chale, khud seekhe, aur sirf zaroori faislon par Waleed se poochhe.
-> Status: design (11 Oct 2026). Implementation phases neeche section 10 mein hain.
+> Status: chal raha hai (12 Oct 2026). Neeche "Abhi kya chal raha hai" asal setup hai; baqi document shuru ka design hai.
+
+## Abhi kya chal raha hai (12 Oct 2026)
+
+| Kahan | Kya | Kab | Engine |
+|---|---|---|---|
+| Server (Docker) | **Worker**: sources → cluster → triage → likhai → QA → image → publish → social | 24/7, event par | Likhai: Cursor → Claude Haiku → Gemini → OpenRouter. Image: Gemini (extension) → FLUX (Cloudflare) |
+| Server (`agents` container) | **Watchdog**: site, worker heartbeat, queues, publishing, extension | Har minute | Sirf code. Masla → Linear `incident` / `needs-waleed` |
+| Server (`agents` container) | **Editor-in-Chief** | Har ghanta (raat ko har 3 ghante) | Cursor → Claude Haiku, sirf allowlisted tools |
+| Mac (Claude app scheduled tasks) | **Engineer** | Har 2 ghante | Incidents, phir `pm-approved` issue → branch + PR |
+| Mac | **PM** standup / review (+ Sunday strategy) | 09:00 / 21:00 | Linear triage, approvals, summary |
+| Mac | **SEO** | 10:00 (Monday audit) | CTR, SEO check, playbook |
+| Mac | **Social** | 08:00 | Din ka plan, queued posts |
+| GitHub Actions | **Auto release** | CI ke baad + har 30 min | `agent/*` PR + Linear `pm-approved` (aur `risk-high` nahi) + CI green → merge → release → zero-downtime deploy |
+
+- **Deploy:** release tag → server runner → blue/green (3100/3101), health check, nginx graceful switch. Fail ho to purana live rehta hai.
+- **Agents ki yaad:** server: `/data/<agent>/journal.md` (`docker exec zaviya-agents-1 ...`); Mac: `~/.zaviya-agents/<agent>/journal.md`.
+- **Pacing:** normal khabrein kam az kam 15 min ke fasle se (Settings → Min interval), roz ki hadd 96 (`DAILY_ARTICLE_CAP`); breaking par koi hadd nahi.
 
 ---
 
