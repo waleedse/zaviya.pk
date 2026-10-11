@@ -23,4 +23,10 @@ describe('cli helpers', () => {
     await expect(p.chat({ model: 'haiku', messages: [{ role: 'user', content: 'hi' }] })).rejects.toThrow()
     expect(p.isResting()).toBe(true)
   })
+
+  it('fails cleanly when the CLI exits before reading a large prompt', async () => {
+    const p = new CliProvider({ kind: 'claude', bin: 'false' })
+    const content = 'x'.repeat(2_000_000)
+    await expect(p.chat({ model: 'haiku', messages: [{ role: 'user', content }] })).rejects.toThrow(/failed \(exit 1\)/)
+  })
 })

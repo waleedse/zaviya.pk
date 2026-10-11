@@ -138,6 +138,9 @@ export class CliProvider implements LLMProvider {
         child.stdout.on('data', (d) => (stdout += d))
         child.stderr.on('data', (d) => (stderr += d))
         child.on('error', reject)
+        // A CLI that exits before reading its prompt closes the pipe: ignore the EPIPE here,
+        // 'close' still reports the exit code. Unhandled, it would crash the whole process.
+        child.stdin.on('error', () => {})
         child.on('close', (code) => resolve({ stdout, stderr, code: code ?? 1 }))
         if (this.opts.kind === 'claude') child.stdin.end(input)
         else child.stdin.end()
