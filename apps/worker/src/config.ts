@@ -43,7 +43,8 @@ const envSchema = z.object({
   LLM_API_LIGHT_MODEL: optionalStr,
   /** Cursor plan via `cursor-agent` (first writing engine when set) */
   CURSOR_API_KEY: optionalStr,
-  CURSOR_MODEL: z.string().default('auto'),
+  /** Cursor models in order, comma separated: when one hits its limit the next takes over */
+  CURSOR_MODEL: z.string().default('auto,gemini-3.7-flash-high,composer-2.5'),
   /** Claude plan via `claude -p` (`claude setup-token`): writing engine after Cursor */
   CLAUDE_CODE_OAUTH_TOKEN: optionalStr,
   CLAUDE_WRITER_MODEL: z.string().default('haiku'),
@@ -109,7 +110,10 @@ export function subscriptionChain(env: WorkerEnv) {
   const tasks = env.SUBSCRIPTION_TASKS.split(',').map((t) => t.trim()).filter(Boolean) as LLMTask[]
   const chain: { provider: CliProvider; model: string; tasks: LLMTask[] }[] = []
   if (env.CURSOR_API_KEY) {
-    chain.push({ provider: new CliProvider({ kind: 'cursor', env: { CURSOR_API_KEY: env.CURSOR_API_KEY } }), model: env.CURSOR_MODEL, tasks })
+    // One provider per model, so each model rests on its own when it hits a limit
+    for (const model of env.CURSOR_MODEL.split(',').map((m) => m.trim()).filter(Boolean)) {
+      chain.push({ provider: new CliProvider({ kind: 'cursor', env: { CURSOR_API_KEY: env.CURSOR_API_KEY } }), model, tasks })
+    }
   }
   if (env.CLAUDE_CODE_OAUTH_TOKEN) {
     chain.push({
