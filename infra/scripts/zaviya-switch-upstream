@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Point nginx at the Zaviya web port (3100 blue / 3101 green) and reload gracefully.
+# Installed as /usr/local/bin/zaviya-switch-upstream; the deploy user may sudo it (and nothing else).
+set -euo pipefail
+PORT="${1:?usage: zaviya-switch-upstream 3100|3101}"
+case "$PORT" in 3100|3101) ;; *) echo "port must be 3100 or 3101" >&2; exit 2 ;; esac
+CONF=/etc/nginx/conf.d/zaviya-upstream.conf
+cp "$CONF" "$CONF.bak" 2>/dev/null || true
+printf 'upstream zaviya_web {\n    server 127.0.0.1:%s;\n    keepalive 16;\n}\n' "$PORT" > "$CONF"
+if nginx -t 2>/dev/null; then
+  systemctl reload nginx
+  echo "nginx -> 127.0.0.1:$PORT"
+else
+  mv "$CONF.bak" "$CONF"
+  echo "nginx config test failed; kept the previous upstream" >&2
+  exit 1
+fi

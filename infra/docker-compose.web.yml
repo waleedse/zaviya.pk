@@ -1,0 +1,44 @@
+# Zaviya web, one colour of a blue/green pair. deploy.sh runs it as compose project
+# zaviya-web-blue (127.0.0.1:3100) or zaviya-web-green (127.0.0.1:3101) and points nginx at
+# the healthy one. Both join the main stack's network as "web" so the worker can reach it.
+#   COLOR=green WEB_PORT=3101 RELEASE=v... docker compose -p zaviya-web-green -f docker-compose.web.yml --env-file ../../env/compose.env up -d
+services:
+  web:
+    image: zaviya-web:${RELEASE:-latest}
+    build:
+      context: ..
+      dockerfile: infra/web.Dockerfile
+      network: host
+      args:
+        BUILD_DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@127.0.0.1:5434/${DB_NAME:-zaviya}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_WHATSAPP_CHANNEL_URL: ${NEXT_PUBLIC_WHATSAPP_CHANNEL_URL:-}
+        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+    restart: unless-stopped
+    env_file: ${ENV_DIR:-../../env}/web.env
+    environment:
+      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/${DB_NAME:-zaviya}
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:${WEB_PORT:?set WEB_PORT}:3000'
+    volumes:
+      - media:/app/apps/web/media
+    networks:
+      default:
+        aliases: [web]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/robots.txt').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
+      retries: 10
+
+networks:
+  default:
+    name: zaviya_default
+    external: true
+
+volumes:
+  media:
+    name: zaviya_media
+    external: true

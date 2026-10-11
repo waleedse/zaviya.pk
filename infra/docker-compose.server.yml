@@ -2,7 +2,8 @@
 # Lives at /var/www/aurm-test/app; secrets in /var/www/aurm-test/env (never in git).
 #   docker compose -f infra/docker-compose.server.yml --env-file ../env/compose.env up -d --build
 # Ports are bound to 127.0.0.1 only: nginx on the host terminates TLS and proxies in.
-# The host already serves other sites on 3000, so the web app uses 3100.
+# The web app is NOT here: it runs blue/green from docker-compose.web.yml (ports 3100/3101)
+# so releases switch over with zero downtime (see infra/scripts/deploy.sh).
 name: zaviya
 
 services:
@@ -34,36 +35,6 @@ services:
       interval: 5s
       retries: 20
 
-  web:
-    image: zaviya-web:${RELEASE:-latest}
-    build:
-      context: ..
-      dockerfile: infra/web.Dockerfile
-      network: host
-      args:
-        BUILD_DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@127.0.0.1:5434/${DB_NAME:-zaviya}
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL}
-        NEXT_PUBLIC_WHATSAPP_CHANNEL_URL: ${NEXT_PUBLIC_WHATSAPP_CHANNEL_URL:-}
-        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
-    restart: unless-stopped
-    env_file: ${ENV_DIR:-../../env}/web.env
-    environment:
-      DATABASE_URL: postgres://zaviya:${POSTGRES_PASSWORD}@postgres:5432/${DB_NAME:-zaviya}
-      NODE_ENV: production
-    ports:
-      - '127.0.0.1:3100:3000'
-    volumes:
-      - media:/app/apps/web/media
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/robots.txt').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 10s
-      start_period: 90s
-      retries: 10
-
   worker:
     image: zaviya-worker:${RELEASE:-latest}
     build:
@@ -83,10 +54,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      web:
-        condition: service_healthy
 
 volumes:
   pgdata:
   redisdata:
-  media:
