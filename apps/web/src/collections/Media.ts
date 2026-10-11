@@ -26,8 +26,12 @@ export const Media: CollectionConfig = {
     {
       name: 'alt',
       type: 'text',
-      required: true,
       localized: true,
+      // Required on upload only. Not `required: true`: the R2 storage plugin re-saves the doc right
+      // after upload and that internal update does not see the localized alt, so every upload failed.
+      validate: (value: unknown, { operation }: { operation?: string }) =>
+        operation !== 'create' || (typeof value === 'string' && value.trim().length > 0) || 'Alt text is required',
+      admin: { description: 'Required: describe the image for readers using screen readers and for Google Images.' },
     },
     {
       name: 'credit',

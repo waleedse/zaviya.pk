@@ -190,7 +190,10 @@ export interface User {
  */
 export interface Media {
   id: number;
-  alt: string;
+  /**
+   * Required: describe the image for readers using screen readers and for Google Images.
+   */
+  alt?: string | null;
   credit?: string | null;
   license?: ('own' | 'ai-generated' | 'handout' | 'wikimedia' | 'stock') | null;
   isAiGenerated?: boolean | null;

@@ -148,7 +148,7 @@ export async function processMediaJob(
   if (blob) {
     try {
       const uploaded = await deps.payload.uploadMedia(blob, {
-        alt: data.write.en.altText,
+        alt: data.write.en.altText?.trim() || data.write.en.title,
         license: 'ai-generated',
         isAiGenerated: true,
         credit: 'Zaviya',
