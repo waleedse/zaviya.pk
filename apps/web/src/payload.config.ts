@@ -29,6 +29,7 @@ import { Settings } from './globals/Settings'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
 import { ANALYTICS_DDL } from './lib/analytics'
 import { LEARNING_DDL } from './lib/learning'
+import { migrations } from './migrations'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -111,6 +112,9 @@ export default buildConfig({
     // Keep false: onInit owns the pgvector `embedding` column; Drizzle push
     // would otherwise prompt to drop it and hang the non-interactive server.
     push: process.env.PAYLOAD_DATABASE_PUSH === 'true',
+    // Production applies pending migrations on boot. After changing a collection:
+    //   pnpm --filter @zaviya/web payload migrate:create <name>
+    prodMigrations: migrations,
   }),
   sharp,
   plugins,
