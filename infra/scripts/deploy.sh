@@ -13,7 +13,7 @@ mkdir -p "$STATE"
 git -C "$APP" fetch --quiet --tags --force origin
 git -C "$APP" checkout --quiet --force --detach "$REF"
 SHA=$(git -C "$APP" rev-parse --short HEAD)
-RELEASE=$(echo "$REF" | tr -c 'A-Za-z0-9_.-\n' '-')
+RELEASE=$(echo "$REF" | tr -c 'A-Za-z0-9_.\n-' '-')
 PREVIOUS=$(cat "$STATE/current" 2>/dev/null || true)
 
 dc() { (cd "$APP/infra" && RELEASE="$1" docker compose -f docker-compose.server.yml --env-file "$ROOT/env/compose.env" "${@:2}"); }
