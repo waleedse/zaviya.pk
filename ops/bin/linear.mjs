@@ -48,14 +48,12 @@ async function gql(query, variables = {}) {
 let teamCache
 async function team() {
   if (teamCache) return teamCache
-  const d = await gql(
-    `query($key: String!) { teams(filter: { key: { eq: $key } }) { nodes { id
-      states { nodes { id name type } }
-      labels(first: 250) { nodes { id name } } } } }`,
-    { key: TEAM_KEY },
-  )
-  teamCache = d.teams.nodes[0]
-  if (!teamCache) fail(`team ${TEAM_KEY} not found`)
+  // Separate small queries: one nested query exceeds Linear's complexity limit
+  const t = (await gql(`query($key: String!) { teams(filter: { key: { eq: $key } }) { nodes { id } } }`, { key: TEAM_KEY })).teams.nodes[0]
+  if (!t) fail(`team ${TEAM_KEY} not found`)
+  const states = (await gql(`query($id: String!) { team(id: $id) { states(first: 50) { nodes { id name type } } } }`, { id: t.id })).team.states
+  const labels = (await gql(`query { issueLabels(first: 100) { nodes { id name } } }`)).issueLabels
+  teamCache = { id: t.id, states, labels }
   return teamCache
 }
 
