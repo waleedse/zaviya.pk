@@ -7,6 +7,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
+import { generateHeroViaWorkersAI } from './flux.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
 export { renderSocialCard, renderSocialCardSet } from './social-card.js'
@@ -118,8 +119,18 @@ export async function processMediaJob(
   const category = triage?.category ?? 'pakistan'
   const accent = categoryAccentColor(category)
 
-  // Never reuse source photos (copyright). Generate an illustration via Gemini web.
-  const blob = await generateHeroViaExtension(data.write.en.imageBrief || data.write.en.title, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
+  // Never reuse source photos (copyright). Generate the image via Gemini web (extension); when the
+  // extension is offline or Gemini has failed enough times, fall back to Workers AI (FLUX).
+  const brief = data.write.en.imageBrief || data.write.en.title
+  let blob = await generateHeroViaExtension(brief, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
+  const geminiTries = (data.imageTries ?? 0) + 1
+  if (!blob && (!deps.bridge.isOnline() || geminiTries >= deps.env.GEMINI_IMAGE_TRIES_BEFORE_FALLBACK)) {
+    blob = await generateHeroViaWorkersAI(brief, {
+      accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
+      token: deps.env.CLOUDFLARE_AI_TOKEN,
+      clusterId: data.clusterId,
+    })
+  }
   // No real illustration yet: hold the story and try again later instead of publishing a text card.
   if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
     const tries = (data.imageTries ?? 0) + 1

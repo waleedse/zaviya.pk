@@ -55,6 +55,22 @@ services:
       redis:
         condition: service_healthy
 
+  agents:
+    image: zaviya-agents:${RELEASE:-latest}
+    build:
+      context: ..
+      dockerfile: infra/agents.Dockerfile
+    restart: unless-stopped
+    env_file: ${ENV_DIR:-../../env}/agents.env
+    environment:
+      PAYLOAD_URL: http://web:3000
+      SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    volumes:
+      - agentdata:/data
+    # Watchdog + one CLI agent run at a time: keep it small next to the web app
+    mem_limit: 1g
+
 volumes:
+  agentdata:
   pgdata:
   redisdata:

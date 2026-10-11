@@ -3,7 +3,7 @@
 #   1. build the web + worker images for the release (the live site keeps serving)
 #   2. start web on the idle colour (3100 blue / 3101 green) and wait until it is healthy
 #   3. point nginx at it (graceful reload), then stop the old colour
-#   4. recreate the worker on the new image (no user-facing traffic)
+#   4. recreate the worker and agents on the new images (no user-facing traffic)
 # If the new web never gets healthy, nginx is not touched and the old colour stays live.
 #   bash infra/scripts/deploy.sh v2026.10.12-1
 set -euo pipefail
@@ -46,7 +46,7 @@ NEXT=blue; NEXT_PORT=3100
 
 echo "==> $RELEASE ($SHA): live=$LIVE, deploying to $NEXT"
 web "$NEXT" "$RELEASE" build
-stack "$RELEASE" build worker
+stack "$RELEASE" build worker agents
 
 web "$NEXT" "$RELEASE" up -d --force-recreate
 if ! web_healthy "$NEXT_PORT"; then
@@ -63,7 +63,7 @@ web "$LIVE" "${PREVIOUS:-latest}" down --remove-orphans 2>/dev/null || true
 # One-time cleanup: the web service used to live in the main stack
 docker rm -f zaviya-web-1 >/dev/null 2>&1 || true
 
-stack "$RELEASE" up -d --remove-orphans postgres redis worker
+stack "$RELEASE" up -d --remove-orphans postgres redis worker agents
 for _ in $(seq 1 20); do
   [ "$(docker inspect -f '{{.State.Running}}' zaviya-worker-1 2>/dev/null)" = true ] && break
   sleep 3

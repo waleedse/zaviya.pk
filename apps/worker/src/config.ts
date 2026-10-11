@@ -63,6 +63,11 @@ const envSchema = z.object({
   /** Never publish with only the branded text card: wait for a real Gemini illustration (default on) */
   REQUIRE_HERO_IMAGE: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** How often to retry the image before giving up (retries are 15 min apart) */
+  /** Cloudflare Workers AI (FLUX) fallback for hero images: account id (same as R2) + API token */
+  CLOUDFLARE_ACCOUNT_ID: optionalStr,
+  CLOUDFLARE_AI_TOKEN: optionalStr,
+  /** Gemini attempts before the FLUX fallback is used */
+  GEMINI_IMAGE_TRIES_BEFORE_FALLBACK: z.coerce.number().min(1).default(3),
   HERO_IMAGE_MAX_TRIES: z.coerce.number().min(1).default(8),
   BRIDGE_PORT: z.coerce.number().default(8787),
   /** Interface the bridge listens on: keep 127.0.0.1 natively, 0.0.0.0 in Docker */
