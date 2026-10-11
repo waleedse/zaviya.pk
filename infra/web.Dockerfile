@@ -5,9 +5,14 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@10.18.0 --activate
 WORKDIR /app
 
-FROM base AS build
+FROM base AS deps
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @zaviya/web...
+# `--target deps` gives a tools image for Payload CLI jobs (migrations, seed).
+WORKDIR /app/apps/web
+
+FROM deps AS build
+WORKDIR /app
 # Public build-time values (canonical URLs, analytics, WhatsApp channel)
 ARG NEXT_PUBLIC_SITE_URL=https://zaviya.pk
 ARG NEXT_PUBLIC_WHATSAPP_CHANNEL_URL=
