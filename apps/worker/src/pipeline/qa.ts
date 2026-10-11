@@ -96,15 +96,14 @@ export async function processQaJob(
       return
     }
     if (deps.autoApprove && deps.autoApprove !== 'off') {
-      // Nobody is waiting on a review queue: publish if only style/SEO/length remain, drop if facts don't check out.
+      // Publish if only style/SEO/length issues remain; unsupported facts go to the review queue below.
       const factual = result.issues.filter((i) => /^Unsupported|originality|overlap|copied/i.test(i))
       if (!factual.length) {
         await deps.mediaQueue.add('media', { clusterId: data.clusterId, write: data.write, qaScore: result.qaScore, priority: data.priority }, { priority: 5 })
-      } else {
-        await deps.payload.patchCluster(data.clusterId, { status: 'rejected' })
-        logger.warn({ clusterId: data.clusterId, issues: factual.slice(0, 3) }, 'dropped after QA: unsupported claims')
+        return
       }
-      return
+      // Facts did not check out three times: a person decides (editor agent or Waleed), it is not binned.
+      logger.warn({ clusterId: data.clusterId, issues: factual.slice(0, 3) }, 'QA flagged unsupported claims: sent to review')
     }
     const review = await deps.payload.postReview({
       clusterId: data.clusterId,
