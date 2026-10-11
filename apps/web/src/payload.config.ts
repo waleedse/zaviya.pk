@@ -112,9 +112,10 @@ export default buildConfig({
     // Keep false: onInit owns the pgvector `embedding` column; Drizzle push
     // would otherwise prompt to drop it and hang the non-interactive server.
     push: process.env.PAYLOAD_DATABASE_PUSH === 'true',
-    // Production applies pending migrations on boot. After changing a collection:
+    // Production applies pending migrations on boot (not during `next build`, whose parallel
+    // page workers would race each other). After changing a collection:
     //   pnpm --filter @zaviya/web payload migrate:create <name>
-    prodMigrations: migrations,
+    prodMigrations: process.env.NEXT_PHASE === 'phase-production-build' ? undefined : migrations,
   }),
   sharp,
   plugins,

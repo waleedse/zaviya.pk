@@ -194,6 +194,7 @@ export interface Media {
   credit?: string | null;
   license?: ('own' | 'ai-generated' | 'handout' | 'wikimedia' | 'stock') | null;
   isAiGenerated?: boolean | null;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -875,6 +876,7 @@ export interface MediaSelect<T extends boolean = true> {
   credit?: T;
   license?: T;
   isAiGenerated?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
