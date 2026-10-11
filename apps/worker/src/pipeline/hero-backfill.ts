@@ -40,12 +40,16 @@ function hasRealHero(a: ArticleDoc): boolean {
 }
 
 /** Queue an image for every live story without one. Stories stay published. */
-export async function queueHeroBackfill(payload: PayloadClient, mediaQueue: Pick<Queue, 'add'>, opts: { dryRun?: boolean } = {}) {
+export async function queueHeroBackfill(
+  payload: PayloadClient,
+  mediaQueue: Pick<Queue, 'add'>,
+  opts: { dryRun?: boolean; /** Redo these articles even if they already have an image */ ids?: string[] } = {},
+) {
   const res = await payload.request<{ docs: ArticleDoc[] }>(
     'GET',
     '/api/articles?where[_status][equals]=published&depth=1&limit=500&locale=en&sort=-publishedAt',
   )
-  const missing = res.docs.filter((a) => !hasRealHero(a))
+  const missing = opts.ids?.length ? res.docs.filter((a) => opts.ids!.includes(String(a.id))) : res.docs.filter((a) => !hasRealHero(a))
   logger.info({ published: res.docs.length, withoutImage: missing.length, dryRun: Boolean(opts.dryRun) }, 'hero backfill: scan')
   if (opts.dryRun) return { published: res.docs.length, queued: 0, ids: missing.map((a) => String(a.id)) }
 

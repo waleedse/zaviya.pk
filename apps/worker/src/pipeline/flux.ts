@@ -14,7 +14,8 @@ export function fluxPrompt(brief: string, scene?: string | null): string {
     brief.trim(),
     scene ? `The real scene looks like this: ${scene.trim()}` : '',
     'Photorealistic editorial news photograph, natural light, realistic setting in Pakistan where relevant, 16:9 landscape composition, documentary style.',
-    'No text, letters, captions, logos or watermarks. No recognisable faces of real, named people: show the scene, places or objects instead.',
+    'Absolutely no text or writing of any script (no Urdu, Arabic or English letters), no banners, posters, signs, screens with text, captions, logos or watermarks.',
+    'No flags of any country and no portraits or framed photos on walls. No recognisable faces of real, named people: show the scene, places or objects instead; people, if any, seen from behind or at a distance.',
   ]
     .filter(Boolean)
     .join(' ')

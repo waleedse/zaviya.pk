@@ -7,7 +7,8 @@ describe('Workers AI hero image', () => {
     const p = fluxPrompt('Petrol pump in Lahore', 'A busy fuel station at night with motorbikes queueing.')
     expect(p).toMatch(/Photorealistic/)
     expect(p).toMatch(/real scene looks like this: A busy fuel station/)
-    expect(p).toMatch(/No text/)
+    expect(p).toMatch(/no text/i)
+    expect(p).toMatch(/No flags/)
     expect(p).toMatch(/recognisable faces/)
   })
 
