@@ -1,4 +1,4 @@
-import { CliProvider, type LLMTask } from '@zaviya/llm'
+import { CliProvider, WorkersAIProvider, WORKERS_AI_EMBED_MODEL, type LLMTask } from '@zaviya/llm'
 import { z } from 'zod'
 
 /** Treat blank env vars as unset so optional `.url()` fields don't fail. */
@@ -121,4 +121,10 @@ export function subscriptionChain(env: WorkerEnv) {
     })
   }
   return chain
+}
+
+/** Embeddings on Cloudflare Workers AI when its credentials are set (Gemini's free tier is 1,000/day). */
+export function embedder(env: WorkerEnv) {
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_AI_TOKEN) return undefined
+  return { provider: new WorkersAIProvider(env.CLOUDFLARE_ACCOUNT_ID, env.CLOUDFLARE_AI_TOKEN), model: WORKERS_AI_EMBED_MODEL }
 }

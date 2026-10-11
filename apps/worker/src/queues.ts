@@ -1,6 +1,6 @@
 import { Queue, Worker, type ConnectionOptions } from 'bullmq'
 import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
-import { subscriptionChain, type WorkerEnv } from './config.js'
+import { embedder, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
@@ -90,6 +90,7 @@ export async function createWorkerRuntime(
     apiFallbackModel: env.LLM_API_FALLBACK_MODEL,
     apiLightModel: env.LLM_API_LIGHT_MODEL,
     subscriptionChain: subscriptionChain(env),
+    embedder: embedder(env),
   })
 
   try {
@@ -175,7 +176,7 @@ export async function createWorkerRuntime(
       connection,
       concurrency: 2,
       // Stay under the free Gemini embedding rate limit when a feed delivers hundreds of items at once
-      limiter: { max: 50, duration: 60_000 },
+      limiter: { max: env.CLOUDFLARE_AI_TOKEN ? 600 : 50, duration: 60_000 },
     }),
   )
 

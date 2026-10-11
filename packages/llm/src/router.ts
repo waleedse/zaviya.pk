@@ -30,6 +30,8 @@ export interface LLMRouterOptions {
    * for writing). A resting or failing engine is skipped and the normal chain takes over.
    */
   subscriptionChain?: { provider: CliProvider; model: string; tasks: LLMTask[] }[]
+  /** Embeddings provider tried before the task's normal chain (e.g. Cloudflare Workers AI) */
+  embedder?: { provider: LLMProvider; model: string }
 }
 
 function parseModelRef(ref: string): { provider: 'ollama' | 'gemini' | 'api'; model: string } {
@@ -61,6 +63,7 @@ export class LLMRouter {
   private readonly apiFallbackModel?: string
   private readonly apiLightModel?: string
   private readonly subscriptionChain: NonNullable<LLMRouterOptions['subscriptionChain']>
+  private readonly embedder?: LLMRouterOptions['embedder']
 
   constructor(opts: LLMRouterOptions = {}) {
     this.ollama = new OllamaProvider(opts.ollamaUrl)
@@ -72,6 +75,7 @@ export class LLMRouter {
     this.apiFallbackModel = opts.apiFallbackModel
     this.apiLightModel = opts.apiLightModel
     this.subscriptionChain = opts.subscriptionChain ?? []
+    this.embedder = opts.embedder
   }
 
   /** Which subscription engines are usable right now (for the control room and agents). */
@@ -203,6 +207,10 @@ export class LLMRouter {
   }
 
   async embed(task: LLMTask, input: string[]): Promise<number[][]> {
+    if (this.embedder) {
+      // One embedding space for clustering: no silent fallback to a different model.
+      return this.embedder.provider.embed(this.embedder.model, input)
+    }
     const { primary, primaryModel } = await this.resolveProviders(task)
     const run = async (provider: LLMProvider, model: string) => {
       const exec = () => provider.embed(model, input)
