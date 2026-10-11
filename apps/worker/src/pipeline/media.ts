@@ -119,17 +119,19 @@ export async function processMediaJob(
   const category = triage?.category ?? 'pakistan'
   const accent = categoryAccentColor(category)
 
-  // Never reuse source photos (copyright). Generate the image via Gemini web (extension); when the
-  // extension is offline or Gemini has failed enough times, fall back to Workers AI (FLUX).
+  // Never reuse source photos (copyright). IMAGE_SOURCE=flux: Workers AI first (fast, server-side, 24/7),
+  // Gemini web through the extension as backup. IMAGE_SOURCE=extension: the other way round.
   const brief = data.write.en.imageBrief || data.write.en.title
-  let blob = await generateHeroViaExtension(brief, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
-  const geminiTries = (data.imageTries ?? 0) + 1
-  if (!blob && (!deps.bridge.isOnline() || geminiTries >= deps.env.GEMINI_IMAGE_TRIES_BEFORE_FALLBACK)) {
-    blob = await generateHeroViaWorkersAI(brief, {
-      accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
-      token: deps.env.CLOUDFLARE_AI_TOKEN,
-      clusterId: data.clusterId,
-    })
+  const flux = () =>
+    generateHeroViaWorkersAI(brief, { accountId: deps.env.CLOUDFLARE_ACCOUNT_ID, token: deps.env.CLOUDFLARE_AI_TOKEN, clusterId: data.clusterId })
+  const gemini = () => generateHeroViaExtension(brief, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
+  let blob: Blob | null
+  if (deps.env.IMAGE_SOURCE === 'flux') {
+    blob = (await flux()) ?? (await gemini())
+  } else {
+    blob = await gemini()
+    const geminiTries = (data.imageTries ?? 0) + 1
+    if (!blob && (!deps.bridge.isOnline() || geminiTries >= deps.env.GEMINI_IMAGE_TRIES_BEFORE_FALLBACK)) blob = await flux()
   }
   // No real illustration yet: hold the story and try again later instead of publishing a text card.
   if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
