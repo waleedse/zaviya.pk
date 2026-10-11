@@ -171,9 +171,11 @@ export async function createWorkerRuntime(
   )
 
   workers.push(
-    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage, minSources: env.TRIAGE_MIN_SOURCES }), {
+    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage, embedQueue: queues.embed, minSources: env.TRIAGE_MIN_SOURCES }), {
       connection,
       concurrency: 2,
+      // Stay under the free Gemini embedding rate limit when a feed delivers hundreds of items at once
+      limiter: { max: 50, duration: 60_000 },
     }),
   )
 
