@@ -55,6 +55,7 @@ for (const path of paths) {
   const segs = path.split('/').filter(Boolean).filter((s) => s !== 'ur')
   const isArticle = segs.length === 2 && !['p', 'tag', 'author', 'stories', 'namaz-timings'].includes(segs[0])
   if (isArticle && !ld.some((b) => b.includes('"NewsArticle"'))) add('error', 'article without NewsArticle schema')
+  if (isArticle && ld.some((b) => /"@type":\s*"NewsArticle"/.test(b) && /"image":\s*\[\s*\]/.test(b))) add('error', 'NewsArticle has empty "image":[]')
   if (!issues.some(([p, l]) => p === path && l === 'error')) ok++
 }
 
