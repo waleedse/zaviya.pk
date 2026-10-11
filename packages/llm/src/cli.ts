@@ -84,7 +84,7 @@ export class CliProvider implements LLMProvider {
 
     const args =
       this.opts.kind === 'cursor'
-        ? ['-p', '--output-format', 'json', ...(opts.model ? ['--model', opts.model] : [])]
+        ? ['-p', '--trust', '--output-format', 'json', ...(opts.model ? ['--model', opts.model] : [])]
         : [
             '-p',
             '--output-format', 'json',
@@ -113,7 +113,10 @@ export class CliProvider implements LLMProvider {
       model: `${this.id}:${opts.model || 'default'}`,
       provider: this.id,
       usage: parsed.usage
-        ? { promptTokens: parsed.usage.input_tokens, completionTokens: parsed.usage.output_tokens }
+        ? {
+            promptTokens: parsed.usage.input_tokens ?? parsed.usage.inputTokens,
+            completionTokens: parsed.usage.output_tokens ?? parsed.usage.outputTokens,
+          }
         : undefined,
     }
   }
@@ -148,7 +151,7 @@ export class CliProvider implements LLMProvider {
 interface CliJson {
   result?: string
   is_error?: boolean
-  usage?: { input_tokens?: number; output_tokens?: number }
+  usage?: { input_tokens?: number; output_tokens?: number; inputTokens?: number; outputTokens?: number }
 }
 
 /** Both CLIs print one JSON object (`{"type":"result","result":...}`); tolerate log lines around it. */
