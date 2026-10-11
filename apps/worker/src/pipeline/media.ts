@@ -8,6 +8,7 @@ import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI } from './flux.js'
+import { describeReferenceScene } from './reference.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
 export { renderSocialCard, renderSocialCardSet } from './social-card.js'
@@ -122,8 +123,19 @@ export async function processMediaJob(
   // Never reuse source photos (copyright). IMAGE_SOURCE=flux: Workers AI first (fast, server-side, 24/7),
   // Gemini web through the extension as backup. IMAGE_SOURCE=extension: the other way round.
   const brief = data.write.en.imageBrief || data.write.en.title
-  const flux = () =>
-    generateHeroViaWorkersAI(brief, { accountId: deps.env.CLOUDFLARE_ACCOUNT_ID, token: deps.env.CLOUDFLARE_AI_TOKEN, clusterId: data.clusterId })
+  const flux = async () => {
+    // Look at the real photo behind the story (described in words, never reused) so the image fits the event.
+    const scene = await describeReferenceScene(cluster?.items.map((i) => i.url) ?? [], {
+      geminiApiKey: deps.env.GEMINI_API_KEY,
+      clusterId: data.clusterId,
+    }).catch(() => null)
+    return generateHeroViaWorkersAI(brief, {
+      accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
+      token: deps.env.CLOUDFLARE_AI_TOKEN,
+      clusterId: data.clusterId,
+      scene,
+    })
+  }
   const gemini = () => generateHeroViaExtension(brief, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
   let blob: Blob | null
   if (deps.env.IMAGE_SOURCE === 'flux') {
