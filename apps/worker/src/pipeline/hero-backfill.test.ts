@@ -20,16 +20,17 @@ const docs = [
 ]
 
 describe('queueHeroBackfill', () => {
-  it('takes only stories without a Gemini image offline and queues them', async () => {
+  it('queues stories without a real image and keeps them online', async () => {
     const { payload, calls } = fakePayload(docs)
     const add = vi.fn(async () => undefined)
     const res = await queueHeroBackfill(payload, { add } as never)
     expect(res.ids).toEqual(['2', '3'])
-    expect(calls.filter((c) => c.method === 'PATCH').map((c) => [c.path, c.body])).toEqual([
-      ['/api/articles/2?locale=en', { _status: 'draft' }],
-      ['/api/articles/3?locale=en', { _status: 'draft' }],
-    ])
-    expect(add).toHaveBeenCalledWith(HERO_BACKFILL_JOB, { articleId: '2', title: 'Text card', brief: 'Text card. Dek two' }, expect.anything())
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false)
+    expect(add).toHaveBeenCalledWith(
+      HERO_BACKFILL_JOB,
+      { articleId: '2', title: 'Text card', brief: 'Text card. Dek two', sourceUrls: [] },
+      expect.anything(),
+    )
   })
 
   it('changes nothing on a dry run', async () => {
