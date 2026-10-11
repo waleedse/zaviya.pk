@@ -151,13 +151,20 @@ export function articleOgUrl(article: ArticleCard): string {
   return absoluteUrl(`/api/og?${params.toString()}`)
 }
 
+/** Publisher logo: a raster PNG (Google rejects SVG logos); lives in public/logo.png. */
+export function logoUrl(): string {
+  return absoluteUrl('/logo.png')
+}
+
 export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: SITE.name,
     url: siteUrl(),
-    logo: absoluteUrl('/icon.svg'),
+    alternateName: ['Zaviya News', 'زاویہ'],
+    logo: logoUrl(),
+    // Left empty on purpose until the owner confirms the official social profile URLs (do not guess them).
     sameAs: [],
   }
 }
@@ -197,7 +204,8 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     '@type': 'NewsArticle',
     headline: article.title,
     description: article.dek,
-    image: article.image?.url ? [article.image.url.startsWith('/') ? absoluteUrl(article.image.url) : article.image.url] : [],
+    // No hero image: fall back to the generated 1200x630 social card, never an empty list.
+    image: [article.image?.url ? (article.image.url.startsWith('/') ? absoluteUrl(article.image.url) : article.image.url) : articleOgUrl(article)],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt ?? article.publishedAt,
     author: {
@@ -207,7 +215,7 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     publisher: {
       '@type': 'Organization',
       name: SITE.name,
-      logo: { '@type': 'ImageObject', url: absoluteUrl('/icon.svg') },
+      logo: { '@type': 'ImageObject', url: logoUrl(), width: 512, height: 512 },
     },
     mainEntityOfPage: absoluteUrl(locale === 'ur' ? article.href : path),
   }

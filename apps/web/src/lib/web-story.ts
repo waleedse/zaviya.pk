@@ -80,7 +80,7 @@ export function buildWebStoryHtml(article: ArticleFull, locale: string, canonica
   <amp-story standalone
     title="${title}"
     publisher="${escapeHtml(publisher)}"
-    publisher-logo-src="${escapeHtml(absoluteUrl('/icon.svg'))}"
+    publisher-logo-src="${escapeHtml(absoluteUrl('/logo.png'))}"
     poster-portrait-src="${escapeHtml(poster)}">
     <amp-story-page id="cover" auto-advance-after="7s">
       <amp-story-grid-layer template="fill">
