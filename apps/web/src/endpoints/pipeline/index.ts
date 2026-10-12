@@ -728,6 +728,40 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // "Coming up" dates people search for (prize bond draws, SBP policy, holidays, results, matches).
+    // The research agent keeps this list current; the homepage briefing shows the next few.
+    path: '/pipeline/upcoming',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json((await getLearning(req.payload, 'upcoming_events')) ?? [])
+    },
+  },
+  {
+    path: '/pipeline/upcoming',
+    method: 'put',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(
+        req,
+        z.array(
+          z.object({
+            title: z.string().min(3).max(90),
+            date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+            kind: z.enum(['prices', 'money', 'holiday', 'results', 'sports', 'politics', 'religion', 'other']).default('other'),
+            href: z.string().max(300).optional(),
+            source: z.string().max(300).optional(),
+          }),
+        ).max(30),
+      )
+      if ('error' in parsed) return parsed.error
+      await setLearning(req.payload, 'upcoming_events', parsed.data)
+      return json(parsed.data)
+    },
+  },
+  {
     // Editor gate: written articles waiting for the editor (drafts with workflow in_review)
     path: '/pipeline/gate',
     method: 'get',

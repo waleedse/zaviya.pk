@@ -19,6 +19,7 @@ import {
 } from '@zaviya/shared'
 import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './mock'
 import { getPayloadClient } from './payload'
+import { getLearning } from './learning'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
 
@@ -533,6 +534,39 @@ export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> 
     overrideAccess: true,
   })
   return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+})
+
+export interface UpcomingEvent {
+  title: string
+  date: string
+  kind: string
+  href?: string
+}
+
+/** Next petrol/diesel price notification: the government revises prices on the 15th and the last day of each month. */
+function nextFuelReview(now = new Date()): UpcomingEvent {
+  const pk = new Date(now.getTime() + 5 * 3_600_000)
+  const y = pk.getUTCFullYear()
+  const m = pk.getUTCMonth()
+  const d = pk.getUTCDate()
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  const date = d < 15 ? new Date(Date.UTC(y, m, 15)) : d < last ? new Date(Date.UTC(y, m, last)) : new Date(Date.UTC(y, m + 1, 15))
+  return { title: 'Next petrol price announcement', date: date.toISOString().slice(0, 10), kind: 'prices', href: '/petrol-price-today-pakistan' }
+}
+
+/** Upcoming dates for the homepage: the research agent's list plus the fortnightly fuel review, soonest first. */
+export const getUpcoming = cache(async (limit = 5): Promise<UpcomingEvent[]> => {
+  const today = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10)
+  let list: UpcomingEvent[] = []
+  try {
+    const payload = await getPayloadClient()
+    list = (await getLearning<UpcomingEvent[]>(payload, 'upcoming_events')) ?? []
+  } catch {
+    list = []
+  }
+  const fuel = nextFuelReview()
+  const all = list.some((e) => e.kind === 'prices' && e.date === fuel.date) ? list : [...list, fuel]
+  return all.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, limit)
 })
 
 const PRIORITY_RANK: Record<string, number> = { breaking: 3, high: 2, normal: 1 }

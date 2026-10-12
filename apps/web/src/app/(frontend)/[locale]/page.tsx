@@ -14,7 +14,7 @@ import { TOOLS } from '@/components/home/tools'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NameFinder } from '@/components/names/NameFinder'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
-import { getCategoryFeed, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags } from '@/lib/queries'
+import { getCategoryFeed, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import { buildPageMetadata, SECTION_SEO } from '@/lib/seo'
@@ -72,11 +72,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const slides = [lead, ...take(feed.latest, 9, (a) => Boolean(a.image))]
   const leadMore = take(feed.latest, 6)
   const latestRail = feed.latest.slice(0, 9)
-  const [top12, top24, aiFeed, jobsFeed] = await Promise.all([
+  const [top12, top24, aiFeed, jobsFeed, upcoming] = await Promise.all([
     getTopStories(locale, 12, 8),
     getTopStories(locale, 24, 8),
     getCategoryFeed(locale, 'ai', 1),
     getCategoryFeed(locale, 'education-jobs', 1),
+    getUpcoming(4),
   ])
   // Chronological, so it may repeat stories shown above.
   const live = feed.live.length ? feed.live.slice(0, 5) : feed.latest.slice(0, 5)
@@ -131,7 +132,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden />
           </Link>
         </aside>
-        <BriefingRail locale={locale} rates={rates} ai={(aiFeed?.docs ?? []).slice(0, 3)} jobs={(jobsFeed?.docs ?? []).slice(0, 3)} />
+        <BriefingRail locale={locale} rates={rates} ai={(aiFeed?.docs ?? []).slice(0, 3)} jobs={(jobsFeed?.docs ?? []).slice(0, 3)} upcoming={upcoming} />
       </section>
 
       {/* ── Top stories: the editor's picks of the last 12 / 24 hours ── */}
