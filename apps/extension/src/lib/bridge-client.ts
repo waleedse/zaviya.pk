@@ -6,7 +6,7 @@ import {
 import { getSettings, type PlatformKey } from './storage'
 import { scanOpenPlatforms } from './tabs'
 
-const EXTENSION_VERSION = '0.2.9'
+const EXTENSION_VERSION = chrome.runtime.getManifest().version
 
 type JobHandler = (job: BridgeJob) => Promise<unknown>
 
