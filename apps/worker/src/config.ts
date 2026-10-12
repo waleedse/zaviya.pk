@@ -50,6 +50,8 @@ const envSchema = z.object({
   CLAUDE_WRITER_MODEL: z.string().default('haiku'),
   /** Writer calls allowed per 5 hours, so the agents keep their share of the Claude plan */
   CLAUDE_WRITER_MAX_CALLS_5H: z.coerce.number().min(0).default(40),
+  /** Minimum characters of real source text before a story is written (headline-only items are skipped) */
+  MIN_SOURCE_CHARS: z.coerce.number().min(0).default(500),
   /** Tasks the subscription engines take, comma separated */
   SUBSCRIPTION_TASKS: z.string().default('write_en,write_ur'),
   /** Local Ollama model for triage/SEO/QA and as the writing fallback ("off" to disable) */

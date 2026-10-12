@@ -130,11 +130,29 @@ async function runLocaleWrite(
   return { ...parsed, bodyMarkdown, title, model }
 }
 
+/** Characters of real reporting in the sources (summary + extracted text, not titles). */
+export function sourceTextChars(items: { title: string; summary?: string; contentText?: string }[]): number {
+  return items.reduce((n, it) => {
+    const text = `${it.summary ?? ''} ${it.contentText ?? ''}`.replace(/\s+/g, ' ').trim()
+    // Google News summaries just repeat the headline and outlet name
+    return n + (text.length > it.title.length + 40 ? text.length : 0)
+  }, 0)
+}
+
 export async function processWriteJob(
   data: { clusterId: string; feedback?: string[] },
   deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv; redis?: Redis },
 ): Promise<WriteResult | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
+  // Headline-only items (Google News links, blocked outlets) give the writer nothing to report.
+  // Without real source text it writes "about the headline" instead of the news: skip until an
+  // outlet with readable text joins the cluster (a new item re-triggers triage).
+  const sourceChars = sourceTextChars(cluster.items)
+  if (sourceChars < deps.env.MIN_SOURCE_CHARS) {
+    await deps.payload.patchCluster(data.clusterId, { status: 'triaged' })
+    logger.info({ clusterId: data.clusterId, sourceChars }, 'write skipped: not enough source text yet')
+    return null
+  }
   const seo = await researchSeo(cluster, deps)
   if (seo) logger.info({ clusterId: data.clusterId, keyword: seo.plan.primaryKeyword, trends: seo.matchedTrends }, 'SEO plan ready')
   const urlLog = new Set<string>()

@@ -33,6 +33,24 @@ export function publisherName(title: string, feedName: string): string {
   return m ? m[1]!.trim() : feedName.replace(/^Google News — .*/, 'Google News')
 }
 
+const OUTLETS = 'Dawn|Dawn News|Geo|Geo News|Geo TV|ARY|ARY News|Express Tribune|The Express Tribune|The News|Jang|Samaa|BBC|BBC Urdu|Reuters|AP|AFP|Al Jazeera|Independent Urdu|ProPakistani|Google News|Google Trends'
+
+/** "Dawn: X happened", "X happened, Dawn reports", "X, Dawn headline says" → "X happened" */
+export function stripOutletRefs(title: string): string {
+  const t = title
+    .replace(new RegExp(`^(${OUTLETS})\\s*[:\\-–|]\\s*`, 'i'), '')
+    .replace(new RegExp(`[,:\\-–]?\\s*(as\\s+)?(${OUTLETS})('s)?\\s+(reports?|says|said|headline says|headline|story|item)(\\s+today)?\\s*$`, 'i'), '')
+    .replace(/\s+[-–|]\s*$/, '')
+    .trim()
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : title
+}
+
+/** Outlet and aggregator names are sources, not topics: never tags. */
+export function cleanTags(tags: string[]): string[] {
+  const outlet = new RegExp(`^(${OUTLETS})$`, 'i')
+  return tags.filter((t) => t.trim() && !outlet.test(t.trim()))
+}
+
 /** Social posts found during discovery are embedded (officially supported), never re-hosted. */
 export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: string }[] {
   const out: { type: 'x' | 'instagram'; url: string }[] = []
@@ -53,6 +71,18 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
   return out.slice(0, 3)
 }
 
+/** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
+export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
+  const settings = await payload.getSettings()
+  const minIntervalMs = (settings.minIntervalMin ?? 15) * 60_000
+  const cap = settings.dailyCaps?.articles ?? 96
+  if ((settings.articlesPublishedToday ?? 0) >= cap) return 60 * 60_000
+  const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
+  const gap = now - last
+  // A little jitter so several waiting stories do not all wake at the same second
+  return gap >= minIntervalMs ? 0 : minIntervalMs - gap + Math.floor(Math.random() * 90_000)
+}
+
 export async function processPublishJob(
   data: {
     clusterId: string
@@ -64,10 +94,21 @@ export async function processPublishJob(
     triage?: TriageResult
     articleId?: string
   },
-  deps: { payload: PayloadClient; socialQueue: Queue },
+  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue },
 ): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
+
+  // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
+  // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
+  if (deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
+    const wait = await pacingWaitMs(deps.payload).catch(() => 0)
+    if (wait > 0) {
+      await deps.publishQueue.add('publish', data, { delay: wait, priority: 5 })
+      logger.info({ clusterId: data.clusterId, waitMin: Math.round(wait / 60_000) }, 'publish paced: waiting for the next slot')
+      return null
+    }
+  }
 
   if (triage?.isUpdateOfExisting && triage.existingArticleId) {
     await deps.payload.postLiveUpdate(triage.existingArticleId, {
@@ -108,15 +149,15 @@ export async function processPublishJob(
       },
       locales: {
         en: {
-          title: data.write.en.title,
-          titleVariants: data.write.en.titleOptions.filter((t) => t !== data.write.en.title),
+          title: stripOutletRefs(data.write.en.title),
+          titleVariants: data.write.en.titleOptions.filter((t) => t !== data.write.en.title).map(stripOutletRefs),
           slug: data.write.en.slug,
           dek: data.write.en.dek,
           keyPoints: data.write.en.keyPoints,
           bodyMarkdown: data.write.en.bodyMarkdown,
           whatItMeans: data.write.en.whatItMeans,
           faqs: data.write.en.faqs,
-          tags: data.write.en.tags,
+          tags: cleanTags(data.write.en.tags),
           metaDescription: data.write.en.metaDescription,
           altText: data.write.en.altText,
         },
@@ -129,7 +170,7 @@ export async function processPublishJob(
           bodyMarkdown: data.write.ur!.bodyMarkdown,
           whatItMeans: data.write.ur!.whatItMeans,
           faqs: data.write.ur!.faqs,
-          tags: data.write.ur!.tags,
+          tags: cleanTags(data.write.ur!.tags),
           metaDescription: data.write.ur!.metaDescription,
           altText: data.write.ur!.altText,
         } } : {}),
