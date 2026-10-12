@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
+import { statfs } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { Engines, type EngineName } from './engines.js'
@@ -70,8 +71,11 @@ async function observe(): Promise<Observation> {
     .then((r) => r.json())
     .catch(() => ({}))) as { docs?: { publishedAt?: string }[] }
   const publishedAt = latest.docs?.[0]?.publishedAt
+  // Container overlay shares the host root disk, so this is the server's disk
+  const disk = await statfs('/').catch(() => null)
   return {
     now,
+    diskUsedPct: disk ? (1 - disk.bavail / disk.blocks) * 100 : null,
     siteStatus,
     heartbeat: {
       at: settings.lastHeartbeat ? Date.parse(settings.lastHeartbeat) : null,

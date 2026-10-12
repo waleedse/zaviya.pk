@@ -15,6 +15,8 @@ export interface Observation {
   siteStatus: number
   heartbeat: Heartbeat
   lastPublishedAt: number | null
+  /** Percent of the root disk in use; null when it could not be read */
+  diskUsedPct?: number | null
   now: number
 }
 
@@ -27,6 +29,7 @@ export interface Problem {
 }
 
 const MIN = 60_000
+export const DISK_ALERT_PCT = 85
 
 /** Daytime in Pakistan (07:00-01:00), when a quiet newsroom is a problem */
 export function isNewsHours(now: number): boolean {
@@ -87,6 +90,15 @@ export function findProblems(o: Observation, prev?: Observation): Problem[] {
         label: 'needs-waleed',
       })
     }
+  }
+
+  if (o.diskUsedPct != null && o.diskUsedPct > DISK_ALERT_PCT) {
+    problems.push({
+      key: 'disk-high',
+      title: `Server disk is ${Math.round(o.diskUsedPct)}% full`,
+      detail: `Root disk above ${DISK_ALERT_PCT}%. At 100% Redis refuses writes (MISCONF) and jobs are lost. Check old release images and build cache (docker system df); never remove the running or rollback tag.`,
+      label: 'incident',
+    })
   }
 
   if (isNewsHours(o.now) && o.lastPublishedAt && o.now - o.lastPublishedAt > 2 * 60 * MIN) {
