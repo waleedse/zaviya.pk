@@ -47,11 +47,12 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
 }
 
 export async function sendHeartbeat(runtime: WorkerRuntime): Promise<void> {
-  const queues: Record<string, { waiting: number; active: number; failed: number }> = {}
+  const queues: Record<string, { waiting: number; delayed: number; active: number; failed: number }> = {}
   for (const name of QUEUE_NAMES) {
     const c = await runtime.queues[name].getJobCounts('waiting', 'prioritized', 'delayed', 'active', 'failed')
     queues[name] = {
       waiting: (c.waiting ?? 0) + (c.prioritized ?? 0) + (c.delayed ?? 0),
+      delayed: c.delayed ?? 0,
       active: c.active ?? 0,
       failed: c.failed ?? 0,
     }

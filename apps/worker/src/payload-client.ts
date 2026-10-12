@@ -282,7 +282,7 @@ export class PayloadClient {
 
   heartbeat(body: {
     version: string
-    queues: Record<string, { waiting: number; active: number; failed: number }>
+    queues: Record<string, { waiting: number; delayed?: number; active: number; failed: number }>
     [extra: string]: unknown
   }) {
     return this.request<{ ok: true; killSwitch: boolean; commands?: WorkerCommand[] }>('POST', '/api/pipeline/heartbeat', body)
