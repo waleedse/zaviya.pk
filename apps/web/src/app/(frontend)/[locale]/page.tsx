@@ -5,6 +5,7 @@ import { ArticleCard } from '@/components/article/ArticleCard'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { HomeLatest } from '@/components/home/HomeLatest'
 import { LeadSlider } from '@/components/home/LeadSlider'
+import { BriefingRail } from '@/components/home/BriefingRail'
 import { TopStoriesTabs } from '@/components/home/TopStories'
 import { RatesWidget } from '@/components/home/RatesWidget'
 import { SectionHeader } from '@/components/home/SectionHeader'
@@ -13,7 +14,7 @@ import { TOOLS } from '@/components/home/tools'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NameFinder } from '@/components/names/NameFinder'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
-import { getHomeFeed, getRatesTicker, getTopStories, getTrendingTags } from '@/lib/queries'
+import { getCategoryFeed, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import { buildPageMetadata, SECTION_SEO } from '@/lib/seo'
@@ -69,10 +70,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   // The lead slot rotates through the newest stories that have a picture (lead first)
   const slides = [lead, ...take(feed.latest, 9, (a) => Boolean(a.image))]
-  const secondary = take(feed.secondary, 3)
   const leadMore = take(feed.latest, 6)
   const latestRail = feed.latest.slice(0, 9)
-  const [top12, top24] = await Promise.all([getTopStories(locale, 12, 8), getTopStories(locale, 24, 8)])
+  const [top12, top24, aiFeed, jobsFeed] = await Promise.all([
+    getTopStories(locale, 12, 8),
+    getTopStories(locale, 24, 8),
+    getCategoryFeed(locale, 'ai', 1),
+    getCategoryFeed(locale, 'education-jobs', 1),
+  ])
   // Chronological, so it may repeat stories shown above.
   const live = feed.live.length ? feed.live.slice(0, 5) : feed.latest.slice(0, 5)
   const explainers = take(feed.explainers, 3)
@@ -86,7 +91,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <h1 className="sr-only">{isUr ? 'زاویہ: پاکستان کی تازہ ترین خبریں' : 'Zaviya: Latest Pakistan news'}</h1>
 
       {/* ── Front page: lead, three seconds and the live "Latest" rail ── */}
-      <section className="container-wide grid gap-6 pt-6 md:pt-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.92fr)]">
+      <section className="container-wide grid gap-6 pt-6 md:pt-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
         {/* Lead column: the lead story, then extra headlines so it ends level with its neighbours */}
         <div className="flex flex-col gap-5">
           <LeadSlider
@@ -111,13 +116,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
           )}
         </div>
-        {secondary.length > 0 && (
-          <div className="flex flex-col gap-4 lg:order-3 lg:col-span-2 lg:grid lg:grid-cols-3 xl:order-none xl:col-span-1 xl:flex">
-            {secondary.map((a) => (
-              <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
-            ))}
-          </div>
-        )}
         <aside className="card-surface flex flex-col p-5 md:p-6" aria-label={d.latest}>
           <SectionHeader title={d.latest} href={localePath(locale, '/live')} linkLabel={d.seeAll} icon={Newspaper} tile="bg-red-50 text-breaking dark:bg-red-950" />
           <div>
@@ -133,6 +131,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden />
           </Link>
         </aside>
+        <BriefingRail locale={locale} rates={rates} ai={(aiFeed?.docs ?? []).slice(0, 3)} jobs={(jobsFeed?.docs ?? []).slice(0, 3)} />
       </section>
 
       {/* ── Top stories: the editor's picks of the last 12 / 24 hours ── */}
