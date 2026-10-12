@@ -72,4 +72,34 @@ describe('applyTriageRules', () => {
     const s = computeWeightedScore(baseTriage, { categoryWeights: { pakistan: 0.5 } })
     expect(s).toBeCloseTo((0.4 * 0.9 + 0.35 * 0.8 + 0.25 * 0.7) * 0.5)
   })
+
+  describe('ZAV-6: strong Pakistan stories are not code-rejected', () => {
+    const thin = { maxTier: 3 as const, distinctSources: 1, settings: {} }
+
+    it('keeps a Pakistan cricket preview (cluster 1079) in review', () => {
+      const d = applyTriageRules({ ...baseTriage, category: 'cricket', pakistanRelevance: 1, newsworthiness: 0.8, sourceCredibility: 0.8 }, thin)
+      expect(d.outcome).toBe('review')
+    })
+
+    it('keeps Pakistan jobs (cluster 1182) and business in review', () => {
+      expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, thin).outcome).toBe('review')
+      expect(applyTriageRules({ ...baseTriage, category: 'business' }, thin).outcome).toBe('review')
+    })
+
+    it('keeps an unverified-flag jobs item in review', () => {
+      const d = applyTriageRules({ ...baseTriage, category: 'education-jobs', sensitivityFlags: ['unverified'] }, thin)
+      expect(d.outcome).toBe('review')
+    })
+
+    it('still rejects scorecard-only items, model rejects and low scores', () => {
+      expect(applyTriageRules({ ...baseTriage, category: 'cricket', reason: 'Live score page only' }, thin).outcome).toBe('reject')
+      expect(applyTriageRules({ ...baseTriage, category: 'cricket', decision: 'reject' }, thin).outcome).toBe('reject')
+      expect(applyTriageRules({ ...baseTriage, category: 'cricket', newsworthiness: 0.2, sourceCredibility: 0.3 }, thin).outcome).toBe('reject')
+    })
+
+    it('never returns reject for a review codeOutcome path: sensitive flags stay review', () => {
+      const d = applyTriageRules({ ...baseTriage, category: 'cricket', sensitivityFlags: ['death'] }, thin)
+      expect(d.outcome).toBe('review')
+    })
+  })
 })
