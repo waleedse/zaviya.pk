@@ -2,6 +2,7 @@ import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
+import { selectStorySources } from './story-sources.js'
 import { logger } from '../logger.js'
 import { SITE } from '@zaviya/shared'
 
@@ -79,14 +80,15 @@ export async function processPublishJob(
   }
 
   const category = triage?.category ?? 'pakistan'
-  const sources = cluster.items.map((i) => ({
+  const storySources = selectStorySources(cluster.items)
+  const sources = storySources.map((i) => ({
     name: publisherName(i.title, i.source.name),
     url: i.url,
     tier: i.source.trustTier,
     publishedAt: i.publishedAt,
   }))
 
-  const embeds = embedsFromUrls(cluster.items.map((i) => i.url))
+  const embeds = embedsFromUrls(storySources.map((i) => i.url))
 
   let res: { id: string }
   try {

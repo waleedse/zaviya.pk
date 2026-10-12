@@ -7,6 +7,7 @@ import { extractUrls } from './qa-checks.js'
 import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
+import { selectStorySources } from './story-sources.js'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 
 export interface WriteResult {
@@ -24,7 +25,6 @@ function wrapSources(items: { id?: string; title: string; contentText?: string; 
   // ~12k characters of source text keeps the prompt inside a local model's 8k-token window.
   const perItem = Math.max(1200, Math.floor(12_000 / Math.max(1, items.length)))
   return items
-    .slice(0, 8)
     .map((it) => ({ ...it, contentText: it.contentText?.slice(0, perItem) }))
     .map(
       (it, i) =>
@@ -138,9 +138,10 @@ export async function processWriteJob(
   const seo = await researchSeo(cluster, deps)
   if (seo) logger.info({ clusterId: data.clusterId, keyword: seo.plan.primaryKeyword, trends: seo.matchedTrends }, 'SEO plan ready')
   const urlLog = new Set<string>()
-  for (const it of cluster.items) urlLog.add(it.url)
+  const storySources = selectStorySources(cluster.items)
+  for (const it of storySources) urlLog.add(it.url)
 
-  const sourcesBlock = wrapSources(cluster.items)
+  const sourcesBlock = wrapSources(storySources)
   const feedbackBlock = data.feedback?.length
     ? `\n\nA previous draft failed editorial QA. Fix every issue below:\n${data.feedback.map((f) => `- ${f}`).join('\n')}`
     : ''

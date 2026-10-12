@@ -5,6 +5,7 @@ import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
 import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../prompts/triage.js'
 import { applyTriageRules } from './triage-rules.js'
+import { MAX_CLUSTER_ITEMS } from './story-sources.js'
 import { logger } from '../logger.js'
 
 export async function processTriageJob(
@@ -20,6 +21,12 @@ export async function processTriageJob(
 ): Promise<void> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const settings = await deps.payload.getSettings().catch(() => ({}) as import('../payload-client.js').PipelineSettings)
+
+  if (cluster.items.length > MAX_CLUSTER_ITEMS) {
+    logger.warn({ clusterId: data.clusterId, items: cluster.items.length }, 'cluster too large to be one story; rejecting')
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected' })
+    return
+  }
 
   let triage
   try {
