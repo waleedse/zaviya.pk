@@ -12,7 +12,7 @@ import {
 import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { revalidateDataTag } from '../../lib/revalidate'
-import { getLearning, pacingStats, retitleArticle, runDailyLearning } from '../../lib/learning'
+import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
 
 // Phase 2: Remotion reel render queue — see docs/GROWTH.md and lib/remotion-brief.ts
 
@@ -26,6 +26,21 @@ const SERIES_TO_DATA_KEY: Record<string, string> = {
   hsd: 'petrol',
   kerosene: 'petrol',
 }
+
+const SOURCING_PLAN_KEY = 'sourcing_plan'
+const SourcingPlanSchema = z.object({
+  /** X searches the extension runs every discovery cycle (max 12) */
+  xQueries: z.array(z.string().min(3).max(300)).max(12).optional(),
+  /** Instagram newsroom profiles to read (max 12) */
+  igProfiles: z.array(z.string().regex(/^[A-Za-z0-9._]{1,30}$/)).max(12).optional(),
+  /** Things the editor wants found now; each becomes an X search until it expires */
+  hunts: z.array(z.object({ query: z.string().min(3).max(300), until: z.string().datetime() })).max(10).optional(),
+  /** Publishing pace, bounded so a bad plan can neither flood nor freeze the site */
+  minIntervalMin: z.number().int().min(5).max(60).optional(),
+  dailyArticleCap: z.number().int().min(24).max(200).optional(),
+  notes: z.string().max(2000).optional(),
+})
+type SourcingPlan = z.infer<typeof SourcingPlanSchema> & { updatedAt?: string }
 
 function guard(req: PayloadRequest): Response | null {
   return requireBotOrAdmin(req)
@@ -648,15 +663,22 @@ const pipelineEndpoints: Endpoint[] = [
       if (denied) return denied
       const settings = await req.payload.findGlobal({ slug: 'settings', overrideAccess: true })
       // Pacing and learned weights the triage rules need, alongside the editable settings.
-      const [pacing, categoryWeights] = await Promise.all([
+      const [pacing, categoryWeights, plan] = await Promise.all([
         pacingStats(req.payload),
         getLearning<Record<string, number>>(req.payload, 'category_weights'),
+        getLearning<SourcingPlan>(req.payload, SOURCING_PLAN_KEY),
       ])
       return json({
         ...settings,
         ...pacing,
         categoryWeights: categoryWeights ?? {},
-        dailyCaps: { ...(settings.dailyCaps ?? {}), articles: Number(process.env.DAILY_ARTICLE_CAP ?? 60) },
+        // The editor's sourcing plan can tighten or loosen the pace within safe bounds
+        ...(plan?.minIntervalMin ? { minIntervalMin: plan.minIntervalMin } : {}),
+        dailyCaps: {
+          ...(settings.dailyCaps ?? {}),
+          articles: plan?.dailyArticleCap ?? Number(process.env.DAILY_ARTICLE_CAP ?? 60),
+        },
+        sourcingPlan: plan ?? null,
       })
     },
   },
@@ -679,6 +701,30 @@ const pipelineEndpoints: Endpoint[] = [
       if ('error' in parsed) return parsed.error
       const id = String(req.routeParams?.id ?? '')
       return json(await retitleArticle(req.payload, id, parsed.data.locale, parsed.data.title, parsed.data.reason))
+    },
+  },
+  {
+    // The editor agent's sourcing plan: what the Chrome extension searches on X / Instagram, what to
+    // hunt for, and the publishing pace. Read by the worker every discovery cycle.
+    path: '/pipeline/sourcing-plan',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json((await getLearning<SourcingPlan>(req.payload, SOURCING_PLAN_KEY)) ?? {})
+    },
+  },
+  {
+    path: '/pipeline/sourcing-plan',
+    method: 'put',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, SourcingPlanSchema)
+      if ('error' in parsed) return parsed.error
+      const plan = { ...parsed.data, updatedAt: new Date().toISOString() }
+      await setLearning(req.payload, SOURCING_PLAN_KEY, plan)
+      return json(plan)
     },
   },
   {

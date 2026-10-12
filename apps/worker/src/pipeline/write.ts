@@ -1,3 +1,5 @@
+import { PageReadResultSchema } from '@zaviya/shared'
+import type { BridgeServer } from '../bridge/server.js'
 import { WriterOutputSchema, type WriterOutput } from '@zaviya/shared'
 import { isQuotaExhausted, zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
 import type { PayloadClient } from '../payload-client.js'
@@ -130,6 +132,30 @@ async function runLocaleWrite(
   return { ...parsed, bodyMarkdown, title, model }
 }
 
+/** Read up to three thin source items through the extension; true when any text was saved. */
+async function enrichFromExtension(
+  items: { id?: string; title: string; summary?: string; contentText?: string; url: string }[],
+  payload: PayloadClient,
+  bridge: Pick<BridgeServer, 'isOnline' | 'send'>,
+  clusterId: string,
+): Promise<boolean> {
+  let saved = false
+  const thin = items.filter((it) => it.id && sourceTextChars([it]) === 0).slice(0, 3)
+  for (const it of thin) {
+    try {
+      const raw = await bridge.send({ id: `read_${clusterId}_${it.id}_${Date.now()}`, type: 'page.read', payload: { url: it.url } }, 60_000)
+      const page = PageReadResultSchema.parse(raw)
+      if (page.text.length < 300) continue
+      await payload.patchSourceItem(it.id!, { contentText: `${page.text}\n\n(Read from ${new URL(page.url).hostname})` })
+      saved = true
+      logger.info({ clusterId, itemId: it.id, host: new URL(page.url).hostname, chars: page.text.length }, 'source text read by extension')
+    } catch (e) {
+      logger.warn({ clusterId, itemId: it.id, err: e instanceof Error ? e.message : e }, 'extension page read failed')
+    }
+  }
+  return saved
+}
+
 /** Characters of real reporting in the sources (summary + extracted text, not titles). */
 export function sourceTextChars(items: { title: string; summary?: string; contentText?: string }[]): number {
   return items.reduce((n, it) => {
@@ -141,9 +167,16 @@ export function sourceTextChars(items: { title: string; summary?: string; conten
 
 export async function processWriteJob(
   data: { clusterId: string; feedback?: string[] },
-  deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv; redis?: Redis },
+  deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv; redis?: Redis; bridge?: Pick<BridgeServer, 'isOnline' | 'send'> },
 ): Promise<WriteResult | null> {
-  const cluster = await deps.payload.getCluster(data.clusterId)
+  let cluster = await deps.payload.getCluster(data.clusterId)
+  // Hybrid sourcing: when the sources carry only headlines (blocked outlets, Google News links),
+  // the Chrome extension opens the pages in Waleed's browser and sends back the article text.
+  if (sourceTextChars(cluster.items) < deps.env.MIN_SOURCE_CHARS && deps.bridge?.isOnline()) {
+    if (await enrichFromExtension(cluster.items, deps.payload, deps.bridge, data.clusterId)) {
+      cluster = await deps.payload.getCluster(data.clusterId)
+    }
+  }
   // Headline-only items (Google News links, blocked outlets) give the writer nothing to report.
   // Without real source text it writes "about the headline" instead of the news: skip until an
   // outlet with readable text joins the cluster (a new item re-triggers triage).

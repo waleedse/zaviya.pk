@@ -56,7 +56,18 @@ export const BridgeJobSchema = z.discriminatedUnion('type', [
   z.object({ id: z.string(), type: z.literal('x.search'), payload: z.object({ query: z.string(), limit: z.number().int().max(50).default(20) }) }),
   z.object({ id: z.string(), type: z.literal('x.trending'), payload: z.object({}).default({}) }),
   z.object({ id: z.string(), type: z.literal('instagram.readProfile'), payload: z.object({ username: z.string(), limit: z.number().int().max(24).default(9) }) }),
+  /** Open a page in the reader tab (follows Google News redirects) and return its article text */
+  z.object({ id: z.string(), type: z.literal('page.read'), payload: z.object({ url: z.string().url() }) }),
 ])
+
+export const PageReadResultSchema = z.object({
+  url: z.string(),
+  title: z.string(),
+  text: z.string(),
+  image: z.string().nullable().optional(),
+  publishedAt: z.string().nullable().optional(),
+})
+export type PageReadResult = z.infer<typeof PageReadResultSchema>
 
 /** Result of a `gemini.image` bridge job: the generated image as base64. */
 export const GeminiImageResultSchema = z.object({

@@ -29,6 +29,8 @@ export async function runBridgeJob(job: BridgeJob): Promise<unknown> {
       return runInstagramPost(job)
     case 'instagram.readProfile':
       return runInstagramReadProfile(job)
+    case 'page.read':
+      return readPage(job.payload.url)
     case 'gemini.image': {
       // Hard ceiling per image so one stuck run can never block every later job.
       const run = geminiChain.then(() => withTimeout(runGeminiImage(job), 300_000, 'gemini_job_timeout'))
@@ -38,6 +40,67 @@ export async function runBridgeJob(job: BridgeJob): Promise<unknown> {
     default:
       throw new Error('unknown_job')
   }
+}
+
+/**
+ * Reader tab: one background tab reused for every page read. Pages open with Waleed's own browser,
+ * so outlets that block the server (Dawn, ARY, jobs sites) and Google News redirects work.
+ */
+let readerTabId: number | undefined
+
+async function readerTab(url: string): Promise<number> {
+  if (readerTabId !== undefined) {
+    try {
+      await chrome.tabs.update(readerTabId, { url })
+      return readerTabId
+    } catch {
+      readerTabId = undefined
+    }
+  }
+  const tab = await chrome.tabs.create({ url, active: false })
+  if (tab.id === undefined) throw new Error('reader_tab_failed')
+  readerTabId = tab.id
+  return tab.id
+}
+
+async function readPage(url: string): Promise<unknown> {
+  const tabId = await readerTab(url)
+  // Wait for the load and for any redirect away from news.google.com (it redirects with JavaScript)
+  for (let i = 0; i < 40; i++) {
+    await sleep(750)
+    const tab = await chrome.tabs.get(tabId)
+    if (tab.status === 'complete' && tab.url && !/^https:\/\/news\.google\.com\//.test(tab.url)) break
+  }
+  await sleep(1_500)
+  const [res] = await withTimeout(
+    chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const meta = (sel: string) => document.querySelector<HTMLMetaElement>(sel)?.content ?? null
+        const root = document.querySelector('article') ?? document.querySelector('main') ?? document.body
+        const seen = new Set<string>()
+        const paras: string[] = []
+        root.querySelectorAll('p, h2, li').forEach((el) => {
+          const t = (el as HTMLElement).innerText?.replace(/\s+/g, ' ').trim() ?? ''
+          if (t.length < 50 || seen.has(t)) return
+          if (el.closest('nav, header, footer, aside, form, [class*="comment"], [class*="related"], [class*="share"]')) return
+          seen.add(t)
+          paras.push(t)
+        })
+        return {
+          url: location.href,
+          title: meta('meta[property="og:title"]') ?? document.title,
+          text: paras.join('\n\n').slice(0, 20_000),
+          image: meta('meta[property="og:image"]'),
+          publishedAt: meta('meta[property="article:published_time"]'),
+        }
+      },
+    }),
+    30_000,
+    'page_read_timeout',
+  )
+  if (!res?.result) throw new Error('page_read_empty')
+  return res.result
 }
 
 async function runXReadList(job: Extract<BridgeJob, { type: 'x.readList' }>): Promise<unknown> {

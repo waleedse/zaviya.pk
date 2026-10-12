@@ -15,7 +15,7 @@ import { isAllowedByRobots } from './ingest/robots.js'
 import { fetchArticleText } from './ingest/extract.js'
 import { fetchCuratedTweets } from './ingest/x.js'
 import { fetchTrends, isTrendsUrl, trendsToSourceItems } from './ingest/trends.js'
-import { runDiscovery, X_TRENDS_KEY } from './ingest/discovery.js'
+import { DEFAULT_X_QUERIES, runDiscovery, X_TRENDS_KEY } from './ingest/discovery.js'
 import { runLearningJob } from './pipeline/learning.js'
 import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
@@ -212,7 +212,7 @@ export async function createWorkerRuntime(
         }
         let result: WriteResult | null
         try {
-          result = await processWriteJob({ clusterId, feedback }, { router, payload, env, redis })
+          result = await processWriteJob({ clusterId, feedback }, { router, payload, env, redis, bridge })
         } catch (e) {
           // Every model (cloud and local) unavailable: try again when the quota resets.
           if (isQuotaExhausted(e)) {
@@ -345,12 +345,17 @@ export async function createWorkerRuntime(
         const xSource = sources.find((s) => s.key === 'x-discovery')
         const igSource = sources.find((s) => s.key === 'instagram-discovery')
         const list = (v?: string, sep = ',') => v?.split(sep).map((x) => x.trim()).filter(Boolean)
+        // The editor agent's sourcing plan (Payload) wins over env and the built-in defaults;
+        // its active "hunts" are searched on X on top of the regular queries.
+        const plan = (await payload.getSettings().catch(() => null))?.sourcingPlan
+        const hunts = (plan?.hunts ?? []).filter((h) => Date.parse(h.until) > Date.now()).map((h) => h.query)
+        const baseX = plan?.xQueries?.length ? plan.xQueries : list(env.DISCOVERY_X_QUERIES, '||')
         const result = await runDiscovery({
           bridge,
           xSourceId: xSource?.id,
           igSourceId: igSource?.id,
-          xQueries: list(env.DISCOVERY_X_QUERIES, '||'),
-          igProfiles: list(env.DISCOVERY_IG_PROFILES),
+          xQueries: hunts.length ? [...hunts, ...(baseX ?? DEFAULT_X_QUERIES)].slice(0, 14) : baseX,
+          igProfiles: plan?.igProfiles?.length ? plan.igProfiles : list(env.DISCOVERY_IG_PROFILES),
         })
         if (result.xTrends.length) {
           await redis.set(X_TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends: result.xTrends }))

@@ -95,6 +95,13 @@ export interface PipelineArticleInput {
 export interface PipelineSettings {
   thresholds?: { publish?: number; review?: number }
   dailyCaps?: Record<string, number>
+  sourcingPlan?: {
+    xQueries?: string[]
+    igProfiles?: string[]
+    hunts?: { query: string; until: string }[]
+    minIntervalMin?: number
+    dailyArticleCap?: number
+  } | null
   publishWindow?: { start: string; end: string }
   minIntervalMin?: number
   activeModels?: Record<string, string>
@@ -185,6 +192,11 @@ export class PayloadClient {
 
   getCluster(id: string) {
     return this.request<ClusterDetail>('GET', `/api/pipeline/clusters/${id}`)
+  }
+
+  /** Full text read by the Chrome extension for an item the server could not fetch */
+  patchSourceItem(id: string, data: { contentText?: string; summary?: string }) {
+    return this.request('PATCH', `/api/source-items/${id}`, data)
   }
 
   patchCluster(
