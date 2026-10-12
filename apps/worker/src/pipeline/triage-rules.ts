@@ -25,6 +25,11 @@ export interface TriageDecision {
 /** Topics where a human must look before anything goes live. */
 const HARD_FLAGS = new Set(['military', 'judiciary', 'religion', 'blasphemy', 'violence', 'death', 'minor', 'election'])
 
+/** Desks where a thin-source code reject has repeatedly binned good Pakistan stories (ZAV-6). */
+const PROTECTED_CATEGORIES = new Set(['cricket', 'education-jobs', 'business'])
+/** Items that are only a scorecard or a photo caption are not worth a human's time. */
+const LOW_VALUE_REASON = /\b(scorecard|live[- ]?score|photo caption)\b/i
+
 const DEFAULT_PUBLISH = 0.72
 const DEFAULT_REVIEW = 0.5
 
@@ -79,6 +84,15 @@ export function applyTriageRules(triage: TriageResult, ctx: TriageContext): Tria
   const reviewThreshold = ctx.settings.thresholds?.review ?? DEFAULT_REVIEW
   const isBreaking = triage.suggestedPriority === 'breaking'
 
+  // A strong Pakistan cricket/jobs/business item that the model did not reject is never
+  // binned by the source-count rules; it goes to the review queue instead.
+  const protectedFromReject =
+    triage.decision !== 'reject' &&
+    PROTECTED_CATEGORIES.has(triage.category) &&
+    triage.pakistanRelevance >= 0.8 &&
+    weightedScore >= publishThreshold &&
+    !LOW_VALUE_REASON.test(triage.reason ?? '')
+
   const hardFlags = triage.sensitivityFlags.filter((f) => HARD_FLAGS.has(f))
   if (hardFlags.length > 0) {
     return {
@@ -91,7 +105,7 @@ export function applyTriageRules(triage: TriageResult, ctx: TriageContext): Tria
   // "unverified" only blocks when nothing credible backs the story.
   if (triage.sensitivityFlags.includes('unverified') && ctx.maxTier === 3) {
     return {
-      outcome: ctx.distinctSources >= 2 ? 'review' : 'reject',
+      outcome: ctx.distinctSources >= 2 || protectedFromReject ? 'review' : 'reject',
       reason: 'Unverified claim with only low-tier sources',
       weightedScore,
       modelDecision: triage.decision,
@@ -108,8 +122,10 @@ export function applyTriageRules(triage: TriageResult, ctx: TriageContext): Tria
       }
     }
     return {
-      outcome: 'reject',
-      reason: 'Insufficient source diversity (tier 3, single source)',
+      outcome: protectedFromReject ? 'review' : 'reject',
+      reason: protectedFromReject
+        ? 'Strong Pakistan story on a thin source (tier 3, single source) — needs human review'
+        : 'Insufficient source diversity (tier 3, single source)',
       weightedScore,
       modelDecision: triage.decision,
     }
