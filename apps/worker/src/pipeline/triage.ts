@@ -1,5 +1,5 @@
 import { TriageResultSchema } from '@zaviya/shared'
-import { zodToJsonSchema } from '@zaviya/llm'
+import { zodToJsonSchema, isQuotaExhausted } from '@zaviya/llm'
 import type { LLMRouter } from '@zaviya/llm'
 import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
@@ -35,6 +35,14 @@ export async function processTriageJob(
     })
     triage = TriageResultSchema.parse(JSON.parse(result.content))
   } catch (e) {
+    if (isQuotaExhausted(e)) {
+      // Out of quota is not a verdict on the story: look at it again once the first model frees up,
+      // otherwise the cluster sits in `new` until another item happens to arrive.
+      const delay = Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000) + 5_000
+      await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: 4, jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
+      logger.info({ clusterId: data.clusterId, delayMs: delay }, 'triage quota exhausted, requeued')
+      return
+    }
     logger.warn({ err: e, clusterId: data.clusterId }, 'triage LLM skipped/failed')
     return
   }
