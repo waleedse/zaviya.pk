@@ -34,6 +34,11 @@ function parseArgs(argv) {
 
 const list = (v) => (v === undefined ? [] : [].concat(v))
 
+// Every comment/issue written through this script is signed, so the inbox can tell agents from Waleed
+// (they share one Linear account). The inbox only answers comments without this mark.
+export const AGENT_MARK = '🤖'
+const sign = (text) => (text.includes(AGENT_MARK) ? text : `${text}\n\n— ${AGENT_MARK} ${process.env.AGENT_NAME ?? 'Zaviya agent'}`)
+
 async function gql(query, variables = {}) {
   const res = await fetch(API, {
     method: 'POST',
@@ -114,7 +119,7 @@ if (cmd === 'list') {
 } else if (cmd === 'create') {
   if (!args.title) fail('--title is required')
   const t = await team()
-  const input = { teamId: t.id, title: args.title, description: args.body ?? '' }
+  const input = { teamId: t.id, title: args.title, description: sign(args.body ?? '') }
   const labels = list(args.label)
   if (labels.length) input.labelIds = await labelIds(labels)
   if (args.priority) input.priority = Number(args.priority)
@@ -125,7 +130,7 @@ if (cmd === 'list') {
   if (!id || !args.body) fail('usage: comment ZAV-1 --body "..."')
   const issue = (await gql(`query($id: String!) { issue(id: $id) { id } }`, { id })).issue
   await gql(`mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`, {
-    input: { issueId: issue.id, body: args.body },
+    input: { issueId: issue.id, body: sign(args.body) },
   })
   console.log(JSON.stringify({ ok: true, id }))
 } else if (cmd === 'update') {

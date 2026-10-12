@@ -30,7 +30,7 @@ async function comment(identifier, body) {
   await fetch('https://api.linear.app/graphql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: KEY },
-    body: JSON.stringify({ query: 'mutation($i:CommentCreateInput!){ commentCreate(input:$i){ success } }', variables: { i: { issueId, body } } }),
+    body: JSON.stringify({ query: 'mutation($i:CommentCreateInput!){ commentCreate(input:$i){ success } }', variables: { i: { issueId, body: `${body}\n\n— 🤖 Auto release` } } }),
   })
 }
 

@@ -5,6 +5,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { Engines, type EngineName } from './engines.js'
 import { SCHEDULE, TIMEOUT_MIN, isDue, slotKey, type AgentName } from './schedule.js'
+import { fetchCommentsSince, inboxPrompt, newHumanComments } from './inbox.js'
 import { CONFIRM_CHECKS, DEFAULT_CONFIRM_CHECKS, findProblems, type Observation, type Problem } from './watchdog.js'
 
 /**
@@ -142,7 +143,7 @@ async function watchdog() {
 
 // ---------- editor ----------
 
-function readRole(agent: AgentName): { model: string; body: string } {
+function readRole(agent: string): { model: string; body: string } {
   const raw = fs.readFileSync(path.join(WORKSPACE, '.claude', 'agents', `${agent}.md`), 'utf8')
   const fm = raw.match(/^---\n([\s\S]*?)\n---\n/)
   return { model: fm?.[1]?.match(/^model:\s*(\S+)/m)?.[1] ?? 'haiku', body: fm ? raw.slice(fm[0].length) : raw }
@@ -190,12 +191,61 @@ async function runAgent(agent: AgentName, session: string) {
   log(agent, `${res.ok ? 'done' : 'FAILED'} via ${res.engine}: ${res.output.trim().split('\n').slice(-3).join(' | ').slice(0, 600)}`)
 }
 
+// ---------- inbox: Waleed's Linear comments wake the PM ----------
+
+const INBOX_EVERY_MS = 2 * 60_000
+let inboxBusy = false
+let lastInboxCheck = 0
+
+async function inbox() {
+  const key = process.env.LINEAR_API_KEY
+  if (!key || inboxBusy || Date.now() - lastInboxCheck < INBOX_EVERY_MS) return
+  lastInboxCheck = Date.now()
+  // First run starts from now: older comments were already handled by hand.
+  const state = readState<{ since: string; seen: string[] }>('inbox.json', { since: new Date().toISOString(), seen: [] })
+  const comments = await fetchCommentsSince(state.since, key)
+  const todo = newHumanComments(comments, new Set(state.seen)).slice(0, 3)
+  if (!todo.length) {
+    writeState('inbox.json', state)
+    return
+  }
+  inboxBusy = true
+  try {
+    for (const c of todo) {
+      log('inbox', `${c.issue!.identifier}: answering "${c.body.slice(0, 80).replace(/\n/g, ' ')}"`)
+      const role = readRole('product')
+      const res = await engines.run({
+        order: (process.env.EDITOR_ENGINES ?? 'cursor,claude').split(',').map((x) => x.trim()) as EngineName[],
+        role: role.body,
+        prompt: [
+          `Time: ${new Date().toISOString()} (Pakistan is UTC+5). Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api (header "Authorization: users API-Key $PAYLOAD_API_KEY").`,
+          'Read ops/agents/PLAYBOOK.md first.',
+          inboxPrompt(c),
+        ].join('\n'),
+        claudeModel: role.model,
+        allowedTools: EDITOR_TOOLS,
+        cwd: WORKSPACE,
+        timeoutMin: 15,
+        log: (m) => log('inbox', m),
+      })
+      log('inbox', `${res.ok ? 'replied' : 'FAILED'} on ${c.issue!.identifier} via ${res.engine}: ${res.output.trim().split('\n').slice(-1)[0]?.slice(0, 300) ?? ''}`)
+      state.seen = [...state.seen, c.id].slice(-200)
+      state.since = c.createdAt
+      writeState('inbox.json', state)
+    }
+  } finally {
+    inboxBusy = false
+  }
+}
+
 // ---------- loop ----------
 
 let agentBusy = false
 
 async function tick() {
   await watchdog().catch((e) => log('watchdog', `error: ${(e as Error).message}`))
+  // The inbox runs beside the editor so Waleed never waits for an hourly run to finish
+  void inbox().catch((e) => log('inbox', `error: ${(e as Error).message}`))
   if (agentBusy) return
   const now = new Date()
   const runs = readState<Record<string, number>>('last-runs.json', {})
