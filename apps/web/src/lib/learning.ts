@@ -194,13 +194,18 @@ export async function retitleArticle(payload: Payload, id: string, locale: 'en' 
     data: { title, titleVariants: variants, seo: { ...(doc.seo as object), metaTitle: title } },
     overrideAccess: true,
   })
-  const retitled = (await getLearning<Record<string, string>>(payload, 'retitled_at')) ?? {}
-  retitled[id] = new Date().toISOString()
-  await setLearning(payload, 'retitled_at', retitled)
+  // The headline is already saved: bookkeeping must never turn that into an error for the caller.
+  try {
+    const retitled = (await getLearning<Record<string, string>>(payload, 'retitled_at')) ?? {}
+    retitled[id] = new Date().toISOString()
+    await setLearning(payload, 'retitled_at', retitled)
+  } catch (e) {
+    console.error('[retitle] could not record retitled_at', id, e)
+  }
   await payload.create({
     collection: 'audit-log',
     data: { entity: 'articles', entityId: id, action: 'retitle', actor: 'ai:learning', payload: { old, title, reason }, at: new Date().toISOString() },
     overrideAccess: true,
-  }).catch(() => undefined)
+  }).catch((e) => console.error('[retitle] could not write audit-log', id, e))
   return { old, title }
 }
