@@ -693,6 +693,7 @@ const pipelineEndpoints: Endpoint[] = [
           queues: z.record(
             z.object({
               waiting: z.number(),
+              delayed: z.number().optional(),
               active: z.number(),
               failed: z.number(),
             }),
