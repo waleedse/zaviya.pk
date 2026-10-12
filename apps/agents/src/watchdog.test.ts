@@ -31,6 +31,11 @@ describe('watchdog', () => {
     expect(findProblems(delayed, delayed).map((p) => p.key)).toEqual([])
   })
 
+  it('flags a nearly full disk', () => {
+    expect(findProblems({ ...healthy, diskUsedPct: 80 }).map((p) => p.key)).toEqual([])
+    expect(findProblems({ ...healthy, diskUsedPct: 91 }).map((p) => p.key)).toEqual(['disk-high'])
+  })
+
   it('flags a burst of failures and an offline extension for Waleed', () => {
     const o = { ...healthy, heartbeat: { ...healthy.heartbeat, queues: { write: { waiting: 3, active: 1, failed: 40 } }, extension: false } }
     const problems = findProblems(o, healthy)
