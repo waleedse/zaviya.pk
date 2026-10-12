@@ -1,4 +1,5 @@
 import type { Queue } from 'bullmq'
+import type { Redis } from 'ioredis'
 import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
@@ -71,6 +72,41 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
   return out.slice(0, 3)
 }
 
+/** Redis hash of stories waiting for the editor: articleId → publish job data */
+export const GATE_KEY = 'zaviya:gate'
+
+/** Publish (or drop) a story the editor decided on. Publishing reuses the normal path with its article id. */
+export async function finishGated(
+  articleId: string,
+  action: 'publish' | 'reject',
+  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis },
+): Promise<boolean> {
+  const raw = await deps.redis.hget(GATE_KEY, articleId)
+  if (!raw) return false
+  await deps.redis.hdel(GATE_KEY, articleId)
+  const data = JSON.parse(raw) as Parameters<typeof processPublishJob>[0]
+  if (action === 'reject') {
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected' }).catch(() => undefined)
+    logger.info({ articleId }, 'editor rejected the story')
+    return true
+  }
+  await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue })
+  return true
+}
+
+/** Gate fallback: when nothing went out for `minutes`, publish the oldest waiting story (editor down or slow). */
+export async function gateFallback(deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis }, minutes: number): Promise<void> {
+  const waiting = await deps.redis.hgetall(GATE_KEY)
+  const ids = Object.keys(waiting)
+  if (!ids.length) return
+  const settings = await deps.payload.getSettings()
+  const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
+  if (Date.now() - last < minutes * 60_000) return
+  const oldest = ids.sort((a, b) => (JSON.parse(waiting[a]!).waitingSince ?? 0) - (JSON.parse(waiting[b]!).waitingSince ?? 0))[0]!
+  logger.warn({ articleId: oldest, minutes }, 'editor gate fallback: publishing the oldest waiting story')
+  await finishGated(oldest, 'publish', deps)
+}
+
 /** Categories that must publish at least once every 4 hours (Waleed, 13 Oct) */
 export const QUOTA_CATEGORIES: string[] = ['ai', 'education-jobs']
 const QUOTA_WINDOW_MS = 4 * 60 * 60_000
@@ -107,10 +143,14 @@ export async function processPublishJob(
     triage?: TriageResult
     articleId?: string
   },
-  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue },
+  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; gate?: { redis: Redis } },
 ): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
+
+  // Editor gate: normal stories wait as drafts (workflow in_review); the editor agent publishes the
+  // best one each run. Breaking stories and live updates still go out at once.
+  const gated = Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting
 
   // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
@@ -118,7 +158,7 @@ export async function processPublishJob(
   const overdueCategory = triage?.category && QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
     : false
-  if (deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !overdueCategory) {
+  if (!gated && deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !overdueCategory) {
     const wait = await pacingWaitMs(deps.payload).catch(() => 0)
     if (wait > 0) {
       await deps.publishQueue.add('publish', data, { delay: wait, priority: 5 })
@@ -154,7 +194,7 @@ export async function processPublishJob(
       category,
       priority: data.priority,
       isBreaking: data.priority === 'breaking',
-      status: 'published',
+      status: gated ? 'in_review' : 'published',
       heroMediaId: data.heroMediaId,
       sources,
       embeds,
@@ -196,6 +236,14 @@ export async function processPublishJob(
   } catch (e) {
     logger.warn({ err: e }, 'publish failed')
     return null
+  }
+
+  if (gated && deps.gate) {
+    // Keep everything needed to finish publishing once the editor approves (or the fallback fires)
+    await deps.gate.redis.hset(GATE_KEY, String(res.id), JSON.stringify({ ...data, articleId: String(res.id), waitingSince: Date.now() }))
+    await deps.payload.patchCluster(data.clusterId, { status: 'in_review', article: res.id })
+    logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title }, 'waiting for the editor')
+    return { articleId: String(res.id) }
   }
 
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })

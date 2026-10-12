@@ -728,6 +728,57 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Editor gate: written articles waiting for the editor (drafts with workflow in_review)
+    path: '/pipeline/gate',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const res = await req.payload.find({
+        collection: 'articles',
+        where: { and: [{ _status: { equals: 'draft' } }, { workflow: { equals: 'in_review' } }] },
+        draft: true,
+        sort: 'createdAt',
+        limit: 50,
+        depth: 1,
+        locale: 'en',
+        overrideAccess: true,
+      })
+      return json(
+        res.docs.map((a) => ({
+          id: a.id,
+          title: a.title,
+          dek: a.dek,
+          category: typeof a.category === 'object' && a.category ? a.category.slug : a.category,
+          priority: a.priority,
+          createdAt: a.createdAt,
+          sources: (a.sources ?? []).map((s) => ({ name: s.name, url: s.url })),
+          hasImage: Boolean(a.heroImage),
+        })),
+      )
+    },
+  },
+  {
+    // The editor decides: publish now, or reject (stays an unpublished draft). The worker carries it out.
+    path: '/pipeline/gate/:id',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ action: z.enum(['publish', 'reject']), note: z.string().max(500).optional() }))
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      if (!/^\d+$/.test(id)) return json({ error: 'bad id' }, 400)
+      if (parsed.data.action === 'reject') {
+        await req.payload.update({ collection: 'articles', id, data: { workflow: 'draft' }, draft: true, overrideAccess: true, req })
+      }
+      await req.payload.db.drizzle.execute(
+        sql`INSERT INTO zaviya_commands (kind, payload, created_by) VALUES ('gate', ${JSON.stringify({ articleId: id, action: parsed.data.action, note: parsed.data.note ?? '' })}::jsonb, 'agent:editor')`,
+      )
+      return json({ ok: true, id, action: parsed.data.action })
+    },
+  },
+  {
     path: '/pipeline/heartbeat',
     method: 'post',
     handler: async (req) => {

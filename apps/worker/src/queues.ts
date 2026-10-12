@@ -281,7 +281,7 @@ export async function createWorkerRuntime(
         const cluster = await payload.getCluster(d.clusterId)
         await processPublishJob(
           { ...d, triage: cluster.triage as TriageResult | undefined },
-          { payload, socialQueue: queues.social, publishQueue: queues.publish },
+          { payload, socialQueue: queues.social, publishQueue: queues.publish, gate: env.EDITOR_GATE ? { redis } : undefined },
         )
       },
       { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },

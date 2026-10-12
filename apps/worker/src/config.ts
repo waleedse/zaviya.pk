@@ -50,6 +50,10 @@ const envSchema = z.object({
   CLAUDE_WRITER_MODEL: z.string().default('haiku'),
   /** Writer calls allowed per 5 hours, so the agents keep their share of the Claude plan */
   CLAUDE_WRITER_MAX_CALLS_5H: z.coerce.number().min(0).default(40),
+  /** Editor gate: written stories wait as drafts until the editor agent publishes or rejects them */
+  EDITOR_GATE: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
+  /** Gate fallback: publish the oldest waiting story when nothing went out for this many minutes */
+  EDITOR_GATE_FALLBACK_MIN: z.coerce.number().min(10).default(40),
   /** Minimum characters of real source text before a story is written (headline-only items are skipped) */
   MIN_SOURCE_CHARS: z.coerce.number().min(0).default(500),
   /** Tasks the subscription engines take, comma separated */

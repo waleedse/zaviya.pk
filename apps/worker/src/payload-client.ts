@@ -18,8 +18,8 @@ export interface PipelineSource {
 /** Queued from the admin Control Room, delivered with the heartbeat response. */
 export interface WorkerCommand {
   id: string
-  kind: 'write' | 'triage' | 'pause' | 'resume' | 'discover' | 'ingest'
-  payload: { clusterId?: string }
+  kind: 'write' | 'triage' | 'pause' | 'resume' | 'discover' | 'ingest' | 'gate'
+  payload: { clusterId?: string; articleId?: string; action?: 'publish' | 'reject'; note?: string }
 }
 
 export interface SourceItemInput {

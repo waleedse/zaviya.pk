@@ -4,6 +4,7 @@ import { X_TRENDS_KEY } from './ingest/discovery.js'
 import type { WorkerCommand } from './payload-client.js'
 import { geminiModelStatus } from '@zaviya/llm'
 import { logger } from './logger.js'
+import { finishGated, gateFallback } from './pipeline/publish.js'
 
 async function readJson<T>(runtime: WorkerRuntime, key: string): Promise<T | null> {
   try {
@@ -35,6 +36,15 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
     case 'discover':
       await runtime.queues.discover.add('discover', {})
       break
+    case 'gate': {
+      const articleId = String(cmd.payload?.articleId ?? '')
+      const action = cmd.payload?.action === 'reject' ? 'reject' : 'publish'
+      if (articleId) {
+        const done = await finishGated(articleId, action, { payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis })
+        if (!done) logger.warn({ articleId }, 'gate command for a story that is not waiting')
+      }
+      break
+    }
     case 'ingest': {
       const { sources } = await runtime.payload.getSources()
       for (const s of sources) {
@@ -91,7 +101,16 @@ export async function sendHeartbeat(runtime: WorkerRuntime): Promise<void> {
 }
 
 export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInterval> {
-  const beat = () => sendHeartbeat(runtime).catch((e) => logger.warn({ err: e }, 'heartbeat failed'))
+  let beats = 0
+  const beat = () => {
+    // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one
+    if (runtime.env.EDITOR_GATE && ++beats % 15 === 0) {
+      void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
+        logger.warn({ err: e }, 'gate fallback failed'),
+      )
+    }
+    return sendHeartbeat(runtime).catch((e) => logger.warn({ err: e }, 'heartbeat failed'))
+  }
   void beat()
   // Every 20s so Control Room buttons feel responsive.
   return setInterval(beat, 20_000)

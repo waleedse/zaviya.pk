@@ -19,7 +19,7 @@ export const SCHEDULE: Record<AgentName, Slot[]> = {
   // newest articles every 15 minutes so mistakes are fixed soon after publishing
   editor: [
     { session: 'hourly', every: 60, nightEvery: 180 },
-    { session: 'quick', every: 15, nightEvery: 60 },
+    { session: 'quick', every: 15, nightEvery: 30 },
   ],
 }
 
