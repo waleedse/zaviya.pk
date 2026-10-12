@@ -16,6 +16,7 @@ export const CATEGORIES = [
   { slug: 'world', en: 'World', ur: 'دنیا', color: '#2B59C3' },
   { slug: 'business', en: 'Business', ur: 'کاروبار', color: '#B8902B' },
   { slug: 'tech-telecom', en: 'Tech', ur: 'ٹیکنالوجی', color: '#7B4DFF' },
+  { slug: 'ai', en: 'AI', ur: 'مصنوعی ذہانت', color: '#0891B2' },
   { slug: 'autos', en: 'Autos', ur: 'آٹوز', color: '#E4572E' },
   { slug: 'cricket', en: 'Cricket', ur: 'کرکٹ', color: '#1B998B' },
   { slug: 'education-jobs', en: 'Jobs', ur: 'تعلیم و نوکریاں', color: '#C2185B' },

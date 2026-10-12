@@ -9,6 +9,11 @@ import { RichTextBody } from '@/components/article/RichTextBody'
 
 export const revalidate = 300
 
+// Render on first request, then serve from the ISR cache (without this Next 16 renders every request)
+export async function generateStaticParams() {
+  return []
+}
+
 const PAGE_DESCRIPTIONS: Record<string, [string, string]> = {
   about: ['Zaviya is a Pakistani digital newsroom explaining the stories that matter in clear English and Urdu, with every source listed.', 'زاویہ پاکستان کا ڈیجیٹل نیوز روم ہے جو اہم خبروں کو آسان اردو اور انگریزی میں ذرائع کے ساتھ پیش کرتا ہے۔'],
   'editorial-policy': ['How Zaviya selects, verifies, writes and corrects stories: our standards for sources, accuracy, fairness and sensitive topics.', 'زاویہ خبروں کا انتخاب، تصدیق، تحریر اور تصحیح کیسے کرتا ہے: ذرائع، درستگی اور حساس موضوعات کے ہمارے اصول۔'],

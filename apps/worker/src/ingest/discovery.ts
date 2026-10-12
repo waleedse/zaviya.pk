@@ -19,6 +19,9 @@ export const DEFAULT_X_QUERIES = [
   '(from:TheRealPCB OR from:OGRA_Official OR from:PakistanPolice OR from:pmln_org OR from:PTIofficial) -filter:replies',
   'Pakistan breaking lang:en min_faves:200 -filter:replies',
   'پاکستان min_faves:200 -filter:replies',
+  // AI and jobs: Waleed wants at least one story of each every 4 hours
+  '(from:OpenAI OR from:GoogleDeepMind OR from:AnthropicAI OR from:MetaAI OR from:MITIT_Pakistan OR from:MoITTOfficial) -filter:replies',
+  '(jobs OR vacancies OR "apply now" OR NTS OR FPSC OR PPSC) Pakistan min_faves:50 -filter:replies',
 ]
 
 /** Public newsroom profiles; edit with DISCOVERY_IG_PROFILES (comma separated). */

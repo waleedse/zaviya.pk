@@ -124,6 +124,10 @@ export const SECTION_SEO: Record<string, { en: { title: string; description: str
     en: { title: 'Tech News Pakistan: PTA, Mobiles, Internet & Startups', description: 'Pakistan technology news: PTA, mobile phones and prices, 5G, internet, freelancing, startups and digital payments.' },
     ur: { title: 'ٹیکنالوجی کی خبریں: پی ٹی اے، موبائل اور انٹرنیٹ', description: 'پاکستان میں ٹیکنالوجی کی خبریں: پی ٹی اے، موبائل فون، فائیو جی، انٹرنیٹ اور فری لانسنگ۔' },
   },
+  ai: {
+    en: { title: 'AI News: Latest Artificial Intelligence News for Pakistan', description: 'Latest AI news: ChatGPT, Gemini, Claude and new models, AI jobs and skills, AI policy in Pakistan, and how AI changes work and business.' },
+    ur: { title: 'مصنوعی ذہانت کی خبریں: اے آئی کی تازہ ترین خبریں', description: 'مصنوعی ذہانت (اے آئی) کی تازہ خبریں: چیٹ جی پی ٹی، جیمنائی، نئے ماڈلز، اے آئی ملازمتیں اور پاکستان میں اے آئی پالیسی۔' },
+  },
   autos: {
     en: { title: 'Auto News Pakistan: Car Prices, Bikes, EVs & Launches', description: 'Latest car and bike prices in Pakistan, new launches, EVs, auto financing and industry news.' },
     ur: { title: 'گاڑیوں کی خبریں: قیمتیں، نئی گاڑیاں اور موٹر سائیکل', description: 'پاکستان میں گاڑیوں اور موٹر سائیکلوں کی قیمتیں، نئی لانچز اور آٹو انڈسٹری کی خبریں۔' },

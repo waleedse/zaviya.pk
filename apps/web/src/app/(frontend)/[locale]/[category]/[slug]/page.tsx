@@ -43,6 +43,11 @@ import type { Locale } from '@zaviya/shared'
 
 export const revalidate = 300
 
+// Render on first request, then serve from the ISR cache (without this Next 16 renders every request)
+export async function generateStaticParams() {
+  return []
+}
+
 type Props = { params: Promise<{ locale: string; category: string; slug: string }> }
 
 export async function generateMetadata({ params }: Props) {

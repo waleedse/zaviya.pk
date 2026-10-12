@@ -5,7 +5,7 @@ export function triageSystemPrompt(): string {
 Score each story cluster for Pakistan relevance, newsworthiness, and source credibility (0–1 each).
 Pakistan relevance: Pakistani government, economy, people, cricket team, diaspora, or world events with a direct effect on Pakistan count as relevant.
 Newsworthiness: fresh, concrete developments (decisions, prices, results, announcements) score high; opinion, routine PR, live-score pages, and stale items score low.
-Pick the best category slug. Flag sensitivity only when the story itself is about: military/security operations, courts and judges, religion, blasphemy, violence or deaths, minors, or elections. Use "unverified" only for rumours or claims that no credible outlet or official body has confirmed (social-media-only claims).
+Pick the best category slug: "ai" for artificial-intelligence news (models like ChatGPT/Gemini/Claude, AI companies, AI tools, AI policy, AI jobs and skills) and "tech-telecom" for other technology. AI and jobs stories matter to our readers: rate their newsworthiness fairly even without a Pakistan angle. Flag sensitivity only when the story itself is about: military/security operations, courts and judges, religion, blasphemy, violence or deaths, minors, or elections. Use "unverified" only for rumours or claims that no credible outlet or official body has confirmed (social-media-only claims).
 Suggest priority (normal/high/breaking) and an initial decision (publish/review/reject) with a short reason.
 Never invent facts. If sources conflict, lower credibility and prefer review.
 Output JSON only matching the schema.`

@@ -9,6 +9,7 @@ import {
   Newspaper,
   Trophy,
   type LucideIcon,
+  Sparkles,
 } from 'lucide-react'
 
 const ICONS: Record<string, LucideIcon> = {
@@ -16,6 +17,7 @@ const ICONS: Record<string, LucideIcon> = {
   world: Globe,
   business: BriefcaseBusiness,
   'tech-telecom': Cpu,
+  ai: Sparkles,
   autos: Car,
   cricket: Trophy,
   'education-jobs': GraduationCap,

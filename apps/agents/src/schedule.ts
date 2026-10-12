@@ -15,8 +15,12 @@ export interface Slot {
 }
 
 export const SCHEDULE: Record<AgentName, Slot[]> = {
-  // Newsroom oversight: hourly by day (07:00-01:00 PKT), every 3 hours at night
-  editor: [{ session: 'hourly', every: 60, nightEvery: 180 }],
+  // Newsroom oversight: a full pass hourly by day (every 3 hours at night), and a quick check of the
+  // newest articles every 15 minutes so mistakes are fixed soon after publishing
+  editor: [
+    { session: 'hourly', every: 60, nightEvery: 180 },
+    { session: 'quick', every: 15, nightEvery: 60 },
+  ],
 }
 
 /** Agent run timeouts in minutes */

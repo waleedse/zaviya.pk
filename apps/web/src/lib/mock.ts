@@ -54,6 +54,10 @@ const HEADLINES: Record<CategorySlug, { en: string[]; ur: string[] }> = {
       'ستمبر میں ترسیلات زر ریکارڈ 3.4 ارب ڈالر تک پہنچ گئیں',
     ],
   },
+  ai: {
+    en: ['Pakistan drafts a national AI policy for public services', 'New AI models change how freelancers find work'],
+    ur: ['پاکستان میں قومی اے آئی پالیسی کا مسودہ تیار', 'نئے اے آئی ماڈلز سے فری لانسرز کا کام بدل رہا ہے'],
+  },
   'tech-telecom': {
     en: [
       'PTA begins 5G spectrum auction with three operators in the race',

@@ -71,6 +71,19 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
   return out.slice(0, 3)
 }
 
+/** Categories that must publish at least once every 4 hours (Waleed, 13 Oct) */
+export const QUOTA_CATEGORIES: string[] = ['ai', 'education-jobs']
+const QUOTA_WINDOW_MS = 4 * 60 * 60_000
+
+async function categoryOverdue(payload: PayloadClient, category: string, now = Date.now()): Promise<boolean> {
+  const res = await payload.request<{ docs: { publishedAt?: string }[] }>(
+    'GET',
+    `/api/articles?where[_status][equals]=published&where[category.slug][equals]=${category}&sort=-publishedAt&limit=1&depth=0`,
+  )
+  const last = res.docs[0]?.publishedAt ? Date.parse(res.docs[0].publishedAt) : 0
+  return now - last > QUOTA_WINDOW_MS
+}
+
 /** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
 export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
   const settings = await payload.getSettings()
@@ -101,7 +114,11 @@ export async function processPublishJob(
 
   // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
-  if (deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
+  // AI and jobs must get a story at least every 4 hours: those skip the 15-minute queue when overdue.
+  const overdueCategory = triage?.category && QUOTA_CATEGORIES.includes(triage.category)
+    ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
+    : false
+  if (deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !overdueCategory) {
     const wait = await pacingWaitMs(deps.payload).catch(() => 0)
     if (wait > 0) {
       await deps.publishQueue.add('publish', data, { delay: wait, priority: 5 })
