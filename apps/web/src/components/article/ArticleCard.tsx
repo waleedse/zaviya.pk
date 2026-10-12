@@ -151,15 +151,18 @@ export function ArticleCard({
 
   if (variant === 'list') {
     return (
-      <article className={cn('group grid grid-cols-[64px_minmax(0,1fr)] gap-3 border-t border-border py-3 first:border-t-0', className)}>
+      <article className={cn('group grid grid-cols-[52px_minmax(0,1fr)_76px] gap-3 border-t border-border py-3 first:border-t-0', className)}>
         <TimeAgo iso={article.publishedAt} locale={locale} className="pt-0.5 text-xs font-bold tabular-nums text-fg-subtle" />
         <Link href={article.href} className="block min-w-0 space-y-1">
           <span className="kicker-text block" style={{ color: article.category.color }}>
             {article.category.name}
           </span>
-          <h3 className={cn('text-[0.97rem] font-semibold', isUr ? 'leading-[1.8]' : 'leading-snug')}>
+          <h3 className={cn('text-[0.97rem] font-semibold line-clamp-3', isUr ? 'leading-[1.8]' : 'leading-snug')}>
             <span className="headline-hover">{article.title}</span>
           </h3>
+        </Link>
+        <Link href={article.href} tabIndex={-1} aria-hidden className="block self-start pt-1">
+          <CardImage article={article} locale={locale} aspect="aspect-[4/3]" sizes="76px" showLabel={false} />
         </Link>
       </article>
     )
