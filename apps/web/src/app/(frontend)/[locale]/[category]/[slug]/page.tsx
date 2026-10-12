@@ -26,7 +26,6 @@ import { ArticleBodyWithAds } from '@/components/article/ArticleBodyWithAds'
 import { WhatItMeans } from '@/components/article/WhatItMeans'
 import { LiveUpdates } from '@/components/article/LiveUpdates'
 import { FAQAccordion } from '@/components/article/FAQAccordion'
-import { SourcesList } from '@/components/article/SourcesList'
 import { AuthorBox } from '@/components/article/AuthorBox'
 import { ArticleCard } from '@/components/article/ArticleCard'
 import { ArticleToolbar } from '@/components/article/ArticleToolbar'
@@ -35,7 +34,7 @@ import { NextPrayerCard } from '@/components/namaz/NextPrayerCard'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { todayForAllCities } from '@/lib/prayer-times'
 import { formatNumber } from '@/lib/format'
-import { BadgeCheck, Eye, TrendingUp } from 'lucide-react'
+import { Eye, TrendingUp } from 'lucide-react'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { formatDateTime } from '@/lib/format'
 import { canBuildWebStory, webStoryPath } from '@/lib/web-story'
@@ -92,7 +91,6 @@ export default async function ArticlePage({ params }: Props) {
   const relatedIds = new Set([article.id, ...related.map((a) => a.id)])
   const moreFromSection = (sameSection?.docs ?? []).filter((a) => !relatedIds.has(a.id)).slice(0, 6)
   const namaz = todayForAllCities()
-  const sourceCount = new Set(article.sources.map((s) => s.url)).size
 
   const publicPath = article.href
 
@@ -154,15 +152,6 @@ export default async function ArticlePage({ params }: Props) {
                     </p>
                   </div>
                 </div>
-                {sourceCount > 0 && (
-                  <a
-                    href="#sources"
-                    className="inline-flex items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 py-1.5 text-[13px] font-bold text-accent"
-                  >
-                    <BadgeCheck className="h-4 w-4" aria-hidden />
-                    {isUr ? `${sourceCount} ذرائع · انسانی جائزہ` : `Human-reviewed · ${sourceCount} source${sourceCount === 1 ? '' : 's'}`}
-                  </a>
-                )}
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <ArticleToolbar locale={locale} minutes={article.readingTime} />
@@ -202,7 +191,6 @@ export default async function ArticlePage({ params }: Props) {
               <SocialEmbeds embeds={article.embeds ?? []} locale={locale} />
               <LiveUpdates locale={locale} updates={article.updates} isLive={article.isLive} />
               <FAQAccordion faqs={article.faqs} locale={locale} />
-              <SourcesList sources={article.sources} locale={locale} />
               {article.corrections.map((c, i) => (
                 <p key={i} className="my-4 rounded-2xl bg-surface-2 p-4 text-sm">
                   <strong>{d.corrections}:</strong> {c.note}

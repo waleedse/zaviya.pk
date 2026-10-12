@@ -4,7 +4,7 @@
  * - at:    run once a day at HH:MM (optionally only on some weekdays, 0 = Sunday)
  */
 /** Agents that run on the server. PM, engineer, SEO and social run on Waleed's Mac (Claude app scheduled tasks). */
-export type AgentName = 'editor'
+export type AgentName = 'editor' | 'research'
 
 export interface Slot {
   session: string
@@ -21,10 +21,12 @@ export const SCHEDULE: Record<AgentName, Slot[]> = {
     { session: 'hourly', every: 60, nightEvery: 180 },
     { session: 'quick', every: 15, nightEvery: 30 },
   ],
+  // Growth research once a day: trends, evergreen search demand, ideas for the PM (Linear)
+  research: [{ session: 'daily', at: '09:30' }],
 }
 
 /** Agent run timeouts in minutes */
-export const TIMEOUT_MIN: Record<AgentName, number> = { editor: 15 }
+export const TIMEOUT_MIN: Record<AgentName, number> = { editor: 15, research: 25 }
 
 const PKT_OFFSET_MS = 5 * 60 * 60_000
 
