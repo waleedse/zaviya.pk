@@ -12,7 +12,7 @@ export interface ExtensionSettings {
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  bridgeUrl: 'ws://127.0.0.1:8787',
+  bridgeUrl: 'wss://zaviya.pk/bridge',
   bridgeToken: 'zaviya-dev-bridge',
   platforms: { x: true, instagram: true, facebook: true, gemini: true },
   actionDelayMinMs: 2_000,
