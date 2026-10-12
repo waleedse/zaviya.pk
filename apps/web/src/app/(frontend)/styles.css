@@ -280,6 +280,16 @@
     }
   }
 
+  /* Lead slider: per-slide progress bar */
+  @keyframes slider-progress {
+    from {
+      width: 0%;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
   /* Article body typography (Lexical HTML and Markdown output) */
   .prose-article {
     @apply max-w-[68ch] text-fg;

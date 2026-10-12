@@ -4,6 +4,8 @@ import type { ArticleCard as Card, Locale } from '@zaviya/shared'
 import { ArticleCard } from '@/components/article/ArticleCard'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { HomeLatest } from '@/components/home/HomeLatest'
+import { LeadSlider } from '@/components/home/LeadSlider'
+import { TopStoriesTabs } from '@/components/home/TopStories'
 import { RatesWidget } from '@/components/home/RatesWidget'
 import { SectionHeader } from '@/components/home/SectionHeader'
 import { SectionTabs } from '@/components/home/SectionTabs'
@@ -11,7 +13,7 @@ import { TOOLS } from '@/components/home/tools'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NameFinder } from '@/components/names/NameFinder'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
-import { getHomeFeed, getRatesTicker, getTrendingTags } from '@/lib/queries'
+import { getHomeFeed, getRatesTicker, getTopStories, getTrendingTags } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import { buildPageMetadata, SECTION_SEO } from '@/lib/seo'
@@ -65,10 +67,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     )
   }
 
+  // The lead slot rotates through the newest stories that have a picture (lead first)
+  const slides = [lead, ...take(feed.latest, 9, (a) => Boolean(a.image))]
   const secondary = take(feed.secondary, 3)
   const leadMore = take(feed.latest, 6)
   const latestRail = feed.latest.slice(0, 9)
-  const topStories = take(feed.latest, 8)
+  const [top12, top24] = await Promise.all([getTopStories(locale, 12, 8), getTopStories(locale, 24, 8)])
   // Chronological, so it may repeat stories shown above.
   const live = feed.live.length ? feed.live.slice(0, 5) : feed.latest.slice(0, 5)
   const explainers = take(feed.explainers, 3)
@@ -85,7 +89,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <section className="container-wide grid gap-6 pt-6 md:pt-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.92fr)]">
         {/* Lead column: the lead story, then extra headlines so it ends level with its neighbours */}
         <div className="flex flex-col gap-5">
-          <ArticleCard article={lead} locale={locale} variant="lead" priority />
+          <LeadSlider
+            labels={{
+              prev: isUr ? 'پچھلی خبر' : 'Previous story',
+              next: isUr ? 'اگلی خبر' : 'Next story',
+              slide: isUr ? 'اہم خبر' : 'Top story',
+            }}
+          >
+            {slides.map((a, i) => (
+              <ArticleCard key={a.id} article={a} locale={locale} variant="lead" priority={i === 0} />
+            ))}
+          </LeadSlider>
           {leadMore.length > 0 && (
             <div className="card-surface flex-1 px-5 py-2 md:px-6">
               <p className="eyebrow pb-1 pt-3 text-fg-subtle">{isUr ? 'مزید اہم خبریں' : 'More headlines'}</p>
@@ -121,15 +135,31 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </aside>
       </section>
 
-      {/* ── Top stories grid: eight more cards straight under the fold ── */}
-      {topStories.length > 0 && (
+      {/* ── Top stories: the editor's picks of the last 12 / 24 hours ── */}
+      {top24.length > 0 && (
         <section className="container-wide mt-12">
           <SectionHeader title={isUr ? 'اہم خبریں' : 'Top stories'} icon={Sparkles} />
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {topStories.map((a) => (
-              <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
-            ))}
-          </div>
+          <TopStoriesTabs
+            tabs={[
+              { key: '12h', label: isUr ? 'پچھلے 12 گھنٹے' : 'Last 12 hours', list: top12 },
+              { key: '24h', label: isUr ? 'پچھلے 24 گھنٹے' : 'Last 24 hours', list: top24 },
+            ].map((t) => ({
+              key: t.key,
+              label: t.label,
+              content: (
+                <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                  {t.list.map((a, i) => (
+                    <li key={a.id} className="relative">
+                      <span className="absolute -start-2 -top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-accent font-display text-sm font-bold text-white shadow-md">
+                        {i + 1}
+                      </span>
+                      <ArticleCard article={a} locale={locale} variant="medium" />
+                    </li>
+                  ))}
+                </ol>
+              ),
+            }))}
+          />
         </section>
       )}
 

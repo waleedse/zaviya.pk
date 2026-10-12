@@ -535,6 +535,34 @@ export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> 
   return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
 })
 
+const PRIORITY_RANK: Record<string, number> = { breaking: 3, high: 2, normal: 1 }
+
+/**
+ * Top stories of the last `hours`: the editor marks the day's 5-8 most important stories as
+ * priority high (breaking stays breaking), then newest first.
+ */
+export const getTopStories = cache(async (locale: Locale, hours: number, limit = 8): Promise<ArticleCard[]> => {
+  if (demoData() && !(await hasPublishedArticles())) return mockCards(locale).slice(0, limit)
+  const payload = await getPayloadClient()
+  const since = new Date(Date.now() - hours * 3_600_000).toISOString()
+  const result = await payload.find({
+    collection: 'articles',
+    locale,
+    where: { ...publishedAnd({ publishedAt: { greater_than: since } }) },
+    sort: '-publishedAt',
+    limit: 150,
+    depth: 2,
+    overrideAccess: true,
+  })
+  const ranked = [...result.docs].sort(
+    (a, b) =>
+      (PRIORITY_RANK[String(b.priority ?? 'normal')] ?? 1) - (PRIORITY_RANK[String(a.priority ?? 'normal')] ?? 1) ||
+      Number(Boolean(b.heroImage)) - Number(Boolean(a.heroImage)) ||
+      String(b.publishedAt).localeCompare(String(a.publishedAt)),
+  )
+  return Promise.all(ranked.slice(0, limit).map((d) => mapArticleCardAsync(d, locale)))
+})
+
 export const getLive = cache(async (locale: Locale): Promise<ArticleCard[]> => {
   if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).filter((a) => a.isLive)
