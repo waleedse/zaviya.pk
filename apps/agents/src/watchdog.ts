@@ -7,7 +7,7 @@
 
 export interface Heartbeat {
   at: number | null
-  queues: Record<string, { waiting: number; active: number; failed: number }>
+  queues: Record<string, { waiting: number; delayed?: number; active: number; failed: number }>
   extension: boolean | null
 }
 
@@ -58,12 +58,15 @@ export function findProblems(o: Observation, prev?: Observation): Problem[] {
   } else {
     for (const [name, q] of Object.entries(hb.queues)) {
       // Work waiting but nothing moving, for two checks in a row
+      // Delayed jobs (e.g. scheduled social posts) are not stuck, they are just not due yet
       const before = prev?.heartbeat.queues[name]
-      if (q.waiting > 200 && q.active === 0 && before && before.waiting <= q.waiting && before.active === 0) {
+      const ready = q.waiting - (q.delayed ?? 0)
+      const readyBefore = before ? before.waiting - (before.delayed ?? 0) : 0
+      if (ready > 200 && q.active === 0 && before && readyBefore <= ready && before.active === 0) {
         problems.push({
           key: `queue-stuck-${name}`,
           title: `Queue "${name}" is stuck`,
-          detail: `${q.waiting} jobs waiting, none active.`,
+          detail: `${ready} jobs waiting, none active.`,
           label: 'incident',
         })
       }

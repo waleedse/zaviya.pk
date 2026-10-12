@@ -25,6 +25,12 @@ describe('watchdog', () => {
     expect(findProblems(stuck, stuck).map((p) => p.key)).toEqual(['queue-stuck-embed'])
   })
 
+  it('ignores a queue whose backlog is only delayed jobs', () => {
+    const q = { social: { waiting: 321, delayed: 321, active: 0, failed: 0 } }
+    const delayed = { ...healthy, heartbeat: { ...healthy.heartbeat, queues: q } }
+    expect(findProblems(delayed, delayed).map((p) => p.key)).toEqual([])
+  })
+
   it('flags a burst of failures and an offline extension for Waleed', () => {
     const o = { ...healthy, heartbeat: { ...healthy.heartbeat, queues: { write: { waiting: 3, active: 1, failed: 40 } }, extension: false } }
     const problems = findProblems(o, healthy)
