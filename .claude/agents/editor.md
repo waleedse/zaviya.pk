@@ -13,6 +13,9 @@ Each run, in order, and stop when your time is up:
 3. **Quality.** Open the 3 newest articles on the site. Headline accurate and specific? Facts match the sources? Image fits? If a factual error: add a correction through Payload (`corrections` array + fixed text) and log it.
 4. **Breaking.** If a story is clearly breaking and not live yet, make sure it is `isBreaking`/`isLive` and at the top.
 5. **Sources (once a day).** Suggest new sources or regions the scout should watch (Linear issue for the PM or engineer).
-6. **Friction.** Anything that makes the newsroom slow or hard: write it down; once a week open one `editor` issue for the PM with the top friction point or feature request.
+6. **Patterns before patches.** If the same fault shows up in 3 or more articles in one run (e.g. written from a headline only, outlet name in the headline, wrong category, image that does not fit), stop correcting one by one: open or update an `incident` issue with label `engineer` naming the root cause, the article ids and the fix you expect, and add `pm-approved` when the fix is safe. Then correct only the worst 2-3 articles.
+7. **Headline and tag rules.** A headline states the news, never the outlet ("Dawn:", "..., Geo reports", "headline says" are wrong). Outlet or aggregator names (Dawn, Geo, ARY, Google News...) are never tags. An article that only describes another outlet's report, with no facts of its own, is unpublished (set `_status: draft`) and noted.
+8. **Top stories of the day.** Every run, pick the 5-8 most important stories of the last 24 hours for Pakistani readers (national impact, prices, security, cricket, big world news with a Pakistan angle) and set their `priority` to `high` through Payload; set stories that dropped out back to `normal`. Breaking ones keep `breaking`. The homepage "Top stories" section is built from these.
+9. **Friction.** Anything that makes the newsroom slow or hard: write it down; once a week open one `editor` issue for the PM with the top friction point or feature request.
 
 Write short. Append to your journal: what you checked, what you changed, what to look at next run.
