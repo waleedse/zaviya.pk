@@ -163,13 +163,13 @@ export function logoUrl(): string {
 export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
-    '@type': 'Organization',
+    '@type': 'NewsMediaOrganization',
     name: SITE.name,
     url: siteUrl(),
-    alternateName: ['Zaviya News', 'زاویہ'],
+    alternateName: ['Zaviya News', 'Zaviya.pk', 'زاویہ'],
     logo: logoUrl(),
-    // Left empty on purpose until the owner confirms the official social profile URLs (do not guess them).
-    sameAs: [],
+    // Official profiles only (comma-separated in SOCIAL_PROFILE_URLS); they tie the brand together for Google
+    sameAs: (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)),
   }
 }
 
@@ -179,6 +179,8 @@ export function websiteJsonLd(locale: Locale) {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: SITE.name,
+    // Google reads the site name shown in results from here
+    alternateName: ['Zaviya News', 'Zaviya.pk'],
     url: absoluteUrl(prefix || '/'),
     potentialAction: {
       '@type': 'SearchAction',
