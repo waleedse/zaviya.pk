@@ -1,8 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { dataPageSlugToKey } from '@/lib/seo'
-import { getArticle, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
+import { getArticle, getArticleBySlug, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import {
@@ -78,7 +78,12 @@ export default async function ArticlePage({ params }: Props) {
   if (dataPageSlugToKey(category)) notFound()
   const locale = parseLocale(l) as Locale
   const article = await getArticle(locale, category, slug)
-  if (!article) notFound()
+  if (!article) {
+    // Legacy /news/<slug> (and other wrong-section) links: send to the canonical section URL
+    const canonical = await getArticleBySlug(locale, slug)
+    if (canonical && canonical.href !== `/${category}/${slug}`) permanentRedirect(canonical.href)
+    notFound()
+  }
 
   const d = t(locale)
   const isUr = locale === 'ur'
