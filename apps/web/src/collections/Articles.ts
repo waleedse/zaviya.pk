@@ -10,6 +10,7 @@ import {
   articleAfterChangeHooks,
   articleReadingTime,
   articleSlugUnique,
+  keepHeroImage,
 } from '../hooks/articles'
 
 export const Articles: CollectionConfig = {
@@ -31,6 +32,7 @@ export const Articles: CollectionConfig = {
   },
   hooks: {
     beforeValidate: [articleSlugUnique, articleReadingTime],
+    beforeChange: [keepHeroImage],
     afterChange: articleAfterChangeHooks,
   },
   fields: [

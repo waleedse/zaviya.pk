@@ -1,4 +1,4 @@
-import type { CollectionBeforeValidateHook, CollectionAfterChangeHook } from 'payload'
+import type { CollectionBeforeValidateHook, CollectionBeforeChangeHook, CollectionAfterChangeHook } from 'payload'
 import { computeReadingTimeMinutes } from './readingTime'
 import { revalidateArticleHook } from './revalidate'
 import { pingIndexNowOnFirstPublish } from './indexNow'
@@ -71,3 +71,23 @@ export const articleAfterChangeHooks: CollectionAfterChangeHook[] = [
   revalidateArticleHook,
   pingIndexNowOnFirstPublish,
 ]
+
+/**
+ * A published article never loses its hero image by accident. On 13 Oct the editor agent's edits
+ * (headline fixes, "write back" after a gate publish) sent heroImage empty and most live stories went
+ * out imageless. An empty value keeps the current image and an object becomes its id. An editor can
+ * replace the image but never remove it.
+ */
+export const keepHeroImage: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
+  if (!data || !originalDoc || !('heroImage' in data)) return data
+  const incoming = data.heroImage as unknown
+  if (incoming && typeof incoming === 'object') {
+    const id = (incoming as { id?: number | string }).id
+    if (id !== undefined) data.heroImage = id
+    return data
+  }
+  const current = originalDoc.heroImage as unknown
+  const currentId = current && typeof current === 'object' ? (current as { id?: number | string }).id : current
+  if (!incoming && currentId) data.heroImage = currentId
+  return data
+}
