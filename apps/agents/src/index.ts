@@ -275,7 +275,8 @@ async function main() {
       const obs = await observe()
       console.log(JSON.stringify({ obs, problems: findProblems(obs) }, null, 1))
     } else {
-      await runAgent('editor', process.argv[once + 2] ?? 'hourly')
+      const agent: AgentName = what === 'research' ? 'research' : 'editor'
+      await runAgent(agent, process.argv[once + 2] ?? SCHEDULE[agent][0]!.session)
     }
     return
   }

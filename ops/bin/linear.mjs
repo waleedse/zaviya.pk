@@ -9,8 +9,20 @@
 
 const API = 'https://api.linear.app/graphql'
 const TEAM_KEY = process.env.LINEAR_TEAM_KEY ?? 'ZAV'
-const KEY = process.env.LINEAR_API_KEY
-if (!KEY) fail('LINEAR_API_KEY is not set')
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+
+// Agents often run in shells that did not load any .env: fall back to the agents' own secrets file.
+function keyFromFile() {
+  for (const file of [process.env.ZAVIYA_AGENT_ENV, `${homedir()}/.zaviya-agents/.env`, '/data/.env'].filter(Boolean)) {
+    if (!existsSync(file)) continue
+    const m = readFileSync(file, 'utf8').match(/^LINEAR_API_KEY=(.+)$/m)
+    if (m) return m[1].trim().replace(/^["']|["']$/g, '')
+  }
+  return undefined
+}
+const KEY = process.env.LINEAR_API_KEY || keyFromFile()
+if (!KEY) fail('LINEAR_API_KEY is not set (and not in ~/.zaviya-agents/.env)')
 
 function fail(msg) {
   console.error(msg)
