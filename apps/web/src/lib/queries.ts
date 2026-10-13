@@ -280,6 +280,8 @@ export const getArticle = cache(
       const card = mockCards(locale).find((a) => a.slug === slug && a.category.slug === category)
       return card ? mockArticle(card) : null
     }
+    // categories.slug is a Postgres enum: an unknown slug (e.g. legacy /news/<slug>) would throw, not miss
+    if (!CATEGORIES.some((c) => c.slug === category)) return null
     const payload = await getPayloadClient()
     const cat = await payload.find({
       collection: 'categories',
