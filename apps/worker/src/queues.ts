@@ -298,6 +298,7 @@ export async function createWorkerRuntime(
           copy: WriteResult['en']['socialCopy']
           mediaUrls: string[]
           priority: Priority
+          url?: string
         }
         const settings = await payload.getSettings().catch(
           () => ({}) as import('./payload-client.js').PipelineSettings,
@@ -305,17 +306,17 @@ export async function createWorkerRuntime(
         const cap = settings.dailyCaps?.[d.platform]
         if (d.platform === 'facebook') {
           await postFacebook(
-            { articleId: d.articleId, copy: d.copy, mediaUrls: d.mediaUrls },
+            { articleId: d.articleId, copy: d.copy, mediaUrls: d.mediaUrls, url: d.url },
             { env, payload, bridge, settingsDailyCap: cap },
           )
         } else if (d.platform === 'instagram') {
           await postInstagram(
-            { articleId: d.articleId, copy: d.copy, mediaUrls: d.mediaUrls },
+            { articleId: d.articleId, copy: d.copy, mediaUrls: d.mediaUrls, url: d.url },
             { env, payload, settingsDailyCap: cap },
           )
         } else {
           await postX(
-            { articleId: d.articleId, copy: d.copy, priority: d.priority, mediaUrls: d.mediaUrls },
+            { articleId: d.articleId, copy: d.copy, priority: d.priority, mediaUrls: d.mediaUrls, url: d.url },
             { env, payload, bridge },
           )
         }

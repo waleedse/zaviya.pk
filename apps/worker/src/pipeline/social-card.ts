@@ -17,6 +17,10 @@ export interface SocialCardRenderInput {
   categoryColor?: string
   locale: 'en' | 'ur'
   format: SocialCardFormat
+  /** Hero photo as a data URL (jpeg/png); switches to the full-bleed photo layout */
+  photo?: string | null
+  /** Adds a red BREAKING tag */
+  breaking?: boolean
 }
 
 export interface RenderedSocialCard {
@@ -49,6 +53,9 @@ const FONT_URLS = {
 type SatoriElement = {
   type: string
   props: {
+    src?: string
+    width?: number
+    height?: number
     style?: Record<string, string | number>
     children?: SatoriElement | string | (SatoriElement | string)[]
   }
@@ -109,7 +116,75 @@ function el(
   }
 }
 
+/** Headline size that keeps long titles inside the card */
+export function photoTitleSize(title: string, format: SocialCardFormat): number {
+  const n = title.length
+  if (format === 'og') return n > 90 ? 40 : n > 60 ? 46 : 54
+  return n > 110 ? 54 : n > 70 ? 62 : 74
+}
+
+/** Turns an image blob into a data URL Satori can draw (webp and others are skipped). */
+export async function photoDataUrl(blob: Blob | null | undefined): Promise<string | null> {
+  if (!blob || !/^image\/(jpe?g|png)$/.test(blob.type)) return null
+  return `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`
+}
+
+/** Full-bleed news photo, dark fade, big headline: the eye-catching card for feeds. */
+function buildPhotoCard(input: SocialCardRenderInput & { photo: string }, size: (typeof SOCIAL_CARD_SIZES)[SocialCardFormat]): SatoriElement {
+  const isUr = input.locale === 'ur'
+  const font = isUr ? 'Noto Nastaliq Urdu' : 'Inter'
+  const align = isUr ? 'right' : 'left'
+  const row = isUr ? 'row-reverse' : 'row'
+  const accent = input.categoryColor ?? categoryAccentColor(input.category)
+  const og = input.format === 'og'
+  const pad = og ? 48 : 64
+  const title = truncateForCard(input.title, og ? 110 : 140)
+  const categoryLabel = CATEGORIES.find((c) => c.slug === input.category)?.[isUr ? 'ur' : 'en'] ?? input.category
+  const colW = og ? Math.round(size.width * 0.66) : size.width
+  const textW = colW - pad * 2
+  const pill = (text: string, bg: string): SatoriElement =>
+    el('div', { fontSize: og ? 20 : 24, fontWeight: 700, fontFamily: font, color: '#ffffff', background: bg, padding: og ? '6px 16px' : '8px 20px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: isUr ? 0 : 1 }, text)
+
+  return el(
+    'div',
+    { width: size.width, height: size.height, display: 'flex', position: 'relative', background: BRAND.ink, fontFamily: font },
+    { type: 'img', props: { src: input.photo, width: size.width, height: size.height, style: { position: 'absolute', top: 0, left: 0, width: size.width, height: size.height, objectFit: 'cover' } } },
+    // Dark fade so the headline reads on any photo
+    el('div', {
+      position: 'absolute', top: 0, left: 0, width: size.width, height: size.height,
+      background: og
+        ? 'linear-gradient(90deg, rgba(11,15,23,0.95) 0%, rgba(11,15,23,0.85) 45%, rgba(11,15,23,0.15) 100%)'
+        : 'linear-gradient(180deg, rgba(11,15,23,0.55) 0%, rgba(11,15,23,0.05) 25%, rgba(11,15,23,0.35) 45%, rgba(11,15,23,0.92) 68%, rgba(11,15,23,0.98) 100%)',
+    }),
+    el('div', { position: 'absolute', top: 0, left: 0, width: size.width, height: 10, background: accent }),
+    el(
+      'div',
+      { position: 'absolute', top: pad + 10, left: pad, width: textW, height: size.height - pad * 2 - 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' },
+      el(
+        'div',
+        { display: 'flex', flexDirection: row, alignItems: 'center', gap: 14 },
+        el('div', { display: 'flex', fontSize: og ? 30 : 38, fontWeight: 700, fontFamily: font, color: '#ffffff', background: BRAND.accent, padding: og ? '4px 16px' : '6px 20px', borderRadius: 8 }, isUr ? SITE.nameUr : SITE.name),
+        pill(categoryLabel, `${accent}`),
+      ),
+      el(
+        'div',
+        { display: 'flex', flexDirection: 'column', gap: og ? 14 : 22, width: textW },
+        ...(input.breaking ? [el('div', { display: 'flex', flexDirection: row }, pill(isUr ? 'بریکنگ نیوز' : 'Breaking', BRAND.breaking))] : []),
+        el('div', { display: 'flex', width: textW, fontSize: photoTitleSize(title, input.format), fontWeight: 700, fontFamily: font, lineHeight: isUr ? 1.45 : 1.08, color: '#ffffff', textAlign: align, letterSpacing: isUr ? 0 : -1 }, title),
+        el('div', { display: 'flex', width: og ? 120 : 160, height: 8, background: accent, alignSelf: isUr ? 'flex-end' : 'flex-start' }),
+        el(
+          'div',
+          { display: 'flex', width: textW, flexDirection: row, justifyContent: 'space-between', alignItems: 'center', fontSize: og ? 20 : 26, fontFamily: font, color: '#d6dae1' },
+          el('div', { display: 'flex', fontWeight: 700 }, isUr ? 'مکمل خبر: zaviya.pk' : 'Full story at zaviya.pk'),
+          el('div', { display: 'flex', fontSize: og ? 14 : 16, color: BRAND.fgMuted }, isUr ? 'تصویر: AI' : 'AI image'),
+        ),
+      ),
+    ),
+  )
+}
+
 function buildCardTree(input: SocialCardRenderInput, size: (typeof SOCIAL_CARD_SIZES)[SocialCardFormat]): SatoriElement {
+  if (input.photo) return buildPhotoCard({ ...input, photo: input.photo }, size)
   const isUr = input.locale === 'ur'
   const dir = isUr ? 'rtl' : 'ltr'
   const titleFont = isUr ? 'Noto Nastaliq Urdu' : 'Inter'

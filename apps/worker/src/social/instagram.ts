@@ -2,6 +2,7 @@ import type { WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
 import { logger } from '../logger.js'
+import { pickCard, withLink } from './link.js'
 
 async function checkPublishingLimit(igUserId: string, token: string): Promise<boolean> {
   const url = `https://graph.facebook.com/v21.0/${igUserId}/content_publishing_limit?access_token=${encodeURIComponent(token)}`
@@ -14,7 +15,7 @@ async function checkPublishingLimit(igUserId: string, token: string): Promise<bo
 }
 
 export async function postInstagram(
-  input: { articleId: string; copy: { instagram: string }; mediaUrls: string[] },
+  input: { articleId: string; copy: { instagram: string }; mediaUrls: string[]; url?: string },
   deps: { env: WorkerEnv; payload: PayloadClient; postedToday?: number; settingsDailyCap?: number },
 ): Promise<void> {
   const format = input.mediaUrls.length > 1 ? 'carousel' : 'card'
@@ -32,7 +33,8 @@ export async function postInstagram(
     logger.warn('Instagram content_publishing_limit reached')
     return
   }
-  if (!input.mediaUrls[0]) {
+  const image = pickCard(input.mediaUrls, 'instagram')
+  if (!image) {
     logger.warn('Instagram requires media URL')
     return
   }
@@ -40,8 +42,8 @@ export async function postInstagram(
   try {
     const createUrl = `https://graph.facebook.com/v21.0/${deps.env.IG_USER_ID}/media`
     const createBody = new URLSearchParams({
-      image_url: input.mediaUrls[0]!,
-      caption: input.copy.instagram,
+      image_url: image,
+      caption: withLink(input.copy.instagram, input.url, 'instagram'),
       access_token: deps.env.META_PAGE_TOKEN,
     })
     const createRes = await fetch(createUrl, { method: 'POST', body: createBody })
