@@ -3,8 +3,8 @@ import type { WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { logger } from '../logger.js'
-import { generateHeroViaExtension } from './media.js'
-import { generateHeroViaWorkersAI } from './flux.js'
+import { generateHeroViaExtension, geminiAccounts } from './media.js'
+import { fluxPrompt, generateHeroViaWorkersAI } from './flux.js'
 import { describeReferenceScene } from './reference.js'
 
 /**
@@ -87,7 +87,7 @@ export async function processHeroBackfill(
       token: deps.env.CLOUDFLARE_AI_TOKEN,
       clusterId,
       scene,
-    })) ?? (await generateHeroViaExtension(brief, deps.bridge, clusterId, deps.env.GEMINI_WEB_ACCOUNT))
+    })) ?? (await generateHeroViaExtension(fluxPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0]))
   if (!blob) {
     const tries = (data.tries ?? 0) + 1
     if (tries < deps.env.HERO_IMAGE_MAX_TRIES) {

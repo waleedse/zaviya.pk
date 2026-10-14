@@ -40,7 +40,7 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
       const articleId = String(cmd.payload?.articleId ?? '')
       const action = cmd.payload?.action === 'reject' ? 'reject' : 'publish'
       if (articleId) {
-        const done = await finishGated(articleId, action, { payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis })
+        const done = await finishGated(articleId, action, { payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media })
         if (!done) logger.warn({ articleId }, 'gate command for a story that is not waiting')
       }
       break
@@ -105,7 +105,7 @@ export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInt
   const beat = () => {
     // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one
     if (runtime.env.EDITOR_GATE && ++beats % 15 === 0) {
-      void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
+      void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
         logger.warn({ err: e }, 'gate fallback failed'),
       )
     }
