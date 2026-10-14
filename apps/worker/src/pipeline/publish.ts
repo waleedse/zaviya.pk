@@ -1,3 +1,4 @@
+import { articleUrl } from '../social/link.js'
 import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 import type { PayloadClient } from '../payload-client.js'
@@ -260,6 +261,7 @@ export async function processPublishJob(
         priority: data.priority,
         copy: data.write.en.socialCopy,
         mediaUrls: data.socialMediaUrls ?? [],
+        url: articleUrl(category, data.write.en.slug),
       },
       {
         delay: Math.max(0, (slots[i]?.getTime() ?? Date.now()) - Date.now()),

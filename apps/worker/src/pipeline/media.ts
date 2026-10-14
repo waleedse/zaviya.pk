@@ -4,7 +4,7 @@ import type { Queue } from 'bullmq'
 import type { WriteResult } from './write.js'
 import { logger } from '../logger.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
-import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
+import { renderSocialCardSet, categoryAccentColor, photoDataUrl } from './social-card.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI } from './flux.js'
@@ -174,16 +174,20 @@ export async function processMediaJob(
   }
 
   try {
+    // Cards carry the hero photo and the headline: what people stop scrolling for
+    const photo = await photoDataUrl(blob).catch(() => null)
+    const breaking = data.priority === 'breaking'
     const cardsEn = await renderSocialCardSet({
       title: data.write.en.title,
       dek: data.write.en.dek,
       category,
       categoryColor: accent,
       locale: 'en',
+      photo,
+      breaking,
     })
-    const cardsUr = data.write.ur
-      ? await renderSocialCardSet({ title: data.write.ur.title, dek: data.write.ur.dek, category, categoryColor: accent, locale: 'ur' })
-      : null
+    // No Urdu card: Satori cannot shape Nastaliq (letters come out reversed and broken)
+    const cardsUr = null as { portrait: Buffer } | null
 
     const [ogEn, portraitEn, portraitUr] = await Promise.all([
       uploadGeneratedPng(

@@ -27,3 +27,18 @@ describe('social-card helpers', () => {
     expect(SOCIAL_CARD_SIZES.portrait).toEqual({ width: 1080, height: 1350 })
   })
 })
+
+describe('photo cards', () => {
+  it('shrinks the headline as it gets longer', async () => {
+    const { photoTitleSize } = await import('./social-card.js')
+    expect(photoTitleSize('Short', 'portrait')).toBeGreaterThan(photoTitleSize('x'.repeat(120), 'portrait'))
+    expect(photoTitleSize('Short', 'og')).toBeGreaterThan(photoTitleSize('x'.repeat(100), 'og'))
+  })
+
+  it('only embeds jpeg and png photos', async () => {
+    const { photoDataUrl } = await import('./social-card.js')
+    expect(await photoDataUrl(new Blob([new Uint8Array([1, 2])], { type: 'image/jpeg' }))).toBe('data:image/jpeg;base64,AQI=')
+    expect(await photoDataUrl(new Blob([new Uint8Array([1])], { type: 'image/webp' }))).toBeNull()
+    expect(await photoDataUrl(null)).toBeNull()
+  })
+})

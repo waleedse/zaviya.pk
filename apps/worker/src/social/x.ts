@@ -3,6 +3,7 @@ import type { PayloadClient } from '../payload-client.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
 import { buildOAuthHeader } from './x-oauth.js'
 import { logger } from '../logger.js'
+import { withLink } from './link.js'
 import type { BridgeServer } from '../bridge/server.js'
 import type { Priority } from '@zaviya/shared'
 
@@ -16,12 +17,9 @@ export async function postX(
   },
   deps: { env: WorkerEnv; payload: PayloadClient; bridge?: BridgeServer },
 ): Promise<void> {
-  const format = input.url && input.priority !== 'normal' ? 'link' : 'text'
+  const format = input.url ? 'link' : 'text'
   const key = socialIdempotencyKey(input.articleId, 'x', format)
-  let text = input.copy.x
-  if (input.url && (input.priority === 'high' || input.priority === 'breaking')) {
-    text = `${text} ${input.url}`.trim()
-  }
+  const text = withLink(input.copy.x, input.url, 'x')
 
   const creds =
     deps.env.X_API_KEY &&

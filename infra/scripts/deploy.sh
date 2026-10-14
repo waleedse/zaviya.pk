@@ -80,5 +80,5 @@ for repo in zaviya-web zaviya-worker zaviya-agents; do
 done
 docker image prune -f >/dev/null
 # Build cache grew ~30 GB a day with several releases: cap it (keeps recent layers so builds stay fast)
-docker builder prune -f --max-used-space 8gb >/dev/null 2>&1 || docker builder prune -af --filter until=6h >/dev/null 2>&1 || true
+docker builder prune -f --max-used-space 3gb >/dev/null 2>&1 || docker builder prune -af --filter until=6h >/dev/null 2>&1 || true
 echo "==> $RELEASE is live on $NEXT ($(df -h / | awk 'NR==2 {print $4}') disk free)"
