@@ -5,9 +5,10 @@ import type { WriteResult } from './write.js'
 import { logger } from '../logger.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor, photoDataUrl } from './social-card.js'
+import { renderPostCard } from './post-card.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
-import { generateHeroViaWorkersAI } from './flux.js'
+import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
 import { describeReferenceScene } from './reference.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
@@ -22,6 +23,7 @@ export async function generateHeroViaExtension(
   bridge: Pick<BridgeServer, 'isOnline' | 'send'>,
   clusterId: string,
   account?: string,
+  timeoutMs = 330_000,
 ): Promise<Blob | null> {
   if (!bridge.isOnline()) {
     logger.info({ clusterId }, 'extension offline — skipping Gemini hero image')
@@ -29,14 +31,14 @@ export async function generateHeroViaExtension(
   }
   // The extension makes one Gemini image at a time. Queue here, so each job's timeout covers only its own run
   // (before, jobs waiting behind each other ran out of time and every one failed as "bridge job timeout").
-  const turn = geminiQueue.then(() => runGemini(prompt, bridge, clusterId, account))
+  const turn = geminiQueue.then(() => runGemini(prompt, bridge, clusterId, account, timeoutMs))
   // Space out attempts: dozens of prompts a minute from one account look like abuse to Google.
   geminiQueue = turn.catch(() => null).then((blob) => sleep(blob ? MIN_GAP_AFTER_SUCCESS_MS : MIN_GAP_AFTER_FAILURE_MS))
   return turn
 }
 
 const MIN_GAP_AFTER_SUCCESS_MS = 30_000
-const MIN_GAP_AFTER_FAILURE_MS = 120_000
+const MIN_GAP_AFTER_FAILURE_MS = 20_000
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 let geminiQueue: Promise<unknown> = Promise.resolve()
@@ -45,14 +47,14 @@ async function runGemini(
   prompt: string,
   bridge: Pick<BridgeServer, 'isOnline' | 'send'>,
   clusterId: string,
-  account?: string,
+  account: string | undefined,
+  timeoutMs: number,
 ): Promise<Blob | null> {
   if (!bridge.isOnline()) return null
   try {
     const raw = await bridge.send(
-      { id: `img_${clusterId}_${Date.now()}`, type: 'gemini.image', payload: { prompt: heroPrompt(prompt), account } },
-      // Slightly longer than the extension's own 300s ceiling, so its real error arrives first.
-      330_000,
+      { id: `img_${clusterId}_${Date.now()}`, type: 'gemini.image', payload: { prompt, account } },
+      timeoutMs,
     )
     const img = GeminiImageResultSchema.parse(raw)
     logger.info({ clusterId, bytes: Math.round((img.base64.length * 3) / 4), size: `${img.width}x${img.height}` }, 'Gemini image received')
@@ -63,14 +65,21 @@ async function runGemini(
   }
 }
 
-/** Illustrations only: never a fake "photo" of real people or events. */
-export function heroPrompt(brief: string): string {
-  return [
-    brief.trim(),
-    'Style: clean modern editorial illustration for a news website, 16:9 landscape, soft natural light, rich but calm colours.',
-    'Do not depict identifiable real people, faces of politicians or celebrities, logos, flags with text, or any written text/letters.',
-    'It must clearly look like an illustration, not a photograph.',
-  ].join(' ')
+/** Gemini accounts to try in order (GEMINI_WEB_ACCOUNT, comma separated: an email or the /u/N number). */
+export function geminiAccounts(setting: string | undefined): (string | undefined)[] {
+  const list = (setting ?? '').split(',').map((a) => a.trim()).filter(Boolean)
+  return list.length ? list : [undefined]
+}
+
+/** Per account: Gemini usually answers in under a minute; past this, the next account or FLUX takes over. */
+export const GEMINI_ACCOUNT_TIMEOUT_MS = 150_000
+
+/**
+ * Whether the image waits for the editor. With the gate on, a normal story goes to the editor as a
+ * text draft and gets its image only once approved (half the stories never run, so half the images were waste).
+ */
+export function deferImage(o: { gate: boolean; articleId?: string; priority: Priority; isUpdate?: boolean }): boolean {
+  return o.gate && !o.articleId && o.priority !== 'breaking' && !o.isUpdate
 }
 
 function absoluteMediaUrl(baseUrl: string, url?: string | null): string | undefined {
@@ -109,7 +118,7 @@ async function uploadGeneratedPng(
 const IMAGE_RETRY_DELAY_MS = 15 * 60_000
 
 export async function processMediaJob(
-  data: { clusterId: string; write: WriteResult; qaScore: number; priority: Priority; imageTries?: number },
+  data: { clusterId: string; write: WriteResult; qaScore: number; priority: Priority; imageTries?: number; articleId?: string },
   deps: { payload: PayloadClient; env: WorkerEnv; publishQueue: Queue; mediaQueue?: Queue; bridge: Pick<BridgeServer, 'isOnline' | 'send'> },
 ): Promise<void> {
   let heroMediaId: string | undefined
@@ -120,31 +129,46 @@ export async function processMediaJob(
   const category = triage?.category ?? 'pakistan'
   const accent = categoryAccentColor(category)
 
-  // Never reuse source photos (copyright). IMAGE_SOURCE=flux: Workers AI first (fast, server-side, 24/7),
-  // Gemini web through the extension as backup. IMAGE_SOURCE=extension: the other way round.
+  if (deferImage({ gate: deps.env.EDITOR_GATE, articleId: data.articleId, priority: data.priority, isUpdate: triage?.isUpdateOfExisting })) {
+    await deps.publishQueue.add(
+      'publish',
+      { clusterId: data.clusterId, write: data.write, socialMediaUrls: [], qaScore: data.qaScore, priority: data.priority },
+      { priority: 5 },
+    )
+    logger.info({ clusterId: data.clusterId }, 'image waits for the editor: sent as a text draft')
+    return
+  }
+
+  // Never reuse source photos (copyright). Gemini web (Waleed's AI Pro account, then the next one listed) is free,
+  // so it goes first; FLUX on Workers AI (paid per image) is the fallback. Breaking news cannot wait for Gemini.
   const brief = data.write.en.imageBrief || data.write.en.title
-  const flux = async () => {
-    // Look at the real photo behind the story (described in words, never reused) so the image fits the event.
-    const scene = await describeReferenceScene(cluster?.items.map((i) => i.url) ?? [], {
+  // Look at the real photo behind the story (described in words, never reused) so the image fits the event.
+  let scenePromise: Promise<string | null> | null = null
+  const scene = () =>
+    (scenePromise ??= describeReferenceScene(cluster?.items.map((i) => i.url) ?? [], {
       geminiApiKey: deps.env.GEMINI_API_KEY,
       clusterId: data.clusterId,
-    }).catch(() => null)
-    return generateHeroViaWorkersAI(brief, {
+    }).catch(() => null))
+  const flux = async () =>
+    generateHeroViaWorkersAI(brief, {
       accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
       token: deps.env.CLOUDFLARE_AI_TOKEN,
       clusterId: data.clusterId,
-      scene,
+      scene: await scene(),
     })
+  const gemini = async () => {
+    const prompt = fluxPrompt(brief, await scene())
+    for (const account of geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)) {
+      const b = await generateHeroViaExtension(prompt, deps.bridge, data.clusterId, account, GEMINI_ACCOUNT_TIMEOUT_MS)
+      if (b) {
+        logger.info({ clusterId: data.clusterId, account }, 'hero image from Gemini')
+        return b
+      }
+    }
+    return null
   }
-  const gemini = () => generateHeroViaExtension(brief, deps.bridge, data.clusterId, deps.env.GEMINI_WEB_ACCOUNT)
-  let blob: Blob | null
-  if (deps.env.IMAGE_SOURCE === 'flux') {
-    blob = (await flux()) ?? (await gemini())
-  } else {
-    blob = await gemini()
-    const geminiTries = (data.imageTries ?? 0) + 1
-    if (!blob && (!deps.bridge.isOnline() || geminiTries >= deps.env.GEMINI_IMAGE_TRIES_BEFORE_FALLBACK)) blob = await flux()
-  }
+  const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
+  const blob: Blob | null = fluxFirst ? ((await flux()) ?? (await gemini())) : ((await gemini()) ?? (await flux()))
   // No real illustration yet: hold the story and try again later instead of publishing a text card.
   if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
     const tries = (data.imageTries ?? 0) + 1
@@ -189,6 +213,27 @@ export async function processMediaJob(
     // No Urdu card: Satori cannot shape Nastaliq (letters come out reversed and broken)
     const cardsUr = null as { portrait: Buffer } | null
 
+    // The post card every platform gets: hero photo, Urdu + English headline (rendered in Chromium)
+    const card = data.write.en.card
+    const postPng = await renderPostCard(
+      {
+        title: data.write.en.title,
+        category,
+        photo,
+        breaking,
+        headlineUr: card?.headlineUr ?? data.write.ur?.title ?? null,
+        highlight: card?.highlight,
+        highlightUr: card?.highlightUr,
+        figure: card?.figure,
+        time: `${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })} PKT`,
+      },
+      deps.env.CHROMIUM_PATH,
+    ).catch(() => null)
+    const post = postPng
+      ? await uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, postPng, `${data.write.en.title} — social post`, `${data.write.en.slug}-post`).catch(() => null)
+      : null
+    if (post?.url) socialMediaUrls.push(post.url)
+
     const [ogEn, portraitEn, portraitUr] = await Promise.all([
       uploadGeneratedPng(
         deps.payload,
@@ -229,7 +274,8 @@ export async function processMediaJob(
       socialMediaUrls,
       qaScore: data.qaScore,
       priority: data.priority,
+      ...(data.articleId ? { articleId: data.articleId } : {}),
     },
-    { priority: data.priority === 'breaking' ? 1 : 5 },
+    { priority: data.priority === 'breaking' || data.articleId ? 1 : 5 },
   )
 }

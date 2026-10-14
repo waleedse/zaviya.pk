@@ -80,7 +80,7 @@ export const GATE_KEY = 'zaviya:gate'
 export async function finishGated(
   articleId: string,
   action: 'publish' | 'reject',
-  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis },
+  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
 ): Promise<boolean> {
   const raw = await deps.redis.hget(GATE_KEY, articleId)
   if (!raw) return false
@@ -91,12 +91,22 @@ export async function finishGated(
     logger.info({ articleId }, 'editor rejected the story')
     return true
   }
+  // Approved text draft: make its image and cards now; the media step then publishes it
+  if (!data.heroMediaId && deps.mediaQueue) {
+    await deps.mediaQueue.add(
+      'media',
+      { clusterId: data.clusterId, write: data.write, qaScore: data.qaScore, priority: data.priority, articleId },
+      { priority: 1 },
+    )
+    logger.info({ articleId }, 'editor approved: making the image, then publishing')
+    return true
+  }
   await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue })
   return true
 }
 
 /** Gate fallback: when nothing went out for `minutes`, publish the oldest waiting story (editor down or slow). */
-export async function gateFallback(deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis }, minutes: number): Promise<void> {
+export async function gateFallback(deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue }, minutes: number): Promise<void> {
   const waiting = await deps.redis.hgetall(GATE_KEY)
   const ids = Object.keys(waiting)
   if (!ids.length) return

@@ -83,6 +83,8 @@ const envSchema = z.object({
   BRIDGE_HOST: z.string().default('127.0.0.1'),
   /** Base URL the browser can open for uploaded media (differs from PAYLOAD_URL inside Docker) */
   PUBLIC_MEDIA_URL: optionalUrl,
+  /** Headless Chromium for the social post cards (Urdu needs a real browser engine) */
+  CHROMIUM_PATH: optionalStr,
   BRIDGE_TOKEN: optionalStr,
   GOLD_API_URL: optionalUrl,
   WORKER_VERSION: z.string().default('0.1.0'),

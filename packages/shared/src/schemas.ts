@@ -37,6 +37,15 @@ export const WriterOutputSchema = z.object({
     instagram: z.string().max(2000),
     x: z.string().max(260),
   }),
+  /** Text for the social post card (English writer only) */
+  card: z
+    .object({
+      headlineUr: z.string().max(140),
+      highlight: z.string().max(60).optional(),
+      highlightUr: z.string().max(60).optional(),
+      figure: z.object({ value: z.string().max(16), label: z.string().max(80) }).optional(),
+    })
+    .optional(),
 })
 export type WriterOutput = z.infer<typeof WriterOutputSchema>
 

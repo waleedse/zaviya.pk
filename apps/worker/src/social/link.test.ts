@@ -22,4 +22,9 @@ describe('social links', () => {
     expect(pickCard(media, 'x')).toBe(media[1])
     expect(pickCard(media, 'instagram')).toBe(media[0])
   })
+
+  it('prefers the designed post card on every platform', () => {
+    const media = ['https://zaviya.pk/api/media/file/a-portrait.png', 'https://zaviya.pk/api/media/file/a-post.png', 'https://zaviya.pk/api/media/file/a-card.png']
+    for (const p of ['facebook', 'instagram', 'x'] as const) expect(pickCard(media, p)).toBe(media[1])
+  })
 })
