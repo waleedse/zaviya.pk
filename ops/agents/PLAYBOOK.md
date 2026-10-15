@@ -12,11 +12,11 @@ Every agent reads this first. Design and reasons: `docs/AGENTS.md`.
 - Repo: the current directory (a clone of `waleedse/zaviya.pk`, branch `main`).
 - Your memory: `$AGENT_HOME/journal.md`. Read it at the start, append a dated entry at the end (what you did, what is pending, what to check next run). Keep it under ~300 lines: summarise old entries.
 - Shared notes: `$AGENT_DATA/shared/` (e.g. `seo-playbook.md`, `social-plan.json`, `newsroom-notes.md`).
-- Site: `$SITE_URL`. Payload REST API: `$PAYLOAD_URL/api/...` with header `Authorization: users API-Key $PAYLOAD_API_KEY`.
+- Site: `$SITE_URL`. Payload REST API: `node ops/bin/payload.mjs <METHOD> /api/... ['<json>']` (adds the API key itself; the shell refuses commands that expand `$PAYLOAD_API_KEY`, so never use curl with it).
 
 ## Tools
 - Linear: `node ops/bin/linear.mjs list|get|create|comment|update` (team ZAV). Labels: agent group `product`, `engineer`, `editor`, `seo`, `social`, and `needs-waleed`, `pm-approved`, `risk-high`, `incident`, `Bug`, `Feature`, `Improvement`.
-- Payload: `curl -s -H "Authorization: users API-Key $PAYLOAD_API_KEY" "$PAYLOAD_URL/api/articles?limit=20&sort=-publishedAt&depth=0"`. Collections: articles, story-clusters, sources, review-queue, social-posts, metrics-daily, settings (global: `/api/globals/settings`).
+- Payload: `node ops/bin/payload.mjs GET /api/articles?limit=20&sort=-publishedAt&depth=0`. Collections: articles, story-clusters, sources, review-queue, social-posts, metrics-daily, settings (global: `/api/globals/settings`).
 - Analytics and learning: the SQL tables behind the admin Control Room (`apps/web/src/lib/analytics.ts`, `learning.ts`, `control-room.ts`). Read them through `metrics-daily` and the pipeline collections; the `/api/control` actions need a human editor session and are not for agents.
 - git / pnpm for code (engineer only).
 
