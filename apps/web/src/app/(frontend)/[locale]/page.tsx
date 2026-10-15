@@ -8,6 +8,7 @@ import { HomeLatest } from '@/components/home/HomeLatest'
 import { LiveRefresh } from '@/components/home/LiveRefresh'
 import { DeskHead, LeadStory, PictureStory, ThumbStory, TopList, Wire } from '@/components/home/Newsroom'
 import { RatesWidget } from '@/components/home/RatesWidget'
+import { ScrollFeature } from '@/components/home/ScrollFeature'
 import { SectionHeader } from '@/components/home/SectionHeader'
 import { Slider } from '@/components/home/Slider'
 import { TOOLS } from '@/components/home/tools'
@@ -105,19 +106,16 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     pakistan: pakistan.length > 0 && (
       <section aria-label={name('pakistan', 'Pakistan')}>
         <DeskHead title={name('pakistan', 'Pakistan')} href={path('/pakistan')} more={d.seeAll} color={color('pakistan', '#0E7C5A')} icon={Flag} />
-        <div className="grid gap-x-7 gap-y-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
-          <PictureStory article={pakistan[0]!} locale={locale} size="lg" dek />
-          <div className="divide-y divide-border">
-            {pakistan.slice(1, 4).map((a) => (
-              <ThumbStory key={a.id} article={a} locale={locale} />
-            ))}
-          </div>
-          <div className="divide-y divide-border md:col-span-2 lg:col-span-1">
-            {pakistan.slice(4).map((a) => (
-              <ThumbStory key={a.id} article={a} locale={locale} />
-            ))}
-          </div>
-        </div>
+        <ScrollFeature
+          accent={color('pakistan', '#0E7C5A')}
+          counter={isUr ? 'میں سے' : 'of'}
+          features={pakistan.map((a) => (
+            <PictureStory key={a.id} article={a} locale={locale} size="lg" dek />
+          ))}
+          rows={pakistan.map((a) => (
+            <ThumbStory key={a.id} article={a} locale={locale} />
+          ))}
+        />
       </section>
     ),
 
@@ -136,15 +134,19 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden />
           </Link>
         </div>
-        <div className={cn('grid gap-7 md:grid-cols-2', rates.length > 0 && 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_280px]')}>
-          <PictureStory article={money[0]!} locale={locale} size="lg" dek />
-          <div className="divide-y divide-amber-200 dark:divide-border">
-            {money.slice(1, 5).map((a) => (
+        <div className={cn('grid gap-7', rates.length > 0 && 'lg:grid-cols-[minmax(0,1fr)_280px]')}>
+          <ScrollFeature
+            accent="#B45309"
+            counter={isUr ? 'میں سے' : 'of'}
+            features={money.map((a) => (
+              <PictureStory key={a.id} article={a} locale={locale} size="lg" dek />
+            ))}
+            rows={money.map((a) => (
               <ThumbStory key={a.id} article={a} locale={locale} label />
             ))}
-          </div>
+          />
           {rates.length > 0 && (
-            <div className="flex flex-col gap-1 rounded-2xl border border-amber-200 bg-surface p-4 md:col-span-2 lg:col-span-1 dark:border-border">
+            <div className="flex flex-col gap-1 self-start rounded-2xl border border-amber-200 bg-surface p-4 lg:sticky lg:top-24 dark:border-border">
               <b className="mb-1 text-[15px]">{isUr ? 'مارکیٹ ابھی' : 'Markets now'}</b>
               {rates.slice(0, 6).map((r) => (
                 <Link key={r.series} href={r.href} className="flex items-center justify-between gap-3 border-t border-border py-2 text-sm hover:text-accent">
@@ -158,13 +160,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
           )}
         </div>
-        {money.length > 5 && (
-          <div className="mt-2 grid gap-x-7 border-t border-amber-200 sm:grid-cols-2 dark:border-border">
-            {money.slice(5).map((a) => (
-              <ThumbStory key={a.id} article={a} locale={locale} label />
-            ))}
-          </div>
-        )}
       </section>
     ),
 
