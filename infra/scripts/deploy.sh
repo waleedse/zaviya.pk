@@ -45,6 +45,14 @@ NEXT=blue; NEXT_PORT=3100
 [ "$LIVE" = blue ] && { NEXT=green; NEXT_PORT=3101; }
 
 echo "==> $RELEASE ($SHA): live=$LIVE, deploying to $NEXT"
+# A build on a nearly full disk fills it to 100% (15 Oct: 43 GB of build cache), and then Redis and
+# Postgres stop writing. Trim the cache first and refuse to build without enough room.
+docker builder prune -f --max-used-space 3gb >/dev/null 2>&1 || true
+FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+if [ "${FREE_GB:-0}" -lt 12 ]; then
+  echo "!! only ${FREE_GB} GB free on / (need 12): not building. Free space first; production is untouched." >&2
+  exit 1
+fi
 web "$NEXT" "$RELEASE" build
 stack "$RELEASE" build worker agents
 
