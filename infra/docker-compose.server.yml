@@ -1,4 +1,4 @@
-# Zaviya on the shared VPS (209.58.160.74): everything in Docker, behind the host's nginx.
+# Zaviya on its own VPS (Contabo EU, 194.163.184.12): everything in Docker, behind the host's nginx.
 # Lives at /var/www/aurm-test/app; secrets in /var/www/aurm-test/env (never in git).
 #   docker compose -f infra/docker-compose.server.yml --env-file ../env/compose.env up -d --build
 # Ports are bound to 127.0.0.1 only: nginx on the host terminates TLS and proxies in.

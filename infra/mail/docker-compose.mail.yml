@@ -4,9 +4,9 @@
 # Mailboxes:  docker exec zaviya-mail setup email add contact@zaviya.pk '<password>'
 # DKIM:       docker exec zaviya-mail setup config dkim  (then publish mail._domainkey TXT in Cloudflare)
 # DNS (Cloudflare, all "DNS only", never proxied):
-#   A    mail.zaviya.pk -> 209.58.160.74
+#   A    mail.zaviya.pk -> 194.163.184.12
 #   MX   zaviya.pk      -> mail.zaviya.pk (10)
-#   TXT  zaviya.pk      "v=spf1 ip4:209.58.160.74 mx -all"
+#   TXT  zaviya.pk      "v=spf1 ip4:194.163.184.12 mx -all"
 #   TXT  _dmarc         "v=DMARC1; p=quarantine; rua=mailto:postmaster@zaviya.pk"
 # TLS comes from the host's certbot (webroot via host nginx): certbot certonly --webroot -w /var/www/html -d mail.zaviya.pk
 # Outlook / phone: IMAP mail.zaviya.pk:993 (SSL), SMTP mail.zaviya.pk:587 (STARTTLS), user = full address.
