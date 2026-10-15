@@ -19,7 +19,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, zaviya-server]
+    # Zaviya's own VPS (Contabo EU, 194.163.184.12) since 16 Oct 2026; the old shared server ran zaviya-server
+    runs-on: [self-hosted, zaviya-eu]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

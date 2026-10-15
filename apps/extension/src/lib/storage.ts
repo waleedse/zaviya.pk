@@ -12,7 +12,7 @@ export interface ExtensionSettings {
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  bridgeUrl: 'wss://zaviya.209-58-160-74.sslip.io/bridge',
+  bridgeUrl: 'wss://zaviya.194-163-184-12.sslip.io/bridge',
   bridgeToken: 'zaviya-dev-bridge',
   platforms: { x: true, instagram: true, facebook: true, gemini: true },
   actionDelayMinMs: 2_000,

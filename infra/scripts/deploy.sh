@@ -7,6 +7,9 @@
 # If the new web never gets healthy, nginx is not touched and the old colour stays live.
 #   bash infra/scripts/deploy.sh v2026.10.12-1
 set -euo pipefail
+# The web build needs the host network (it reads Postgres to pre-render pages). Newer buildx refuses that
+# under Compose's bake builder without --allow, so use the classic builder.
+export COMPOSE_BAKE=false
 
 REF="${1:?usage: deploy.sh <tag-or-commit>}"
 ROOT="${ZAVIYA_ROOT:-/var/www/aurm-test}"
