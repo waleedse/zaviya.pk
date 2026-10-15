@@ -42,6 +42,8 @@ const MIN_GAP_AFTER_FAILURE_MS = 20_000
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 let geminiQueue: Promise<unknown> = Promise.resolve()
+/** Why the last Gemini attempt failed (e.g. gemini_user_active: Waleed is using the laptop) */
+let lastGeminiError = ''
 
 async function runGemini(
   prompt: string,
@@ -51,6 +53,7 @@ async function runGemini(
   timeoutMs: number,
 ): Promise<Blob | null> {
   if (!bridge.isOnline()) return null
+  lastGeminiError = ''
   try {
     const raw = await bridge.send(
       { id: `img_${clusterId}_${Date.now()}`, type: 'gemini.image', payload: { prompt, account } },
@@ -60,7 +63,12 @@ async function runGemini(
     logger.info({ clusterId, bytes: Math.round((img.base64.length * 3) / 4), size: `${img.width}x${img.height}` }, 'Gemini image received')
     return new Blob([Buffer.from(img.base64, 'base64')], { type: img.mimeType })
   } catch (e) {
-    logger.warn({ err: e instanceof Error ? e.message : e, clusterId }, 'Gemini (extension) image failed')
+    lastGeminiError = e instanceof Error ? e.message : String(e)
+    if (/gemini_user_(active|locked)/.test(lastGeminiError)) {
+      logger.info({ clusterId, reason: lastGeminiError }, 'Waleed is on the laptop (or it is locked): Gemini skipped')
+      return null
+    }
+    logger.warn({ err: lastGeminiError, clusterId }, 'Gemini (extension) image failed')
     return null
   }
 }
@@ -164,6 +172,8 @@ export async function processMediaJob(
         logger.info({ clusterId: data.clusterId, account }, 'hero image from Gemini')
         return b
       }
+      // Laptop in use or locked: no other account will do better, go straight to FLUX
+      if (/gemini_user_/.test(lastGeminiError)) break
     }
     return null
   }
@@ -191,7 +201,7 @@ export async function processMediaJob(
         filename: data.write.en.slug,
       })
       heroMediaId = uploaded.id
-      logger.info({ clusterId: data.clusterId, mediaId: uploaded.id }, 'hero image from Gemini (extension)')
+      logger.info({ clusterId: data.clusterId, mediaId: uploaded.id }, 'hero image uploaded')
     } catch (e) {
       logger.warn({ err: e }, 'hero upload skipped')
     }

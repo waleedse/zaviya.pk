@@ -42,6 +42,37 @@ export async function ensureTab(url: string, platform: PlatformKey): Promise<num
 }
 
 /**
+ * Gemini gets its own small window with only its tab, so it can be brought forward for a moment
+ * without switching Waleed's tabs: Gemini will not send a message from a hidden tab.
+ */
+export async function ensureGeminiWindowTab(url: string): Promise<{ tabId: number; windowId: number }> {
+  const tabs = await chrome.tabs.query({})
+  for (const t of tabs) {
+    if (t.id === undefined || !PLATFORM_PATTERNS.gemini.some((re) => re.test(t.url ?? ''))) continue
+    const siblings = await chrome.tabs.query({ windowId: t.windowId })
+    if (siblings.length === 1) {
+      await chrome.tabs.update(t.id, { url })
+      await waitForTabLoad(t.id)
+      return { tabId: t.id, windowId: t.windowId }
+    }
+  }
+  const win = await chrome.windows.create({ url, focused: false, state: 'normal', width: 480, height: 640, left: 24, top: 24 })
+  const tabId = win.tabs?.[0]?.id
+  if (tabId === undefined || win.id === undefined) throw new Error('failed to create gemini window')
+  await waitForTabLoad(tabId)
+  return { tabId, windowId: win.id }
+}
+
+/** Brings a window forward for `ms`, then gives focus back to the window Waleed was using. */
+export async function showBriefly(windowId: number, ms: number): Promise<void> {
+  const prev = await chrome.windows.getLastFocused().catch(() => undefined)
+  await chrome.windows.update(windowId, { focused: true, state: 'normal' })
+  setTimeout(() => {
+    if (prev?.id !== undefined && prev.id !== windowId) void chrome.windows.update(prev.id, { focused: true }).catch(() => undefined)
+  }, ms)
+}
+
+/**
  * Heavy single-page apps (X, Gemini) often never report "complete" in a background tab.
  * Wait up to the timeout, then carry on: the content script waits for the elements it needs.
  */
