@@ -5,6 +5,7 @@ import type { WorkerCommand } from './payload-client.js'
 import { geminiModelStatus } from '@zaviya/llm'
 import { logger } from './logger.js'
 import { finishGated, gateFallback } from './pipeline/publish.js'
+import { decidePitch, pitchFallback } from './pipeline/pitch.js'
 
 async function readJson<T>(runtime: WorkerRuntime, key: string): Promise<T | null> {
   try {
@@ -42,6 +43,14 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
       if (articleId) {
         const done = await finishGated(articleId, action, { payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media })
         if (!done) logger.warn({ articleId }, 'gate command for a story that is not waiting')
+      }
+      break
+    }
+    case 'pitch': {
+      if (clusterId) {
+        const action = cmd.payload?.action === 'reject' ? 'reject' : 'write'
+        const done = await decidePitch(clusterId, action, { payload: runtime.payload, writeQueue: runtime.queues.write, redis: runtime.redis }, cmd.payload?.note ?? '')
+        if (!done) logger.warn({ clusterId }, 'pitch command for a story that is not waiting')
       }
       break
     }
@@ -108,6 +117,11 @@ export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInt
       void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
         logger.warn({ err: e }, 'gate fallback failed'),
       )
+      if (runtime.env.EDITOR_PITCH) {
+        void pitchFallback({ payload: runtime.payload, writeQueue: runtime.queues.write, redis: runtime.redis }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
+          logger.warn({ err: e }, 'pitch fallback failed'),
+        )
+      }
     }
     return sendHeartbeat(runtime).catch((e) => logger.warn({ err: e }, 'heartbeat failed'))
   }

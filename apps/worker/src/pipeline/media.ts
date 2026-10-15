@@ -10,6 +10,7 @@ import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
 import { describeReferenceScene } from './reference.js'
+import { editorApproved } from './pitch.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
 export { renderSocialCard, renderSocialCardSet } from './social-card.js'
@@ -86,8 +87,8 @@ export const GEMINI_ACCOUNT_TIMEOUT_MS = 150_000
  * Whether the image waits for the editor. With the gate on, a normal story goes to the editor as a
  * text draft and gets its image only once approved (half the stories never run, so half the images were waste).
  */
-export function deferImage(o: { gate: boolean; articleId?: string; priority: Priority; isUpdate?: boolean }): boolean {
-  return o.gate && !o.articleId && o.priority !== 'breaking' && !o.isUpdate
+export function deferImage(o: { gate: boolean; articleId?: string; priority: Priority; isUpdate?: boolean; approved?: boolean }): boolean {
+  return o.gate && !o.articleId && o.priority !== 'breaking' && !o.isUpdate && !o.approved
 }
 
 function absoluteMediaUrl(baseUrl: string, url?: string | null): string | undefined {
@@ -137,7 +138,7 @@ export async function processMediaJob(
   const category = triage?.category ?? 'pakistan'
   const accent = categoryAccentColor(category)
 
-  if (deferImage({ gate: deps.env.EDITOR_GATE, articleId: data.articleId, priority: data.priority, isUpdate: triage?.isUpdateOfExisting })) {
+  if (deferImage({ gate: deps.env.EDITOR_GATE, articleId: data.articleId, priority: data.priority, isUpdate: triage?.isUpdateOfExisting, approved: editorApproved(triage) })) {
     await deps.publishQueue.add(
       'publish',
       { clusterId: data.clusterId, write: data.write, socialMediaUrls: [], qaScore: data.qaScore, priority: data.priority },
