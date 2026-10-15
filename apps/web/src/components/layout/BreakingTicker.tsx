@@ -4,7 +4,7 @@ import Link from 'next/link'
 import type { ArticleCard, Locale } from '@zaviya/shared'
 import { t } from '@/lib/i18n'
 
-export function BreakingTicker({ items, locale }: { items: ArticleCard[]; locale: Locale }) {
+export function BreakingTicker({ items, locale, label }: { items: ArticleCard[]; locale: Locale; label?: 'latest' }) {
   if (!items.length) return null
   const d = t(locale)
   const doubled = [...items, ...items]
@@ -17,7 +17,7 @@ export function BreakingTicker({ items, locale }: { items: ArticleCard[]; locale
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
           </span>
-          {d.breaking}
+          {label === 'latest' ? d.latest : d.breaking}
         </span>
         <div className="relative min-w-0 flex-1 overflow-hidden">
           <div className="ticker-scroll flex w-max gap-10 whitespace-nowrap">

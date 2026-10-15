@@ -20,6 +20,7 @@ import {
 import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './mock'
 import { getPayloadClient } from './payload'
 import { getLearning } from './learning'
+import { isActive, parsePlan, PIN_SECTIONS, sectionOrder, type FrontPagePlan, type FrontSection, type PinSection, type PlanSlot } from './front-page'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
 
@@ -851,3 +852,57 @@ export const getStaticPage = cache(
     return { title, body: null }
   },
 )
+
+export interface ResolvedFrontPage {
+  lead?: ArticleCard
+  seconds: ArticleCard[]
+  pins: Partial<Record<PinSection, ArticleCard[]>>
+  hidden: Set<string>
+  order: FrontSection[]
+  note?: string
+}
+
+/**
+ * The editor's homepage plan with each article id turned into a card. Expired slots, unpublished
+ * stories and a missing plan all fall back to the automatic page.
+ */
+export const getFrontPagePlan = cache(async (locale: Locale): Promise<ResolvedFrontPage> => {
+  const empty: ResolvedFrontPage = { seconds: [], pins: {}, hidden: new Set(), order: sectionOrder({}) }
+  let plan: FrontPagePlan
+  let note: string | undefined
+  try {
+    const payload = await getPayloadClient()
+    const doc = (await payload.findGlobal({ slug: 'front-page', overrideAccess: true, depth: 0 })) as { plan?: unknown; note?: string | null }
+    plan = parsePlan(doc.plan)
+    note = doc.note ?? undefined
+  } catch {
+    return empty
+  }
+  const now = Date.now()
+  const live = (list?: PlanSlot[]) => (list ?? []).filter((s) => isActive(s, now)).map((s) => s.id)
+  const leadId = isActive(plan.lead, now) ? plan.lead.id : undefined
+  const pinIds = Object.fromEntries(PIN_SECTIONS.map((k) => [k, live(plan.pins?.[k])])) as Record<PinSection, number[]>
+  const ids = [...new Set([leadId, ...live(plan.seconds), ...Object.values(pinIds).flat()].filter((x): x is number => x != null))]
+  const cards = new Map<number, ArticleCard>()
+  if (ids.length) {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'articles',
+      locale,
+      where: publishedAnd({ id: { in: ids } }),
+      limit: ids.length,
+      depth: 2,
+      overrideAccess: true,
+    })
+    await Promise.all(result.docs.map(async (d) => cards.set(Number(d.id), await mapArticleCardAsync(d, locale))))
+  }
+  const pick = (list: number[]) => list.map((id) => cards.get(id)).filter((c): c is ArticleCard => Boolean(c))
+  return {
+    lead: leadId != null ? cards.get(leadId) : undefined,
+    seconds: pick(live(plan.seconds)),
+    pins: Object.fromEntries(PIN_SECTIONS.map((k) => [k, pick(pinIds[k])])),
+    hidden: new Set((plan.hidden ?? []).map(String)),
+    order: sectionOrder(plan),
+    note,
+  }
+})

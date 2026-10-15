@@ -26,6 +26,7 @@ import { PromptVersions } from './collections/PromptVersions'
 import { MetricsDaily } from './collections/MetricsDaily'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { Settings } from './globals/Settings'
+import { FrontPage } from './globals/FrontPage'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
 import { ANALYTICS_DDL } from './lib/analytics'
 import { LEARNING_DDL } from './lib/learning'
@@ -90,7 +91,7 @@ export default buildConfig({
     MetricsDaily,
     PushSubscriptions,
   ],
-  globals: [Settings],
+  globals: [Settings, FrontPage],
   localization: {
     locales: [
       { label: 'English', code: 'en' },

@@ -353,7 +353,24 @@
   }
 
   .container-wide {
-    @apply mx-auto w-full max-w-[1320px] px-4 md:px-8;
+    @apply mx-auto w-full max-w-[calc(1140px+4rem)] px-4 md:px-8;
+  }
+
+  /* Zaviya "angle": category tags and desk tabs are cut at 30 degrees */
+  .angle-tag {
+    @apply inline-block py-1.5 ps-3.5 pe-6 text-[11.5px] font-extrabold uppercase tracking-[0.09em] text-white;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  }
+  [dir='rtl'] .angle-tag {
+    @apply normal-case tracking-normal text-[13px];
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 12px 100%);
+  }
+  .desk-tab {
+    @apply inline-flex items-center gap-2 py-2.5 ps-4 pe-9 font-display text-[1.15rem] font-extrabold text-white;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 0 100%);
+  }
+  [dir='rtl'] .desk-tab {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 18px 100%);
   }
 
   /* Card that lifts on hover */

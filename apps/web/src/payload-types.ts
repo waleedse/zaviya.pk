@@ -121,9 +121,11 @@ export interface Config {
   fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'ur') | ('en' | 'ur')[];
   globals: {
     settings: Setting;
+    'front-page': FrontPage;
   };
   globalsSelect: {
     settings: SettingsSelect<false> | SettingsSelect<true>;
+    'front-page': FrontPageSelect<false> | FrontPageSelect<true>;
   };
   locale: 'en' | 'ur';
   widgets: {
@@ -1367,6 +1369,30 @@ export interface Setting {
   createdAt?: string | null;
 }
 /**
+ * Set by the editor: {"lead":{"id":123,"until":"2026-10-16T18:00:00Z"},"seconds":[{"id":124}],"pins":{"pakistan":[{"id":125}]},"hidden":[99],"order":["pakistan","money","namaz","world-cricket","tech-ai","jobs","stories","more"]}. Empty slots fill themselves with the newest stories.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-page".
+ */
+export interface FrontPage {
+  id: number;
+  plan?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Why the editor arranged the page this way (one or two lines).
+   */
+  note?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "settings_select".
  */
@@ -1403,6 +1429,17 @@ export interface SettingsSelect<T extends boolean = true> {
   killSwitch?: T;
   lastHeartbeat?: T;
   lastHeartbeatMeta?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "front-page_select".
+ */
+export interface FrontPageSelect<T extends boolean = true> {
+  plan?: T;
+  note?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
