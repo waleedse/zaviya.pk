@@ -15,6 +15,19 @@ const baseTriage: TriageResult = {
 }
 
 describe('applyTriageRules', () => {
+  it('publishes global AI stories with no Pakistan angle', () => {
+    const d = applyTriageRules(
+      { ...baseTriage, category: 'ai', pakistanRelevance: 0, newsworthiness: 0.8, sourceCredibility: 0.8 },
+      { maxTier: 1, distinctSources: 2, settings: {} },
+    )
+    expect(d.outcome).toBe('publish')
+    const t = applyTriageRules(
+      { ...baseTriage, category: 'ai', pakistanRelevance: 0, newsworthiness: 0.8, sourceCredibility: 0.8 },
+      { maxTier: 3, distinctSources: 1, settings: {} },
+    )
+    expect(t.outcome).toBe('review')
+  })
+
   it('sends sensitive stories to review', () => {
     const d = applyTriageRules(
       { ...baseTriage, sensitivityFlags: ['military'] },
