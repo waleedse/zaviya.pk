@@ -1,7 +1,7 @@
 import type { BridgeJob, GeminiImageResult } from '@zaviya/shared'
 import type { GeminiSelectors, GeneratedImage } from './gemini-dom'
 import { getSettings } from './storage'
-import { ensureTab, findTabForPlatform, sendToTab, withTimeout } from './tabs'
+import { ensureGeminiWindowTab, ensureTab, findTabForPlatform, sendToTab, showBriefly, withTimeout } from './tabs'
 
 function unwrapTabResponse<T>(res: T): T {
   if (res && typeof res === 'object' && 'error' in res && typeof (res as { error: string }).error === 'string') {
@@ -184,7 +184,14 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary)
 }
 
+/** Seconds without keyboard or mouse before Waleed counts as away from the laptop */
+const AWAY_AFTER_S = 120
+
 async function runGeminiImage(job: Extract<BridgeJob, { type: 'gemini.image' }>): Promise<GeminiImageResult> {
+  // Gemini needs its window in front for a moment. While Waleed is working (or the screen is locked,
+  // where the window cannot show) answer at once, so the server uses FLUX instead of waiting.
+  const state = await chrome.idle.queryState(AWAY_AFTER_S)
+  if (state !== 'idle') throw new Error(`gemini_user_${state}`)
   const settings = await getSettings()
   // A fresh chat per image keeps earlier images out of the "new image" detection.
   // Pick the right Google account when several are signed in: a number is the /u/N/ slot, an email goes in authuser.
@@ -194,8 +201,10 @@ async function runGeminiImage(job: Extract<BridgeJob, { type: 'gemini.image' }>)
     : /^\d+$/.test(account)
       ? `https://gemini.google.com/u/${account}/app`
       : `https://gemini.google.com/app?authuser=${encodeURIComponent(account)}`
-  const tabId = await ensureTab(url, 'gemini')
+  const { tabId, windowId } = await ensureGeminiWindowTab(url)
   await sleep(3_000)
+  // Forward just long enough to type and send; generation then runs in the background
+  await showBriefly(windowId, 12_000)
   const prompt = `Generate an image: ${job.payload.prompt}`
   const generated = unwrapTabResponse(
     await sendToTab<GeneratedImage & { error?: string }>(tabId, {
