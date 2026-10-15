@@ -16,6 +16,7 @@ export function FrontendShell({
   categories,
   rates,
   breaking,
+  tickerLabel,
   langHref,
   trendingTags = [],
   children,
@@ -24,6 +25,7 @@ export function FrontendShell({
   categories: CategoryRef[]
   rates: RateTick[]
   breaking: ArticleCard[]
+  tickerLabel?: 'latest'
   langHref: string
   trendingTags?: { slug: string; name: string }[]
   children: React.ReactNode
@@ -48,7 +50,7 @@ export function FrontendShell({
       <RatesStripMobile locale={locale} rates={rates} />
       <SiteHeader locale={locale} categories={categories} langHref={langHref} suggestions={trending} />
       <TrendingStrip locale={locale} items={trending} />
-      <BreakingTicker items={breaking} locale={locale} />
+      <BreakingTicker items={breaking} locale={locale} label={tickerLabel} />
       <main id="main-content" className="min-h-[50vh]">
         {children}
       </main>

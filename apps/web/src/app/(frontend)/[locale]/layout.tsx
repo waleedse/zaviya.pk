@@ -3,7 +3,7 @@ import { Bricolage_Grotesque, Hanken_Grotesk, Newsreader, Gulzar, Noto_Nastaliq_
 import { notFound } from 'next/navigation'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { FrontendShell, defaultLangHref } from '@/components/layout/FrontendShell'
-import { getBreaking, getCategories, getRatesTicker, getTrendingTags } from '@/lib/queries'
+import { getBreaking, getCategories, getHomeFeed, getRatesTicker, getTrendingTags } from '@/lib/queries'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { AnalyticsScripts } from '@/components/analytics/AnalyticsScripts'
 import Script from 'next/script'
@@ -40,6 +40,8 @@ export default async function LocaleLayout({
     getTrendingTags(locale, 8),
   ])
 
+  // No story flagged breaking: the ticker carries the newest headlines instead, so it is never empty
+  const ticker = breaking.length ? breaking : (await getHomeFeed(locale)).latest.slice(0, 6)
   const langHref = defaultLangHref(locale)
 
   return (
@@ -56,7 +58,7 @@ export default async function LocaleLayout({
         ) : null}
         <ThemeProvider>
           <JsonLd data={[organizationJsonLd(), websiteJsonLd(locale)]} />
-          <FrontendShell locale={locale} categories={categories} rates={rates} breaking={breaking} langHref={langHref} trendingTags={trendingTags}>
+          <FrontendShell locale={locale} categories={categories} rates={rates} breaking={ticker} tickerLabel={breaking.length ? undefined : 'latest'} langHref={langHref} trendingTags={trendingTags}>
             {children}
           </FrontendShell>
         </ThemeProvider>
