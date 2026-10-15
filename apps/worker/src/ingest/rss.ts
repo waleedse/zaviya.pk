@@ -72,8 +72,15 @@ export async function fetchRssFeed(
   }
 }
 
-export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[], lang?: string): SourceItemInput[] {
-  return items.map((i) => ({
+/**
+ * Feeds older than this are not news any more. Google News search feeds ("petrol price Pakistan") return
+ * matches going back a year; on 16 Oct those joined today's clusters (a KP story clustered with an April
+ * petrol hike), the editor rejected the pitches and QA failed the drafts as unsupported.
+ */
+export const MAX_ITEM_AGE_MS = 48 * 60 * 60_000
+
+export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[], lang?: string, now = Date.now()): SourceItemInput[] {
+  return items.filter((i) => !(now - Date.parse(i.publishedAt) > MAX_ITEM_AGE_MS)).map((i) => ({
     sourceId,
     externalId: i.externalId,
     url: i.url,
