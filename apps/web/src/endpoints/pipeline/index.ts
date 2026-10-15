@@ -770,10 +770,17 @@ const pipelineEndpoints: Endpoint[] = [
       if (denied) return denied
       const res = await req.payload.find({
         collection: 'articles',
-        where: { and: [{ _status: { equals: 'draft' } }, { workflow: { equals: 'in_review' } }] },
+        // Newest first, last 24 hours: news goes stale, and oldest-first hid every new story behind a backlog
+        where: {
+          and: [
+            { _status: { equals: 'draft' } },
+            { workflow: { equals: 'in_review' } },
+            { createdAt: { greater_than: new Date(Date.now() - 24 * 60 * 60_000).toISOString() } },
+          ],
+        },
         draft: true,
-        sort: 'createdAt',
-        limit: 50,
+        sort: '-createdAt',
+        limit: 60,
         depth: 1,
         locale: 'en',
         overrideAccess: true,
