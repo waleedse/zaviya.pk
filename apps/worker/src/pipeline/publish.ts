@@ -5,29 +5,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
-import { SITE } from '@zaviya/shared'
 import { editorApproved } from './pitch.js'
-
-function nextSocialSlots(now = new Date(), count = 3): Date[] {
-  const slots: Date[] = []
-  const pktHours = [
-    { h: 8, m: 30 },
-    { h: 9, m: 30 },
-    { h: 13, m: 30 },
-    { h: 20, m: 30 },
-    { h: 22, m: 0 },
-  ]
-  for (let day = 0; day < 2 && slots.length < count; day++) {
-    for (const { h, m } of pktHours) {
-      const d = new Date(now)
-      d.setUTCDate(d.getUTCDate() + day)
-      const pkt = new Date(d.toLocaleString('en-US', { timeZone: SITE.timezone }))
-      pkt.setHours(h, m, 0, 0)
-      if (pkt > now) slots.push(pkt)
-    }
-  }
-  return slots.slice(0, count)
-}
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
 export function publisherName(title: string, feedName: string): string {
@@ -262,7 +240,6 @@ export async function processPublishJob(
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })
   logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId) }, 'published')
 
-  const slots = nextSocialSlots()
   const platforms = ['facebook', 'instagram', 'x'] as const
   for (let i = 0; i < platforms.length; i++) {
     await deps.socialQueue.add(
@@ -276,7 +253,7 @@ export async function processPublishJob(
         url: articleUrl(category, data.write.en.slug),
       },
       {
-        delay: Math.max(0, (slots[i]?.getTime() ?? Date.now()) - Date.now()),
+        // Posted the moment the article goes live (breaking included); the social worker is serial, so the three go one after another
         priority: data.priority === 'breaking' ? 1 : 5,
       },
     )

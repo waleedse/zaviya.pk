@@ -61,10 +61,14 @@ export async function postTweet(
     await randomDelay(delayMinMs, delayMaxMs)
   }
 
-  const editor =
+  const findEditor = () =>
     document.querySelector('[data-testid="tweetTextarea_0"]') ??
     document.querySelector('[data-testid="tweetTextarea_1"]') ??
     document.querySelector('div[contenteditable="true"][role="textbox"]')
+  // The composer modal renders a moment after the Post button is clicked
+  const editorDeadline = Date.now() + 10_000
+  while (!findEditor() && Date.now() < editorDeadline) await new Promise((r) => setTimeout(r, 400))
+  const editor = findEditor()
   if (!(editor instanceof HTMLElement)) throw new Error('composer_not_found')
 
   editor.focus()

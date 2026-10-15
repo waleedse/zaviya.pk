@@ -130,19 +130,26 @@ async function runXTrending(): Promise<unknown> {
 }
 
 async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<unknown> {
-  const tab = await findTabForPlatform('x')
-  const tabId = tab?.id ?? (await ensureTab('https://x.com/home', 'x'))
+  // Always start from the home timeline, and bring the tab forward while posting: X does not
+  // reliably mount its composer in a background tab or on a page without the Post button.
+  const [previous] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  const tabId = await ensureTab('https://x.com/home', 'x')
+  await chrome.tabs.update(tabId, { active: true })
   const settings = await getSettings()
-  return unwrapTabResponse(
-    await sendToTab<{ externalId?: string }>(tabId, {
-      kind: 'zaviya',
-      action: 'x.post',
-      text: job.payload.text,
-      mediaUrls: job.payload.mediaUrls,
-      delayMinMs: settings.actionDelayMinMs,
-      delayMaxMs: settings.actionDelayMaxMs,
-    }),
-  )
+  try {
+    return unwrapTabResponse(
+      await sendToTab<{ externalId?: string }>(tabId, {
+        kind: 'zaviya',
+        action: 'x.post',
+        text: job.payload.text,
+        mediaUrls: job.payload.mediaUrls,
+        delayMinMs: settings.actionDelayMinMs,
+        delayMaxMs: settings.actionDelayMaxMs,
+      }),
+    )
+  } finally {
+    if (previous?.id !== undefined && previous.id !== tabId) await chrome.tabs.update(previous.id, { active: true }).catch(() => undefined)
+  }
 }
 
 async function runInstagramPost(job: Extract<BridgeJob, { type: 'instagram.post' }>): Promise<unknown> {
