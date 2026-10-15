@@ -175,7 +175,7 @@ async function runAgent(agent: AgentName, session: string) {
     `Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api through "node ops/bin/payload.mjs <METHOD> /api/... [json]" (it adds the key; never put $PAYLOAD_API_KEY in a command, the shell refuses it).`,
     `Your journal: ${journal}. Shared notes: ${path.join(DATA, 'shared')}.`,
     session === 'quick'
-      ? 'QUICK RUN (keep it under 6 minutes): first the publishing gate from your role (publish the strongest waiting story, reject weak ones), then check only the articles published since your last journal entry. For each: headline states the news (no outlet name), facts match the sources, it is real reporting and not a write-up of another outlet\'s headline, category and image fit. Fix it, or set `_status: draft` if it is thin or wrong, and note it. Do not do the hourly tasks. Append one short journal line.'
+      ? 'QUICK RUN (keep it under 6 minutes): first the pitches from your role (approve the strongest for writing, reject weak ones), then the publishing gate (publish the strongest waiting draft, reject weak ones), then check only the articles published since your last journal entry. For each: headline states the news (no outlet name), facts match the sources, it is real reporting and not a write-up of another outlet\'s headline, category and image fit. Fix it, or set `_status: draft` if it is thin or wrong, and note it. Do not do the hourly tasks. Append one short journal line.'
       : "Start by reading ops/agents/PLAYBOOK.md and your journal. Do this session's work, then append a dated journal entry.",
     'Finish with a 3-line summary of what you did.',
   ].join('\n')

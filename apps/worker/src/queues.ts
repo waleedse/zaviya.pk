@@ -191,6 +191,7 @@ export async function createWorkerRuntime(
           triageQueue: queues.triage,
           notifyReview,
           autoApprove: env.AUTO_APPROVE,
+          pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
         }),
       // The local model handles one job at a time; an API model can triage several clusters at once.
       { connection, concurrency: env.LOCAL_MODEL === 'off' ? 4 : 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },

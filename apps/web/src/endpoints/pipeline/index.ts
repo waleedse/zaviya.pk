@@ -800,6 +800,61 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Editor pitch: triaged stories not written yet (the writer only writes what the editor approves).
+    // Newest first, last 24 hours; each with what the sources say, so the editor can judge without the article.
+    path: '/pipeline/pitches',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const res = (await req.payload.db.drizzle.execute(sql`
+        SELECT c.id, c.headline, c.triage, c.distinct_sources AS "distinctSources", c.first_seen_at AS "firstSeenAt",
+          COALESCE((
+            SELECT json_agg(json_build_object('title', i.title, 'url', i.url, 'summary', LEFT(COALESCE(i.summary, i.content_text, ''), 300)) ORDER BY i.published_at DESC)
+            FROM (SELECT * FROM source_items si WHERE si.cluster_id = c.id ORDER BY si.published_at DESC LIMIT 4) i
+          ), '[]'::json) AS items
+        FROM story_clusters c
+        WHERE c.status = 'triaged' AND c.triage->>'codeOutcome' = 'pitch'
+          AND c.updated_at > now() - interval '24 hours'
+        ORDER BY c.updated_at DESC
+        LIMIT 60
+      `)) as unknown as {
+        rows: { id: number; headline: string; triage: Record<string, unknown> | null; distinctSources: number; firstSeenAt: string; items: unknown[] }[]
+      }
+      return json(
+        res.rows.map((r) => ({
+          clusterId: String(r.id),
+          headline: r.headline,
+          category: r.triage?.category,
+          priority: r.triage?.suggestedPriority,
+          weightedScore: r.triage?.weightedScore,
+          reason: r.triage?.reason,
+          pitchedAt: r.triage?.pitchedAt,
+          firstSeenAt: r.firstSeenAt,
+          distinctSources: Number(r.distinctSources),
+          sources: r.items,
+        })),
+      )
+    },
+  },
+  {
+    // The editor decides on a pitch: write it (then image and publish follow on their own), or reject it.
+    path: '/pipeline/pitches/:id',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ action: z.enum(['write', 'reject']), note: z.string().max(500).optional() }))
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      if (!/^\d+$/.test(id)) return json({ error: 'bad id' }, 400)
+      await req.payload.db.drizzle.execute(
+        sql`INSERT INTO zaviya_commands (kind, payload, created_by) VALUES ('pitch', ${JSON.stringify({ clusterId: id, action: parsed.data.action, note: parsed.data.note ?? '' })}::jsonb, 'agent:editor')`,
+      )
+      return json({ ok: true, clusterId: id, action: parsed.data.action })
+    },
+  },
+  {
     // The editor decides: publish now, or reject (stays an unpublished draft). The worker carries it out.
     path: '/pipeline/gate/:id',
     method: 'post',

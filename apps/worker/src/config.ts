@@ -53,6 +53,8 @@ const envSchema = z.object({
   /** Editor gate: written stories wait as drafts until the editor agent publishes or rejects them */
   EDITOR_GATE: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
   /** Gate fallback: publish the oldest waiting story when nothing went out for this many minutes */
+  /** Normal stories go to the editor as a pitch and are written only once approved (needs EDITOR_GATE) */
+  EDITOR_PITCH: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
   EDITOR_GATE_FALLBACK_MIN: z.coerce.number().min(10).default(40),
   /** Minimum characters of real source text before a story is written (headline-only items are skipped) */
   MIN_SOURCE_CHARS: z.coerce.number().min(0).default(500),

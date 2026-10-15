@@ -6,6 +6,7 @@ import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
 import { SITE } from '@zaviya/shared'
+import { editorApproved } from './pitch.js'
 
 function nextSocialSlots(now = new Date(), count = 3): Date[] {
   const slots: Date[] = []
@@ -161,7 +162,8 @@ export async function processPublishJob(
 
   // Editor gate: normal stories wait as drafts (workflow in_review); the editor agent publishes the
   // best one each run. Breaking stories and live updates still go out at once.
-  const gated = Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting
+  // A story the editor approved as a pitch was chosen before it was written: it does not wait twice.
+  const gated = Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !editorApproved(triage)
 
   // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.

@@ -6,6 +6,7 @@ import type { PayloadClient } from '../payload-client.js'
 import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../prompts/triage.js'
 import { applyTriageRules } from './triage-rules.js'
 import { logger } from '../logger.js'
+import { shouldPitch } from './pitch.js'
 
 export async function processTriageJob(
   data: { clusterId: string },
@@ -15,6 +16,8 @@ export async function processTriageJob(
     writeQueue: Queue
     triageQueue?: Queue
     autoApprove?: 'off' | 'safe' | 'all'
+    /** Pitch normal stories to the editor instead of writing them at once */
+    pitch?: boolean
     notifyReview?: (args: { clusterId: string; reviewId: string; summary: string }) => Promise<void>
   },
 ): Promise<void> {
@@ -92,6 +95,15 @@ export async function processTriageJob(
       summary: `${cluster.headline ?? cluster.items[0]?.title ?? 'Story'}\n${decision.reason}`,
     })
     await deps.payload.patchCluster(data.clusterId, { status: 'in_review' })
+    return
+  }
+
+  if (shouldPitch({ pitch: Boolean(deps.pitch), priority: triage.suggestedPriority, isUpdate: triage.isUpdateOfExisting })) {
+    await deps.payload.patchCluster(data.clusterId, {
+      status: 'triaged',
+      triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString() },
+    })
+    logger.info({ clusterId: data.clusterId, priority: triage.suggestedPriority }, 'pitched to the editor')
     return
   }
 
