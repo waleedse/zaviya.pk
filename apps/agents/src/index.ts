@@ -159,6 +159,7 @@ const EDITOR_TOOLS = [
   `Edit(${DATA}/**)`,
   'Bash(curl:*)',
   'Bash(node ops/bin/linear.mjs:*)',
+  'Bash(node ops/bin/payload.mjs:*)',
   'Bash(date:*)',
 ]
 
@@ -171,7 +172,7 @@ async function runAgent(agent: AgentName, session: string) {
   const role = readRole(agent)
   const prompt = [
     `Session: ${session}. Time: ${new Date().toISOString()} (Pakistan is UTC+5).`,
-    `Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api (header "Authorization: users API-Key $PAYLOAD_API_KEY").`,
+    `Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api through "node ops/bin/payload.mjs <METHOD> /api/... [json]" (it adds the key; never put $PAYLOAD_API_KEY in a command, the shell refuses it).`,
     `Your journal: ${journal}. Shared notes: ${path.join(DATA, 'shared')}.`,
     session === 'quick'
       ? 'QUICK RUN (keep it under 6 minutes): first the publishing gate from your role (publish the strongest waiting story, reject weak ones), then check only the articles published since your last journal entry. For each: headline states the news (no outlet name), facts match the sources, it is real reporting and not a write-up of another outlet\'s headline, category and image fit. Fix it, or set `_status: draft` if it is thin or wrong, and note it. Do not do the hourly tasks. Append one short journal line.'
@@ -220,7 +221,7 @@ async function inbox() {
         order: (process.env.EDITOR_ENGINES ?? 'cursor,claude').split(',').map((x) => x.trim()) as EngineName[],
         role: role.body,
         prompt: [
-          `Time: ${new Date().toISOString()} (Pakistan is UTC+5). Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api (header "Authorization: users API-Key $PAYLOAD_API_KEY").`,
+          `Time: ${new Date().toISOString()} (Pakistan is UTC+5). Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api through "node ops/bin/payload.mjs <METHOD> /api/... [json]" (it adds the key; never put $PAYLOAD_API_KEY in a command, the shell refuses it).`,
           'Read ops/agents/PLAYBOOK.md first.',
           inboxPrompt(c),
         ].join('\n'),
