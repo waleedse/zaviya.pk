@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { dataPageSlugToKey } from '@/lib/seo'
-import { getArticle, getArticleBySlug, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
+import { getArticle, getArticleBySlug, getDuplicateReplacementHref, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import {
@@ -87,6 +87,9 @@ export default async function ArticlePage({ params }: Props) {
     // Legacy /news/<slug> (and other wrong-section) links: send to the canonical section URL
     const canonical = await getArticleBySlug(locale, slug)
     if (canonical && canonical.href !== `/${category}/${slug}`) permanentRedirect(canonical.href)
+    // An unpublished duplicate: send readers and Google to the live article of the same story
+    const kept = await getDuplicateReplacementHref(locale, slug)
+    if (kept && kept !== `/${category}/${slug}`) permanentRedirect(kept)
     notFound()
   }
 
