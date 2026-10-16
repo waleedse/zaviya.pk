@@ -48,6 +48,10 @@ export function buildPageMetadata(opts: {
   /** Urdu URL path, if an Urdu version exists */
   urPath?: string
   ogImage?: string
+  /** Real size of ogImage when it is a photo (the generated card is 1200x630) */
+  ogImageSize?: { width: number; height: number }
+  /** Search keywords: the article's tags and section */
+  keywords?: string[]
   type?: 'website' | 'article'
   publishedTime?: string
   modifiedTime?: string
@@ -69,6 +73,7 @@ export function buildPageMetadata(opts: {
     // Long headlines skip the " | Zaviya" suffix so Google shows them whole (~60 chars).
     title: opts.absoluteTitle || title.length > 52 ? { absolute: title } : title,
     description,
+    ...(opts.keywords?.length ? { keywords: opts.keywords } : {}),
     alternates,
     robots: noindex ? { index: false, follow: true } : baseRobots(),
     openGraph: {
@@ -79,7 +84,7 @@ export function buildPageMetadata(opts: {
       locale: locale === 'ur' ? 'ur_PK' : 'en_PK',
       alternateLocale: locale === 'ur' ? ['en_PK'] : ['ur_PK'],
       type,
-      images: [{ url: image, width: 1200, height: 630, alt: title }],
+      images: [{ url: image, width: opts.ogImageSize?.width ?? 1200, height: opts.ogImageSize?.height ?? 630, alt: title }],
       ...(publishedTime ? { publishedTime } : {}),
       ...(modifiedTime ? { modifiedTime } : {}),
       ...(opts.section ? { section: opts.section } : {}),
@@ -144,6 +149,23 @@ export const SECTION_SEO: Record<string, { en: { title: string; description: str
     en: { title: 'Trending in Pakistan Today: Viral Stories & Top Searches', description: 'What Pakistan is talking about today: trending topics, viral stories and top searches, explained.' },
     ur: { title: 'پاکستان میں آج کیا ٹرینڈ کر رہا ہے', description: 'پاکستان میں آج کے ٹرینڈنگ موضوعات، وائرل خبریں اور سب سے زیادہ سرچ کی جانے والی خبریں۔' },
   },
+}
+
+/** The article's tags first, then its section: for the keywords meta and NewsArticle schema. */
+export function articleKeywords(article: ArticleCard & { tags?: { name: string }[] }): string[] {
+  const seen = new Set<string>()
+  return [...(article.tags ?? []).map((t) => t.name), article.category.name].filter((k) => {
+    const key = k.trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** The share picture: the article's own photo (the generated text card only when it has none). */
+export function articleShareImage(article: ArticleCard): { url: string; size?: { width: number; height: number } } {
+  if (article.image?.url) return { url: article.image.url, size: { width: article.image.width, height: article.image.height } }
+  return { url: articleOgUrl(article) }
 }
 
 export function articleOgUrl(article: ArticleCard): string {
@@ -214,6 +236,8 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     image: [article.image?.url ? (article.image.url.startsWith('/') ? absoluteUrl(article.image.url) : article.image.url) : articleOgUrl(article)],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt ?? article.publishedAt,
+    ...(articleKeywords(article).length ? { keywords: articleKeywords(article).join(', ') } : {}),
+    articleSection: article.category.name,
     author: {
       '@type': 'Person',
       name: article.author.name,

@@ -6,7 +6,8 @@ import { getArticle, getArticleBySlug, getRelated, getMostRead, getRatesTicker, 
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import {
-  articleOgUrl,
+  articleKeywords,
+  articleShareImage,
   breadcrumbJsonLd,
   buildPageMetadata,
   faqJsonLd,
@@ -57,6 +58,7 @@ export async function generateMetadata({ params }: Props) {
   if (!article) return {}
   const enPath = locale === 'en' ? article.href : article.alternateHref
   const urPath = locale === 'ur' ? article.href : article.alternateHref
+  const share = articleShareImage(article)
   return buildPageMetadata({
     locale,
     title: article.seo.metaTitle ?? article.title,
@@ -65,7 +67,10 @@ export async function generateMetadata({ params }: Props) {
     urPath,
     section: article.category.name,
     tags: article.tags?.map((tg) => tg.name),
-    ogImage: article.seo.ogImage ?? articleOgUrl(article),
+    keywords: articleKeywords(article),
+    // The story's own photo when it has one; an editor-set SEO image wins
+    ogImage: article.seo.ogImage ?? share.url,
+    ogImageSize: article.seo.ogImage ? undefined : share.size,
     type: 'article',
     publishedTime: article.publishedAt,
     modifiedTime: article.updatedAt,

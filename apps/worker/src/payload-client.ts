@@ -285,7 +285,9 @@ export class PayloadClient {
     via?: string
     error?: string
   }) {
-    return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', body)
+    // A retry that succeeds must not keep the earlier attempt's error
+    const payload = body.status === 'posted' && body.error === undefined ? { ...body, error: '' } : body
+    return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', payload)
   }
 
   getSettings() {
