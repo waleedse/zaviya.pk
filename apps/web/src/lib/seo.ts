@@ -114,8 +114,8 @@ export const SECTION_SEO: Record<string, { en: { title: string; description: str
     },
   },
   pakistan: {
-    en: { title: 'Pakistan News Today: Politics, Government & National Updates', description: 'Latest Pakistan news: government decisions, politics, courts, provinces and national developments, with sources and what it means for you.' },
-    ur: { title: 'پاکستان کی خبریں: سیاست، حکومت اور قومی خبریں', description: 'پاکستان کی تازہ ترین خبریں: حکومتی فیصلے، سیاست، عدالتیں اور صوبائی خبریں، ذرائع کے ساتھ۔' },
+    en: { title: 'Pakistan News Today: Politics, Government & National Updates', description: 'Latest Pakistan news: government decisions, politics, courts, provinces and national developments, and what it means for you.' },
+    ur: { title: 'پاکستان کی خبریں: سیاست، حکومت اور قومی خبریں', description: 'پاکستان کی تازہ ترین خبریں: حکومتی فیصلے، سیاست، عدالتیں اور صوبائی خبریں۔' },
   },
   world: {
     en: { title: 'World News: International Stories That Matter to Pakistan', description: 'International news explained from a Pakistani angle: US, China, Middle East, Afghanistan, India and global markets.' },
