@@ -19,6 +19,7 @@ async function handle(msg: {
   sinceId?: string
   text?: string
   mediaUrls?: string[]
+  image?: { base64: string; type: string; name: string }
   delayMinMs?: number
   delayMaxMs?: number
   limit?: number
@@ -53,7 +54,7 @@ async function handle(msg: {
 
   if (msg.action === 'x.post') {
     if (!msg.text) throw new Error('missing_text')
-    return postTweet(msg.text, msg.mediaUrls ?? [], delayMinMs, delayMaxMs)
+    return postTweet(msg.text, msg.image, delayMinMs, delayMaxMs)
   }
 
   throw new Error('unknown_action')

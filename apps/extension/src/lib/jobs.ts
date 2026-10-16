@@ -129,6 +129,25 @@ async function runXTrending(): Promise<unknown> {
   return unwrapTabResponse(await sendToTab(tabId, { kind: 'zaviya', action: 'x.trends' }))
 }
 
+/** The headline card for X (wide card first), fetched here because the x.com page cannot read other origins. */
+async function fetchXImage(mediaUrls: string[]): Promise<{ base64: string; type: string; name: string } | undefined> {
+  const url =
+    mediaUrls.find((u) => /-card(-\d+)?\.(png|jpe?g)$/i.test(u)) ??
+    mediaUrls.find((u) => /-post(-\d+)?\.(png|jpe?g)$/i.test(u)) ??
+    mediaUrls[0]
+  if (!url) return undefined
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return undefined
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return { base64: btoa(bin), type: res.headers.get('content-type') ?? 'image/png', name: url.split('/').pop() ?? 'card.png' }
+  } catch {
+    return undefined
+  }
+}
+
 async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<unknown> {
   // Always start from the home timeline, and bring the tab forward while posting: X does not
   // reliably mount its composer in a background tab or on a page without the Post button.
@@ -136,6 +155,7 @@ async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<un
   const tabId = await ensureTab('https://x.com/home', 'x')
   await chrome.tabs.update(tabId, { active: true })
   const settings = await getSettings()
+  const image = await fetchXImage(job.payload.mediaUrls)
   try {
     return unwrapTabResponse(
       await sendToTab<{ externalId?: string }>(tabId, {
@@ -143,6 +163,7 @@ async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<un
         action: 'x.post',
         text: job.payload.text,
         mediaUrls: job.payload.mediaUrls,
+        image,
         delayMinMs: settings.actionDelayMinMs,
         delayMaxMs: settings.actionDelayMaxMs,
       }),
