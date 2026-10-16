@@ -55,7 +55,7 @@ export function Slider({
 
   return (
     <div>
-      <div ref={row} className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-4 pb-1 md:mx-0 md:px-0">
+      <div ref={row} className="no-scrollbar -mx-4 flex snap-x snap-proximity gap-5 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-1 [-webkit-overflow-scrolling:touch] md:mx-0 md:px-0">
         {children.map((child, i) => (
           <div key={i} className={cn('shrink-0 snap-start', itemClass)}>
             {child}

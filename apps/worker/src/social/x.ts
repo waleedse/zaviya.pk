@@ -34,6 +34,7 @@ export async function postX(
         }
       : null
 
+  const failures: string[] = []
   if (creds) {
     try {
       const url = 'https://api.twitter.com/2/tweets'
@@ -44,7 +45,8 @@ export async function postX(
         body: JSON.stringify({ text }),
         signal: AbortSignal.timeout(20_000),
       })
-      const data = (await res.json()) as { data?: { id: string }; detail?: string }
+      const data = (await res.json().catch(() => ({}))) as { data?: { id: string }; detail?: string; title?: string; errors?: { message?: string }[] }
+      const why = res.ok ? undefined : `X API ${res.status}: ${data.detail ?? data.errors?.[0]?.message ?? data.title ?? 'no reason given'}`
       await deps.payload.upsertSocialPost({
         idempotencyKey: key,
         article: input.articleId,
@@ -55,12 +57,13 @@ export async function postX(
         status: res.ok ? 'posted' : 'failed',
         externalId: data.data?.id,
         via: 'api',
-        error: data.detail,
+        error: why,
         postedAt: res.ok ? new Date().toISOString() : undefined,
       })
       return
     } catch (e) {
       logger.warn({ err: e }, 'X API post failed')
+      failures.push(`X API: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -83,8 +86,22 @@ export async function postX(
       return
     } catch (e) {
       logger.warn({ err: e }, 'X bridge post failed')
+      failures.push(`Chrome extension: ${e instanceof Error ? e.message : String(e)}`)
     }
+  } else {
+    failures.push(creds ? 'Chrome extension not connected' : 'No X API keys set and the Chrome extension is not connected')
   }
 
-  logger.debug('X posting skipped — not configured')
+  // Say why nothing went out: the admin shows this on the post instead of a silent gap
+  logger.warn({ articleId: input.articleId, failures }, 'X post not sent')
+  await deps.payload.upsertSocialPost({
+    idempotencyKey: key,
+    article: input.articleId,
+    platform: 'x',
+    format,
+    copy: text,
+    mediaUrls: input.mediaUrls ?? [],
+    status: 'failed',
+    error: failures.join(' | ').slice(0, 900),
+  })
 }

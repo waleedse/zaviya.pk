@@ -17,7 +17,7 @@ export interface ControlRoomData {
     sourcesToday: { source: string; pageviews: number }[]
     sources7: { source: string; pageviews: number }[]
     devices7: { device: string; pageviews: number }[]
-    topPagesToday: { path: string; title?: string; pageviews: number }[]
+    topPagesToday: { path: string; title?: string; pageviews: number; sources: { source: string; pageviews: number }[] }[]
     firstSearchVisit: string | null
     searchVisits7: number
   }
@@ -44,6 +44,11 @@ export interface ControlRoomData {
     xTrends: { name: string; traffic?: string }[]
     pendingCommands: number
     geminiCooldowns: Record<string, string>
+  }
+  /** What went out to each platform in the last 24 hours, and why anything did not */
+  social: {
+    platforms: { platform: string; posted: number; failed: number }[]
+    recentFailures: { platform: string; error: string; at: string }[]
   }
   learning: {
     categoryWeights: Record<string, number>
@@ -101,8 +106,17 @@ export async function loadControlRoom(payload: Payload): Promise<ControlRoomData
   )
   const topPages = await q<{ path: string; pv: string }>(
     payload,
-    sql`SELECT path, count(*) AS pv FROM zaviya_pageviews WHERE ts >= ${todayStart} GROUP BY path ORDER BY pv DESC LIMIT 10`,
+    sql`SELECT path, count(*) AS pv FROM zaviya_pageviews WHERE ts >= ${todayStart} GROUP BY path ORDER BY pv DESC LIMIT 15`,
   )
+  // Where each of those pages' visits came from (Facebook post, X, Google...)
+  const pageSources = topPages.length
+    ? await q<{ path: string; source: string; pv: string }>(
+        payload,
+        sql`SELECT path, source, count(*) AS pv FROM zaviya_pageviews
+          WHERE ts >= ${todayStart} AND path IN (${sql.join(topPages.map((p) => sql`${p.path}`), sql`, `)})
+          GROUP BY path, source ORDER BY pv DESC`,
+      )
+    : []
   const [firstSearch] = await q<{ ts: string | null }>(
     payload,
     sql`SELECT min(ts)::text AS ts FROM zaviya_pageviews WHERE source IN ('google','discover','google-news','bing')`,
@@ -189,6 +203,18 @@ export async function loadControlRoom(payload: Payload): Promise<ControlRoomData
     gsc_top_queries?: { rows: { query: string; clicks: number; impressions: number }[] }
   }
 
+  const socialCounts = await q<{ platform: string; status: string; n: string }>(
+    payload,
+    sql`SELECT platform::text AS platform, status::text AS status, count(*) AS n FROM social_posts
+      WHERE created_at > now() - interval '24 hours' GROUP BY 1, 2`,
+  )
+  const socialFailures = await q<{ platform: string; error: string | null; at: string }>(
+    payload,
+    sql`SELECT platform::text AS platform, error, updated_at::text AS at FROM social_posts
+      WHERE status = 'failed' AND updated_at > now() - interval '24 hours' ORDER BY updated_at DESC LIMIT 6`,
+  )
+  const platformNames = [...new Set(['x', 'facebook', 'instagram', ...socialCounts.map((r) => r.platform)])]
+
   const settings = (await payload.findGlobal({ slug: 'settings', overrideAccess: true })) as {
     killSwitch?: boolean
     lastHeartbeat?: string | null
@@ -216,7 +242,12 @@ export async function loadControlRoom(payload: Payload): Promise<ControlRoomData
       sourcesToday: sourcesToday.map((s) => ({ source: s.source, pageviews: num(s.pv) })),
       sources7: sources7.map((s) => ({ source: s.source, pageviews: num(s.pv) })),
       devices7: devices7.map((s) => ({ device: s.device, pageviews: num(s.pv) })),
-      topPagesToday: topPages.map((p) => ({ path: p.path, title: titleByPath.get(p.path), pageviews: num(p.pv) })),
+      topPagesToday: topPages.map((p) => ({
+        path: p.path,
+        title: titleByPath.get(p.path),
+        pageviews: num(p.pv),
+        sources: pageSources.filter((r) => r.path === p.path).map((r) => ({ source: r.source, pageviews: num(r.pv) })),
+      })),
       firstSearchVisit: firstSearch?.ts ?? null,
       searchVisits7: num(windows?.search_7),
     },
@@ -249,6 +280,14 @@ export async function loadControlRoom(payload: Payload): Promise<ControlRoomData
       xTrends: meta.xTrends?.items ?? [],
       pendingCommands: num(pending?.n),
       geminiCooldowns: meta.geminiCooldowns ?? {},
+    },
+    social: {
+      platforms: platformNames.map((platform) => ({
+        platform,
+        posted: num(socialCounts.find((r) => r.platform === platform && r.status === 'posted')?.n),
+        failed: num(socialCounts.find((r) => r.platform === platform && r.status === 'failed')?.n),
+      })),
+      recentFailures: socialFailures.map((r) => ({ platform: r.platform, error: r.error ?? 'no reason recorded', at: r.at })),
     },
     learning: {
       categoryWeights: learned.category_weights ?? {},
