@@ -176,11 +176,11 @@ export function seoBrief(plan: SeoPlan, locale: 'en' | 'ur'): string {
 - Search intent: ${plan.searchIntent}`
   }
   return `SEO plan (use naturally; keyword stuffing gets the site penalised):
-- Primary keyword: "${plan.primaryKeyword}" → in at least one title option, the dek and the first paragraph, written with proper capitalization and grammar. 2-4 uses in the body in total.
+- Primary keyword (a topic hint, not text to paste): "${plan.primaryKeyword}" → in at least one title option, the dek and the first paragraph, written with proper capitalization and grammar. 2-4 uses in the body in total.
 - Secondary keywords: use at most one or two where they read naturally: ${plan.secondaryKeywords.join(', ') || 'none'}
 - Angle for the headline: ${plan.titleAngle}
 - Search intent: ${plan.searchIntent}. Answer the reader's question in the first paragraph.
-- FAQs must answer these real searches: ${plan.faqQuestions.join(' | ') || 'none'}; add Roman Urdu FAQs for: ${plan.romanUrduQueries.join(' | ') || 'none'}
+- FAQs must answer these real searches, each rewritten as a complete natural question (never the raw query or a bracketed phrase): ${plan.faqQuestions.join(' | ') || 'none'}; add Roman Urdu FAQs for: ${plan.romanUrduQueries.join(' | ') || 'none'}
 - Structure the body with 2-4 "## " subheadings.`
 }
 
