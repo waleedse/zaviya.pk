@@ -103,7 +103,7 @@ export function buildPageMetadata(opts: {
 export const SECTION_SEO: Record<string, { en: { title: string; description: string }; ur: { title: string; description: string } }> = {
   home: {
     en: {
-      title: 'Zaviya: Latest Pakistan News Today, Breaking News in English & Urdu',
+      title: 'Zaviya News: Latest Pakistan News Today in English & Urdu',
       description:
         'Latest Pakistan news today: breaking stories, politics, business, cricket, petrol, gold and dollar rates, explained clearly in English and Urdu by Zaviya.',
     },
@@ -182,14 +182,28 @@ export function logoUrl(): string {
   return absoluteUrl('/logo.png')
 }
 
+/** One stable id for the brand: Organization, WebSite and AboutPage all point at it (ZAV-100). */
+export function organizationId(): string {
+  return `${siteUrl()}/#organization`
+}
+
 export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'NewsMediaOrganization',
+    '@id': organizationId(),
     name: SITE.name,
     url: siteUrl(),
     alternateName: ['Zaviya News', 'Zaviya.pk', 'زاویہ'],
-    logo: logoUrl(),
+    description: 'Zaviya (zaviya.pk) is a Pakistani digital newsroom publishing the latest Pakistan news, business, cricket, jobs and daily gold, dollar and petrol rates in English and Urdu.',
+    foundingDate: '2026',
+    areaServed: { '@type': 'Country', name: 'Pakistan' },
+    inLanguage: ['en', 'ur'],
+    logo: { '@type': 'ImageObject', url: logoUrl(), width: 512, height: 512 },
+    publishingPrinciples: absoluteUrl('/p/editorial-policy'),
+    ethicsPolicy: absoluteUrl('/p/editorial-policy'),
+    correctionsPolicy: absoluteUrl('/p/corrections'),
+    contactPoint: { '@type': 'ContactPoint', contactType: 'editorial', url: absoluteUrl('/p/contact'), availableLanguage: ['English', 'Urdu'] },
     // Official profiles only (comma-separated in SOCIAL_PROFILE_URLS); they tie the brand together for Google
     sameAs: (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)),
   }
@@ -204,11 +218,24 @@ export function websiteJsonLd(locale: Locale) {
     // Google reads the site name shown in results from here
     alternateName: ['Zaviya News', 'Zaviya.pk'],
     url: absoluteUrl(prefix || '/'),
+    publisher: { '@id': organizationId() },
     potentialAction: {
       '@type': 'SearchAction',
       target: absoluteUrl(`${prefix}/search?q={search_term_string}`),
       'query-input': 'required name=search_term_string',
     },
+  }
+}
+
+export function aboutPageJsonLd(locale: Locale) {
+  const prefix = locale === 'ur' ? '/ur' : ''
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    url: absoluteUrl(`${prefix}/p/about`),
+    name: 'About Zaviya News',
+    about: { '@id': organizationId() },
+    publisher: { '@id': organizationId() },
   }
 }
 
