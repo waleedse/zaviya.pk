@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 const INTERVAL_MS = 6_500
 
 /**
- * The lead slot as a moving strip: every few seconds the next story slides in from the side and the
+ * The lead slot as a moving strip: every few seconds the next story fades in over it and the
  * row of headlines under it shows what is coming. Pauses on hover, focus or a hidden tab, swipes on
  * touch, and stands still for readers who prefer reduced motion. All slides are in the server HTML.
  */
@@ -56,17 +56,22 @@ export function LeadCarousel({ children, titles, labels }: { children: ReactNode
         touchX.current = null
       }}
     >
-      <div className="overflow-hidden rounded-[var(--radius-card)]">
-        <div
-          className={cn('flex', !reduced && 'transition-transform duration-700 ease-[cubic-bezier(.22,.8,.24,1)]')}
-          style={{ transform: `translateX(calc(${index} * -100% * var(--dir, 1)))` }}
-        >
-          {slides.map((slide, i) => (
-            <div key={i} className="w-full shrink-0" aria-hidden={i !== index} inert={i !== index}>
-              {slide}
-            </div>
-          ))}
-        </div>
+      {/* Slides share one cell and crossfade, so wrapping from the last story to the first never
+          rewinds the strip, and the slot keeps the height of the tallest card */}
+      <div className="grid overflow-hidden rounded-[var(--radius-card)]">
+        {slides.map((slide, i) => (
+          <div
+            key={i}
+            className={cn(
+              'col-start-1 row-start-1 w-full ease-in-out motion-reduce:transition-none',
+              i === index ? 'z-10 opacity-100 transition-opacity duration-700' : 'pointer-events-none z-0 opacity-0 transition-opacity delay-700 duration-100',
+            )}
+            aria-hidden={i !== index}
+            inert={i !== index}
+          >
+            {slide}
+          </div>
+        ))}
       </div>
 
       <button

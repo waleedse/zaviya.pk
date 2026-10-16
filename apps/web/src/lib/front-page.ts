@@ -75,6 +75,38 @@ export function parsePlan(raw: unknown): FrontPagePlan {
   return plan
 }
 
+/** A pinned lead older than this goes back to the automatic flow, whatever `until` says. */
+export const LEAD_MAX_AGE_MS = 8 * 3600e3
+
+const STOP = new Set(
+  'a an the of in on at to for and or as by with from after over into amid says say said new its it is are was were be has have had will than that this their his her after before about near during against more most up down out off not no per vs'.split(' '),
+)
+
+function tokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP.has(w)),
+  )
+}
+
+/**
+ * Two headlines about the same event, written by two pipeline runs ("Hospital says 32 students died
+ * in the Peshawar school collapse" / "Peshawar school collapse: toll reaches 33"). Compares the
+ * meaningful words: enough overlap relative to the shorter headline means the same story.
+ */
+export function sameStory(a: string, b: string): boolean {
+  const ta = tokens(a)
+  const tb = tokens(b)
+  const small = Math.min(ta.size, tb.size)
+  if (small < 3) return false
+  let shared = 0
+  for (const w of ta) if (tb.has(w)) shared++
+  return shared >= 3 && shared / small >= 0.6
+}
+
 export function isActive(s: PlanSlot | undefined, now = Date.now()): s is PlanSlot {
   return Boolean(s) && (!s!.until || Date.parse(s!.until) > now)
 }

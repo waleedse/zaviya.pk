@@ -16,7 +16,7 @@ import { TOOLS } from '@/components/home/tools'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
 import { getCategoryFeed, getFrontPagePlan, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
-import { SECTION_CATEGORIES, type FrontSection, type PinSection } from '@/lib/front-page'
+import { LEAD_MAX_AGE_MS, SECTION_CATEGORIES, sameStory, type FrontSection, type PinSection } from '@/lib/front-page'
 import { parseLocale } from '@/lib/locale'
 import { formatNumber } from '@/lib/format'
 import { localePath, t } from '@/lib/i18n'
@@ -60,12 +60,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   // Every story appears once on the page, in the first slot that wants it. Stories the editor
   // took off the homepage never appear.
   const shown = new Set<string>(plan.hidden)
+  // ...and so does every story: a second article about the same event is skipped, not repeated
+  const shownTitles: string[] = []
   const take = (list: Card[], n: number, filter: (a: Card) => boolean = () => true) => {
     const out: Card[] = []
     for (const a of list) {
       if (out.length >= n) break
-      if (shown.has(a.id) || !filter(a)) continue
+      if (shown.has(a.id) || !filter(a) || shownTitles.some((t) => sameStory(t, a.title))) continue
       shown.add(a.id)
+      shownTitles.push(a.title)
       out.push(a)
     }
     return out
@@ -74,7 +77,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   // A section: the editor's pins first, then its newest stories
   const section = (key: PinSection, n: number) => take([...(plan.pins[key] ?? []), ...railOf(SECTION_CATEGORIES[key])], n)
 
-  const lead = take([...(plan.lead ? [plan.lead] : []), ...feed.latest], 1)[0]
+  // A pinned lead that has gone stale (nothing better came in all day) yields to the newest story
+  const pinnedLead = plan.lead && Date.now() - Date.parse(plan.lead.publishedAt) < LEAD_MAX_AGE_MS ? plan.lead : undefined
+  const lead = take([...(pinnedLead ? [pinnedLead] : []), ...feed.latest], 1)[0]
   if (!lead) {
     return (
       <div className="container-page py-24 text-center">

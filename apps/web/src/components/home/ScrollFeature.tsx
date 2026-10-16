@@ -5,12 +5,15 @@ import { cn } from '@/lib/utils'
 
 /**
  * A desk as a scroll story: the big card on the start side stays in view (sticky, large screens)
- * and turns into whichever story in the list beside it is crossing the middle of the screen, with
- * a fade, lift and image zoom; the active row shows how far the reader has scrolled through it.
+ * and crossfades into whichever story in the list beside it is crossing the reading line (never
+ * faster than once every 0.7 s, so fast scrolling stays calm); the active row shows how far the reader has scrolled through it.
  * Hover or focus on a row shows it at once. Small screens keep the first story as the big card
  * (it is out of view while the list scrolls). Readers who prefer reduced motion get no movement.
  * The server renders every card and row; this only decides which one is shown.
  */
+/** Shortest time between two story changes while scrolling */
+const HOLD_MS = 700
+
 export function ScrollFeature({
   features,
   rows,
@@ -33,6 +36,9 @@ export function ScrollFeature({
   const rowRefs = useRef<(HTMLLIElement | null)[]>([])
   const pinned = useRef<number | null>(null)
   const wide = useRef(false)
+  const shown = useRef(0)
+  const switchedAt = useRef(0)
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -41,22 +47,39 @@ export function ScrollFeature({
       raf = 0
       wide.current = mq.matches
       if (!wide.current) {
+        shown.current = 0
         setActive(0)
         setProgress(0)
         return
       }
       if (pinned.current !== null) return
-      const mid = window.innerHeight * 0.5
+      // The story changes a little after a row passes the reading line, never on the first pixel
+      const line = window.innerHeight * 0.42
       let idx = 0
       let prog = 0
       rowRefs.current.forEach((el, i) => {
         if (!el) return
         const r = el.getBoundingClientRect()
-        if (r.top <= mid) {
+        if (r.top <= line - Math.min(40, r.height * 0.3) * (i === shown.current ? 0 : 1)) {
           idx = i
-          prog = Math.min(1, Math.max(0, (mid - r.top) / Math.max(1, r.height)))
+          prog = Math.min(1, Math.max(0, (line - r.top) / Math.max(1, r.height)))
         }
       })
+      // At most one change per HOLD_MS, so a flick of the wheel does not flash through the stories;
+      // when the hold ends, the story under the reading line wins
+      const wait = HOLD_MS - (performance.now() - switchedAt.current)
+      if (idx !== shown.current && wait > 0) {
+        if (settle.current) clearTimeout(settle.current)
+        settle.current = setTimeout(() => {
+          settle.current = null
+          if (!raf) raf = requestAnimationFrame(measure)
+        }, wait)
+        return
+      }
+      if (idx !== shown.current) {
+        shown.current = idx
+        switchedAt.current = performance.now()
+      }
       setActive(idx)
       setProgress(prog)
     }
@@ -71,6 +94,7 @@ export function ScrollFeature({
     mq.addEventListener('change', onScroll)
     return () => {
       if (raf) cancelAnimationFrame(raf)
+      if (settle.current) clearTimeout(settle.current)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       mq.removeEventListener('change', onScroll)
@@ -86,6 +110,8 @@ export function ScrollFeature({
     }
     if (pinned.current === i) return
     pinned.current = i
+    shown.current = i
+    switchedAt.current = performance.now()
     setActive(i)
     setProgress(1)
   }
@@ -105,11 +131,13 @@ export function ScrollFeature({
                 aria-hidden={!on}
                 inert={!on}
                 className={cn(
-                  '[grid-area:1/1] transition-[opacity,transform,filter] duration-700 ease-[cubic-bezier(.2,.75,.15,1)] motion-reduce:transition-none',
-                  '[&_img]:transition-transform [&_img]:duration-[1200ms] [&_img]:ease-out motion-reduce:[&_img]:transition-none',
+                  // Crossfade: the new card fades in over the old one, which only disappears afterwards,
+                  // so the slot is never empty and the picture never blinks out
+                  '[grid-area:1/1] will-change-[opacity] transition-opacity ease-in-out motion-reduce:transition-none',
+                  '[&_img]:transition-transform [&_img]:duration-[1400ms] [&_img]:ease-out motion-reduce:[&_img]:transition-none',
                   on
-                    ? 'z-10 translate-y-0 opacity-100 blur-0 [&_img]:scale-100'
-                    : cn('pointer-events-none opacity-0 blur-[6px] [&_img]:scale-110', i < active ? '-translate-y-5' : 'translate-y-5'),
+                    ? 'z-10 opacity-100 duration-500 [&_img]:scale-100'
+                    : 'pointer-events-none z-0 opacity-0 delay-500 duration-100 [&_img]:scale-[1.03]',
                 )}
               >
                 {f}

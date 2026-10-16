@@ -188,6 +188,44 @@ export async function ControlRoom({ payload }: { payload: Payload }) {
       <section className={styles.grid2}>
         <div className={styles.card}>
           <div className={styles.cardHead}>
+            <h3>Today by source</h3>
+            <span className={styles.muted}>
+              {fmt(traffic.today.pageviews)} views today · {fmt(traffic.yesterday.pageviews)} yesterday
+            </span>
+          </div>
+          <Bars rows={traffic.sourcesToday.map((s) => ({ key: s.source, value: s.pageviews }))} labels={SOURCE_LABELS} />
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardHead}>
+            <h3>Social posting, last 24 hours</h3>
+          </div>
+          <ul className={styles.list}>
+            {data.social.platforms.map((p) => (
+              <li key={p.platform}>
+                <b>{SOURCE_LABELS[p.platform] ?? p.platform}</b>
+                <span className={styles.meta}>{p.failed ? `${p.failed} failed` : 'no failures'}</span>
+                <span className={styles.count}>{fmt(p.posted)} posted</span>
+              </li>
+            ))}
+          </ul>
+          {data.social.recentFailures.length > 0 && (
+            <ul className={styles.list} style={{ marginTop: 12 }}>
+              {data.social.recentFailures.map((f, i) => (
+                <li key={i}>
+                  <span className={styles.meta}>
+                    {SOURCE_LABELS[f.platform] ?? f.platform} · {ago(f.at)}
+                  </span>
+                  <span>{f.error}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className={styles.grid2}>
+        <div className={styles.card}>
+          <div className={styles.cardHead}>
             <h3>Top pages today</h3>
           </div>
           {traffic.topPagesToday.length ? (
@@ -197,6 +235,9 @@ export async function ControlRoom({ payload }: { payload: Payload }) {
                   <a href={`${siteBase}${p.path}`} target="_blank" rel="noreferrer">
                     {p.title || p.path}
                   </a>
+                  <span className={styles.meta}>
+                    {p.sources.map((r) => `${SOURCE_LABELS[r.source] ?? r.source} ${fmt(r.pageviews)}`).join(' · ')}
+                  </span>
                   <span className={styles.count}>{fmt(p.pageviews)}</span>
                 </li>
               ))}
