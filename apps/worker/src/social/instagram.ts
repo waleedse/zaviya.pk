@@ -47,8 +47,12 @@ export async function postInstagram(
       access_token: deps.env.META_PAGE_TOKEN,
     })
     const createRes = await fetch(createUrl, { method: 'POST', body: createBody })
-    const created = (await createRes.json()) as { id?: string }
-    if (!created.id) throw new Error('IG container create failed')
+    const created = (await createRes.json()) as { id?: string; error?: { message?: string; code?: number; error_user_msg?: string } }
+    // Keep Meta's reason (e.g. "The Instagram account is restricted.", code 25) so the Control Room shows it
+    if (!created.id) {
+      const why = created.error?.error_user_msg ?? created.error?.message ?? `HTTP ${createRes.status}`
+      throw new Error(`IG container create failed: ${why}${created.error?.code ? ` (code ${created.error.code})` : ''}`)
+    }
 
     for (let i = 0; i < 10; i++) {
       await new Promise((r) => setTimeout(r, 2000))

@@ -5,6 +5,7 @@ import type { ArticleCard as Card, Locale } from '@zaviya/shared'
 import { ArticleCard } from '@/components/article/ArticleCard'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { HomeLatest } from '@/components/home/HomeLatest'
+import { LeadCarousel } from '@/components/home/LeadCarousel'
 import { LiveRefresh } from '@/components/home/LiveRefresh'
 import { DeskHead, LeadStory, PictureStory, ThumbStory, TopList, Wire } from '@/components/home/Newsroom'
 import { RatesWidget } from '@/components/home/RatesWidget'
@@ -85,12 +86,16 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     )
   }
   const top = take(top24, 5)
-  const seconds = take([...plan.seconds, ...feed.latest], 4)
+  // The editor's lead stays first; the next pictured stories rotate after it
+  const slides = [lead, ...take(feed.latest, 4, (a) => Boolean(a.image))]
+  const seconds = take([...plan.seconds, ...feed.latest], 5)
   const wire = take(feed.latest, 6)
+  const underLead = take(feed.latest, 3, (a) => Boolean(a.image))
+  const leadList = take(feed.latest, 4)
   const pakistan = section('pakistan', 7)
   const money = section('money', 7)
-  const world = section('world', 8)
-  const cricket = section('cricket', 5)
+  const world = section('world', 9)
+  const cricket = section('cricket', 3)
   const tech = section('tech-ai', 8)
   const jobs = section('jobs', 5)
   const explainers = take(feed.explainers, 3)
@@ -210,15 +215,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     ),
 
     'world-cricket': (world.length > 0 || cricket.length > 0) && (
-      <div className={cn('grid gap-8', world.length > 0 && cricket.length > 0 && 'lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]')}>
+      <div className={cn('grid gap-8', world.length > 0 && cricket.length > 0 && 'lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]')}>
         {world.length > 0 && (
           <section aria-label={name('world', 'World')} className="min-w-0">
             <DeskHead title={name('world', 'World')} href={path('/world')} more={d.seeAll} color={color('world', '#2B59C3')} icon={Globe} />
-            <Slider labels={slide} itemClass={cricket.length ? 'w-[78%] sm:w-[calc((100%-1.25rem)/2)]' : undefined}>
-              {world.map((a) => (
-                <PictureStory key={a.id} article={a} locale={locale} />
+            <Slider labels={slide} itemClass={cricket.length ? 'w-[78%] sm:w-[calc((100%-2.5rem)/3)]' : undefined}>
+              {world.slice(0, 6).map((a) => (
+                <PictureStory key={a.id} article={a} locale={locale} dek />
               ))}
             </Slider>
+            {world.length > 6 && (
+              <div className="mt-2 grid gap-x-6 border-t border-border sm:grid-cols-3">
+                {world.slice(6).map((a) => (
+                  <ThumbStory key={a.id} article={a} locale={locale} />
+                ))}
+              </div>
+            )}
           </section>
         )}
         {cricket.length > 0 && (
@@ -321,22 +333,43 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       {/* ── Front page: the editor's lead, the next stories, the wire and the top stories ── */}
       <section aria-label={isUr ? 'صفحہ اول' : 'Front page'} className="container-wide pt-6">
-        <div className="card-surface grid gap-6 p-4 md:p-6 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)_300px] lg:gap-0">
-          <div className="min-w-0 lg:border-e lg:border-border lg:pe-6">
-            <LeadStory article={lead} locale={locale} />
+        <div className="card-surface grid gap-6 p-4 md:p-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_320px] xl:gap-0">
+          <div className="flex min-w-0 flex-col gap-6 xl:border-e xl:border-border xl:pe-6">
+            <LeadCarousel
+              titles={slides.map((a) => a.title)}
+              labels={{ prev: isUr ? 'پچھلی خبر' : 'Previous story', next: isUr ? 'اگلی خبر' : 'Next story', slide: isUr ? 'اہم خبر' : 'Top story' }}
+            >
+              {slides.map((a, i) => (
+                <LeadStory key={a.id} article={a} locale={locale} priority={i === 0} />
+              ))}
+            </LeadCarousel>
+            {underLead.length > 0 && (
+              <div className="grid gap-5 sm:grid-cols-3">
+                {underLead.map((a) => (
+                  <PictureStory key={a.id} article={a} locale={locale} size="sm" />
+                ))}
+              </div>
+            )}
+            {leadList.length > 0 && (
+              <div className="grid gap-x-6 border-t border-border sm:grid-cols-2">
+                {leadList.map((a) => (
+                  <ThumbStory key={a.id} article={a} locale={locale} label />
+                ))}
+              </div>
+            )}
           </div>
-          <div className="min-w-0 divide-y divide-border lg:px-6">
+          <div className="grid min-w-0 gap-x-6 border-t border-border pt-4 sm:grid-cols-2 xl:block xl:divide-y xl:divide-border xl:border-t-0 xl:px-6 xl:pt-0">
             {seconds.map((a, i) =>
               i === 0 ? (
                 <div key={a.id} className="pb-4">
-                  <PictureStory article={a} locale={locale} />
+                  <PictureStory article={a} locale={locale} dek />
                 </div>
               ) : (
                 <ThumbStory key={a.id} article={a} locale={locale} label />
               ),
             )}
           </div>
-          <div className="flex min-w-0 flex-col gap-5 lg:border-s lg:border-border lg:ps-6">
+          <div className="grid min-w-0 content-start gap-5 md:grid-cols-2 xl:flex xl:flex-col xl:border-s xl:border-border xl:ps-6">
             {wire.length > 0 && <Wire locale={locale} items={wire} />}
             {top.length > 0 && <TopList locale={locale} items={top} />}
           </div>

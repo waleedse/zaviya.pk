@@ -113,7 +113,8 @@ async function categoryOverdue(payload: PayloadClient, category: string, now = D
 /** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
 export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
   const settings = await payload.getSettings()
-  const minIntervalMs = (settings.minIntervalMin ?? 15) * 60_000
+  // Never slower than one story every 15 minutes: 4 an hour is the floor (Waleed, 16 Oct)
+  const minIntervalMs = Math.min(settings.minIntervalMin ?? 15, 15) * 60_000
   const cap = settings.dailyCaps?.articles ?? 96
   if ((settings.articlesPublishedToday ?? 0) >= cap) return 60 * 60_000
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0

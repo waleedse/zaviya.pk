@@ -353,7 +353,12 @@
   }
 
   .container-wide {
-    @apply mx-auto w-full max-w-[calc(1140px+4rem)] px-4 md:px-8;
+    @apply mx-auto w-full max-w-[calc(1480px+4rem)] px-4 md:px-8;
+  }
+
+  /* Carousels move the other way in Urdu */
+  [dir='rtl'] {
+    --dir: -1;
   }
 
   /* Zaviya "angle": category tags and desk tabs are cut at 30 degrees */

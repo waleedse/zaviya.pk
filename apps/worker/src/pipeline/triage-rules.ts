@@ -144,7 +144,8 @@ export function applyTriageRules(triage: TriageResult, ctx: TriageContext): Tria
     }
   }
 
-  const minInterval = ctx.settings.minIntervalMin ?? 45
+  // At most 15 minutes, so the 4-an-hour floor holds
+  const minInterval = Math.min(ctx.settings.minIntervalMin ?? 15, 15)
   if (wouldPublish && !isBreaking && ctx.lastPublishedAt && minutesSince(ctx.lastPublishedAt, now) < minInterval) {
     const waitMin = minInterval - minutesSince(ctx.lastPublishedAt, now)
     return {
