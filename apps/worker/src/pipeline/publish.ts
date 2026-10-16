@@ -55,6 +55,25 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
 /** Redis hash of stories waiting for the editor: articleId → publish job data */
 export const GATE_KEY = 'zaviya:gate'
 
+/**
+ * A rejected gate draft must not kill the story (ZAV-54). If the cluster already has a live article the
+ * cluster keeps pointing at it (the draft had overwritten the link); otherwise it goes back to triaged
+ * so a corrected draft can be written.
+ */
+export async function releaseRejectedDraft(clusterId: string, payload: Pick<PayloadClient, 'request' | 'patchCluster'>): Promise<'kept-live' | 'triaged'> {
+  const live = await payload.request<{ docs: { id: string | number }[] }>(
+    'GET',
+    `/api/articles?where[storyCluster][equals]=${clusterId}&where[_status][equals]=published&sort=-publishedAt&limit=1&depth=0`,
+  )
+  const liveId = live.docs[0]?.id
+  if (liveId !== undefined) {
+    await payload.patchCluster(clusterId, { article: String(liveId) })
+    return 'kept-live'
+  }
+  await payload.patchCluster(clusterId, { status: 'triaged' })
+  return 'triaged'
+}
+
 /** Publish (or drop) a story the editor decided on. Publishing reuses the normal path with its article id. */
 export async function finishGated(
   articleId: string,
@@ -66,8 +85,8 @@ export async function finishGated(
   await deps.redis.hdel(GATE_KEY, articleId)
   const data = JSON.parse(raw) as Parameters<typeof processPublishJob>[0]
   if (action === 'reject') {
-    await deps.payload.patchCluster(data.clusterId, { status: 'rejected' }).catch(() => undefined)
-    logger.info({ articleId }, 'editor rejected the story')
+    const outcome = await releaseRejectedDraft(data.clusterId, deps.payload).catch(() => undefined)
+    logger.info({ articleId, outcome }, 'editor rejected the story')
     return true
   }
   // Approved text draft: make its image and cards now; the media step then publishes it
