@@ -23,6 +23,17 @@ export function editorApproved(triage: unknown): boolean {
   return Boolean(triage && typeof triage === 'object' && (triage as { editorApproved?: unknown }).editorApproved === true)
 }
 
+/** Sources older than this are not news today (ZAV-89: an April story was published as today's). */
+export const MAX_SOURCE_AGE_MS = 48 * 60 * 60_000
+
+/** True when at least one source was published within the last 48 hours (items without a date do not count). */
+export function hasFreshSource(items: { publishedAt?: string }[], now = Date.now()): boolean {
+  return items.some((i) => {
+    const t = i.publishedAt ? Date.parse(i.publishedAt) : NaN
+    return Number.isFinite(t) && now - t <= MAX_SOURCE_AGE_MS
+  })
+}
+
 export interface Pitch {
   clusterId: string
   headline: string
@@ -48,6 +59,11 @@ export async function decidePitch(
   const cluster = await deps.payload.getCluster(clusterId)
   const triage = (cluster.triage ?? {}) as Record<string, unknown>
   if (triage.codeOutcome !== 'pitch') return false
+  if (action === 'write' && cluster.items?.length && !hasFreshSource(cluster.items)) {
+    await deps.payload.patchCluster(clusterId, { status: 'rejected', triage: { ...triage, codeOutcome: 'editor_reject', editorNote: 'stale sources' } })
+    logger.warn({ clusterId }, 'pitch refused: no source from the last 48 hours')
+    return false
+  }
   if (action === 'reject') {
     await deps.payload.patchCluster(clusterId, { status: 'rejected', triage: { ...triage, codeOutcome: 'editor_reject', editorNote: note } })
     logger.info({ clusterId }, 'editor rejected the pitch')

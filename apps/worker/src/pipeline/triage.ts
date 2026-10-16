@@ -6,7 +6,7 @@ import type { PayloadClient } from '../payload-client.js'
 import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../prompts/triage.js'
 import { applyTriageRules } from './triage-rules.js'
 import { logger } from '../logger.js'
-import { shouldPitch } from './pitch.js'
+import { hasFreshSource, shouldPitch } from './pitch.js'
 
 export async function processTriageJob(
   data: { clusterId: string },
@@ -95,6 +95,12 @@ export async function processTriageJob(
       summary: `${cluster.headline ?? cluster.items[0]?.title ?? 'Story'}\n${decision.reason}`,
     })
     await deps.payload.patchCluster(data.clusterId, { status: 'in_review' })
+    return
+  }
+
+  if (!triage.isUpdateOfExisting && !hasFreshSource(cluster.items)) {
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: 'stale sources' } })
+    logger.info({ clusterId: data.clusterId }, 'rejected: no source from the last 48 hours')
     return
   }
 
