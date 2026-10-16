@@ -52,6 +52,17 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
   return out.slice(0, 3)
 }
 
+/** Shortest English body that may go live: an empty or stub body must stay a draft (ZAV-90). */
+export const MIN_BODY_WORDS = 80
+
+/** Why this written story must not be published, or null when it is fine. */
+export function publishBlocker(write: { en: { bodyMarkdown?: string; whatItMeans?: string } }): string | null {
+  const words = (write.en.bodyMarkdown ?? '').trim().split(/\s+/).filter(Boolean).length
+  if (words < MIN_BODY_WORDS) return `empty or short body (${words} words)`
+  if (!(write.en.whatItMeans ?? '').trim()) return 'empty whatItMeans'
+  return null
+}
+
 /** Redis hash of stories waiting for the editor: articleId → publish job data */
 export const GATE_KEY = 'zaviya:gate'
 
@@ -138,6 +149,14 @@ export async function processPublishJob(
 ): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
+
+  // Never publish an empty or stub article (ZAV-90): it stays a draft and the cluster goes back to triaged.
+  const blocker = triage?.isUpdateOfExisting ? null : publishBlocker(data.write)
+  if (blocker) {
+    logger.warn({ clusterId: data.clusterId, articleId: data.articleId, blocker }, 'publish blocked: article text is incomplete')
+    await deps.payload.patchCluster(data.clusterId, { status: 'triaged' }).catch(() => undefined)
+    return null
+  }
 
   // Editor gate: normal stories wait as drafts (workflow in_review); the editor agent publishes the
   // best one each run. Breaking stories and live updates still go out at once.
