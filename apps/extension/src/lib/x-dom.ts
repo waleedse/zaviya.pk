@@ -47,7 +47,7 @@ export function scrapeTimelinePosts(sinceId?: string, limit = 30): XPost[] {
 
 export async function postTweet(
   text: string,
-  _mediaUrls: string[],
+  image: { base64: string; type: string; name: string } | undefined,
   delayMinMs: number,
   delayMaxMs: number,
 ): Promise<{ externalId?: string }> {
@@ -74,6 +74,22 @@ export async function postTweet(
   editor.focus()
   document.execCommand('insertText', false, text)
   await randomDelay(delayMinMs, delayMaxMs)
+
+  if (image) {
+    const input = document.querySelector('input[data-testid="fileInput"]') ?? document.querySelector('input[type="file"][accept*="image"]')
+    if (input instanceof HTMLInputElement) {
+      const bytes = Uint8Array.from(atob(image.base64), (c) => c.charCodeAt(0))
+      const dt = new DataTransfer()
+      dt.items.add(new File([bytes], image.name, { type: image.type }))
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      // Wait for the attachment preview so Post does not go out before the image is ready
+      const ready = Date.now() + 15_000
+      while (!document.querySelector('[data-testid="attachments"] img, [data-testid="attachments"] [role="img"]') && Date.now() < ready) {
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    }
+  }
 
   const postBtn =
     document.querySelector('[data-testid="tweetButton"]') ??
