@@ -15,7 +15,7 @@ export async function generateStaticParams() {
 }
 
 const PAGE_DESCRIPTIONS: Record<string, [string, string]> = {
-  about: ['Zaviya is a Pakistani digital newsroom explaining the stories that matter in clear English and Urdu, with every source listed.', 'زاویہ پاکستان کا ڈیجیٹل نیوز روم ہے جو اہم خبروں کو آسان اردو اور انگریزی میں ذرائع کے ساتھ پیش کرتا ہے۔'],
+  about: ['Zaviya (zaviya.pk) is a Pakistani digital newsroom: latest Pakistan news, business, cricket, jobs and daily gold, dollar and petrol rates in English and Urdu.', 'زاویہ (zaviya.pk) پاکستان کا ڈیجیٹل نیوز روم ہے: تازہ ترین خبریں، کاروبار، کرکٹ، ملازمتیں اور سونے، ڈالر اور پیٹرول کے روزانہ ریٹ اردو اور انگریزی میں۔'],
   'editorial-policy': ['How Zaviya selects, verifies, writes and corrects stories: our standards for sources, accuracy, fairness and sensitive topics.', 'زاویہ خبروں کا انتخاب، تصدیق، تحریر اور تصحیح کیسے کرتا ہے: ذرائع، درستگی اور حساس موضوعات کے ہمارے اصول۔'],
   'ai-policy': ['How Zaviya uses AI: drafting from cited sources, automated fact checks, labelled AI illustrations, and human oversight of sensitive stories.', 'زاویہ اے آئی کیسے استعمال کرتا ہے: درج ذرائع سے مسودہ، خودکار حقائق کی جانچ، اے آئی تصاویر پر واضح لیبل۔'],
   corrections: ['Zaviya corrects errors promptly and transparently. Read our corrections policy and how to report a mistake in any story.', 'زاویہ غلطیوں کی فوری اور واضح تصحیح کرتا ہے۔ ہماری تصحیح پالیسی اور غلطی کی نشاندہی کا طریقہ۔'],
