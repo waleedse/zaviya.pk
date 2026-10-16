@@ -32,6 +32,23 @@ export function cleanTags(tags: string[]): string[] {
   return tags.filter((t) => t.trim() && !outlet.test(t.trim()))
 }
 
+const NOT_A_SOURCE_HOST = /(^|\.)(google\.com|googleusercontent\.com|x\.com|twitter\.com|instagram\.com|facebook\.com|fb\.com|youtube\.com|youtu\.be|tiktok\.com|t\.co)$/i
+
+/** Only an outlet's own pages are sources: Google News redirects and social posts are not (ZAV-56). */
+export function isOutletUrl(url: string): boolean {
+  try {
+    return !NOT_A_SOURCE_HOST.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Sources shown under an article: outlet pages only. If every item is a wrapper, keep them all rather than none. */
+export function articleSources<T extends { url: string }>(items: T[]): T[] {
+  const own = items.filter((i) => isOutletUrl(i.url))
+  return own.length ? own : items
+}
+
 /** Social posts found during discovery are embedded (officially supported), never re-hosted. */
 export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: string }[] {
   const out: { type: 'x' | 'instagram'; url: string }[] = []
@@ -169,7 +186,7 @@ export async function processPublishJob(
   }
 
   const category = triage?.category ?? 'pakistan'
-  const sources = cluster.items.map((i) => ({
+  const sources = articleSources(cluster.items).map((i) => ({
     name: publisherName(i.title, i.source.name),
     url: i.url,
     tier: i.source.trustTier,
