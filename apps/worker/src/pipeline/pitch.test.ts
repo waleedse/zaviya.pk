@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { bestPitch, decidePitch, editorApproved, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
+import { bestPitch, decidePitch, editorApproved, floorPitch, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
 import { deferImage } from './media.js'
 
 function fakeRedis(init: Record<string, string> = {}) {
@@ -111,5 +111,36 @@ describe('pitch fallback', () => {
     const redis = fakeRedis({ [PITCH_APPROVED_KEY]: String(Date.now() - 5 * 60_000) })
     await pitchFallback({ payload, writeQueue, redis } as never, 40)
     expect(writeQueue.add).not.toHaveBeenCalled()
+  })
+})
+
+describe('hourly floor', () => {
+  const pitches = [
+    { clusterId: '1', headline: 'a', category: 'pakistan', weightedScore: 0.5 },
+    { clusterId: '2', headline: 'b', category: 'ai', weightedScore: 0.45 },
+  ]
+  const payloadWith = (publishedLastHour: number) => ({
+    getCluster: vi.fn(async () => ({ triage: { codeOutcome: 'pitch' } })),
+    patchCluster: vi.fn(async () => ({})),
+    request: vi.fn(async (_m: string, path: string) => (path.startsWith('/api/articles') ? { totalDocs: publishedLastHour } : pitches)),
+  })
+
+  it('writes a pitch every 15 minutes while fewer than 4 stories went out in the last hour', async () => {
+    const writeQueue = { add: vi.fn(async () => ({})) }
+    const redis = fakeRedis({ [PITCH_APPROVED_KEY]: String(Date.now() - 16 * 60_000) })
+    await pitchFallback({ payload: payloadWith(2), writeQueue, redis } as never, 40)
+    expect(writeQueue.add).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves it to the editor once 4 stories went out', async () => {
+    const writeQueue = { add: vi.fn(async () => ({})) }
+    const redis = fakeRedis({ [PITCH_APPROVED_KEY]: String(Date.now() - 16 * 60_000) })
+    await pitchFallback({ payload: payloadWith(4), writeQueue, redis } as never, 40)
+    expect(writeQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('on a slow hour prefers AI, big tech and business stories', () => {
+    expect(floorPitch(pitches)?.clusterId).toBe('2')
+    expect(floorPitch([{ clusterId: '3', headline: 'c', category: 'pakistan', weightedScore: 0.8 }, ...pitches])?.clusterId).toBe('3')
   })
 })

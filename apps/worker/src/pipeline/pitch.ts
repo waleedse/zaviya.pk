@@ -63,21 +63,58 @@ export async function decidePitch(
   return true
 }
 
-/** When the editor approved nothing for `minutes` but pitches wait, write the best one (editor down or slow). */
+/**
+ * Zaviya must put out at least 4 stories an hour (Waleed, 16 Oct): below that, a waiting pitch is
+ * written every 15 minutes even while the editor is active.
+ */
+export const HOURLY_FLOOR = 4
+export const FLOOR_SPACING_MIN = 15
+/** On a slow news hour the evergreen desks (AI, big tech and business companies) fill the gap. */
+export const QUIET_CATEGORIES = ['ai', 'tech-telecom', 'business']
+const STRONG_SCORE = 0.6
+
+/** The best pitch; when nothing is strong, the best one from the evergreen desks. */
+export function floorPitch(pitches: Pitch[]): Pitch | undefined {
+  const best = bestPitch(pitches)
+  if (!best || (best.weightedScore ?? 0) >= STRONG_SCORE) return best
+  return bestPitch(pitches.filter((p) => p.category && QUIET_CATEGORIES.includes(p.category))) ?? best
+}
+
+async function publishedLastHour(payload: PayloadClient, now = Date.now()): Promise<number> {
+  const since = new Date(now - 60 * 60_000).toISOString()
+  const res = await payload.request<{ totalDocs?: number }>(
+    'GET',
+    `/api/articles?where[_status][equals]=published&where[publishedAt][greater_than]=${encodeURIComponent(since)}&limit=0&depth=0`,
+  )
+  return res.totalDocs ?? 0
+}
+
+/**
+ * Writes a waiting pitch when the editor approved nothing for `minutes` (editor down or slow), or when
+ * fewer than HOURLY_FLOOR stories went out in the last hour (one every FLOOR_SPACING_MIN minutes).
+ */
 export async function pitchFallback(
   deps: { payload: PayloadClient; writeQueue: Pick<Queue, 'add'>; redis: Redis },
   minutes: number,
+  now = Date.now(),
 ): Promise<void> {
   const last = Number(await deps.redis.get(PITCH_APPROVED_KEY))
   if (!last) {
     // First run after a deploy: start the clock instead of writing at once
-    await deps.redis.set(PITCH_APPROVED_KEY, String(Date.now()))
+    await deps.redis.set(PITCH_APPROVED_KEY, String(now))
     return
   }
-  if (Date.now() - last < minutes * 60_000) return
+  const idle = now - last
+  if (idle < FLOOR_SPACING_MIN * 60_000) return
+  let reason = 'fallback: editor did not decide'
+  if (idle < minutes * 60_000) {
+    const out = await publishedLastHour(deps.payload, now)
+    if (out >= HOURLY_FLOOR) return
+    reason = `fallback: ${out} stories in the last hour, below ${HOURLY_FLOOR}`
+  }
   const pitches = await deps.payload.request<Pitch[]>('GET', '/api/pipeline/pitches')
-  const pick = bestPitch(pitches)
+  const pick = floorPitch(pitches)
   if (!pick) return
-  logger.warn({ clusterId: pick.clusterId, minutes }, 'pitch fallback: writing the best waiting pitch')
-  await decidePitch(pick.clusterId, 'write', deps, 'fallback: editor did not decide')
+  logger.warn({ clusterId: pick.clusterId, category: pick.category, reason }, 'pitch fallback: writing a waiting pitch')
+  await decidePitch(pick.clusterId, 'write', deps, reason)
 }

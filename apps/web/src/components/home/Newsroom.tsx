@@ -34,33 +34,42 @@ export function DeskHead({ title, href, more, color, icon: Icon }: { title: stri
   )
 }
 
-/** The lead: picture, headline, dek and byline. Static on purpose (readers skip moving headlines). */
-export function LeadStory({ article, locale }: { article: Card; locale: Locale }) {
+/** The lead: the headline is written on the picture, so the slot holds the story in less height. */
+export function LeadStory({ article, locale, priority }: { article: Card; locale: Locale; priority?: boolean }) {
   const isUr = locale === 'ur'
   return (
-    <article className="group">
-      <Link href={article.href} className="block space-y-3">
-        <div className="relative">
-          <CardImage article={article} locale={locale} priority aspect="aspect-[16/9]" sizes="(max-width:1024px) 100vw, 560px" showLabel={false} />
-          {article.isLive && (
-            <span className="absolute end-3 top-3">
-              <LiveBadge locale={locale} />
-            </span>
-          )}
+    <article className="group relative overflow-hidden rounded-[var(--radius-card)] bg-ink">
+      <Link href={article.href} className="block">
+        <CardImage
+          article={article}
+          locale={locale}
+          priority={priority}
+          aspect="aspect-[4/5] sm:aspect-[16/10] lg:aspect-[16/9]"
+          sizes="(max-width:1024px) 100vw, 860px"
+          showLabel={false}
+          className="rounded-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" aria-hidden />
+        {article.isLive && (
+          <span className="absolute end-4 top-4">
+            <LiveBadge locale={locale} />
+          </span>
+        )}
+        <div className="absolute inset-x-0 bottom-0 space-y-2.5 p-5 text-white md:p-7">
+          <span className="angle-tag" style={{ background: article.category.color }}>
+            {article.category.name}
+            {article.isBreaking ? (isUr ? ' · بریکنگ' : ' · Breaking') : ''}
+          </span>
+          <h2 className={cn('max-w-[24ch] font-display text-[clamp(1.6rem,1.1rem+1.6vw,2.7rem)] font-extrabold', lh(locale, 'leading-[1.06]', 'leading-[1.6]'))}>
+            <span className="headline-hover">{article.title}</span>
+          </h2>
+          {article.dek && <p className="line-clamp-2 max-w-[70ch] text-[1rem] leading-relaxed text-white/85">{article.dek}</p>}
+          <p className="text-sm text-white/75">
+            {article.author && <b className="font-semibold text-white">{article.author.name} · </b>}
+            <TimeAgo iso={article.publishedAt} locale={locale} />
+            {article.readingTime ? ` · ${article.readingTime} ${isUr ? 'منٹ' : 'min read'}` : ''}
+          </p>
         </div>
-        <span className="angle-tag" style={{ background: article.category.color }}>
-          {article.category.name}
-          {article.isBreaking ? (isUr ? ' · بریکنگ' : ' · Breaking') : ''}
-        </span>
-        <h2 className={cn('font-display text-[clamp(1.75rem,1.3rem+1.3vw,2.4rem)] font-extrabold', lh(locale, 'leading-[1.07]', 'leading-[1.6]'))}>
-          <span className="headline-hover">{article.title}</span>
-        </h2>
-        {article.dek && <p className="line-clamp-3 text-[1.05rem] leading-relaxed text-fg-muted">{article.dek}</p>}
-        <p className="text-sm text-fg-subtle">
-          {article.author && <b className="font-semibold text-fg-muted">{article.author.name} · </b>}
-          <TimeAgo iso={article.publishedAt} locale={locale} />
-          {article.readingTime ? ` · ${article.readingTime} ${isUr ? 'منٹ' : 'min read'}` : ''}
-        </p>
       </Link>
     </article>
   )
