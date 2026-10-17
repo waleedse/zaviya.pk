@@ -117,3 +117,58 @@ export function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promis
     }),
   ])
 }
+
+const OWN_TAB_KEY = (platform: PlatformKey) => `ownTab:${platform}`
+
+/**
+ * The extension's own tab for a platform: never one of Waleed's tabs, so a job can leave a draft or navigate away
+ * without touching his work. Its id lives in session storage (cleared when Chrome restarts).
+ */
+export async function ensureOwnTab(url: string, platform: PlatformKey): Promise<number> {
+  const key = OWN_TAB_KEY(platform)
+  const stored = (await chrome.storage.session.get(key))[key] as number | undefined
+  if (stored !== undefined) {
+    const tab = await chrome.tabs.get(stored).catch(() => undefined)
+    if (tab?.id !== undefined && PLATFORM_PATTERNS[platform].some((re) => re.test(tab.url ?? tab.pendingUrl ?? ''))) {
+      await navigateLeavingDrafts(tab.id, url)
+      return tab.id
+    }
+  }
+  const created = await chrome.tabs.create({ url, active: false })
+  if (created.id === undefined) throw new Error('failed to create tab')
+  await chrome.storage.session.set({ [key]: created.id })
+  await waitForTabLoad(created.id)
+  return created.id
+}
+
+/**
+ * Navigates our own tab even when the page asks "Leave site? Changes you made may not be saved" (an unsent X
+ * draft): that native dialog blocks the tab forever and no content script can click it. Through the DevTools
+ * protocol we accept it, the way a person would click "Leave".
+ */
+export async function navigateLeavingDrafts(tabId: number, url: string): Promise<void> {
+  const target = { tabId }
+  let attached = false
+  const onEvent = (source: chrome.debugger.Debuggee, method: string, params?: object) => {
+    if (source.tabId === tabId && method === 'Page.javascriptDialogOpening') {
+      void chrome.debugger.sendCommand(target, 'Page.handleJavaScriptDialog', { accept: true }).catch(() => undefined)
+      console.warn('[zaviya] accepted a page dialog to leave an unsent draft', (params as { message?: string } | undefined)?.message)
+    }
+  }
+  try {
+    await chrome.debugger.attach(target, '1.3')
+    attached = true
+    chrome.debugger.onEvent.addListener(onEvent)
+    await chrome.debugger.sendCommand(target, 'Page.enable')
+    // A dialog that is already open (from an earlier job) is answered first
+    await chrome.debugger.sendCommand(target, 'Page.handleJavaScriptDialog', { accept: true }).catch(() => undefined)
+    await chrome.debugger.sendCommand(target, 'Page.navigate', { url })
+  } catch {
+    // Debugger unavailable (DevTools open on the tab): plain navigation, still better than nothing
+    await chrome.tabs.update(tabId, { url })
+  } finally {
+    await waitForTabLoad(tabId)
+    chrome.debugger.onEvent.removeListener(onEvent)
+    if (attached) await chrome.debugger.detach(target).catch(() => undefined)
+  }
+}
