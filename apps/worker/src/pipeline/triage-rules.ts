@@ -26,7 +26,10 @@ export interface TriageDecision {
 const HARD_FLAGS = new Set(['military', 'judiciary', 'religion', 'blasphemy', 'violence', 'death', 'minor', 'election'])
 
 /** Desks where a thin-source code reject has repeatedly binned good Pakistan stories (ZAV-6). */
-const PROTECTED_CATEGORIES = new Set(['cricket', 'education-jobs', 'business'])
+const PROTECTED_CATEGORIES = new Set(['cricket', 'education-jobs', 'business', 'ai'])
+/** Desks that run global stories with no Pakistan angle (ZAV-83); relevance is floored for scoring. */
+const GLOBAL_DESKS = new Set(['ai'])
+const GLOBAL_DESK_RELEVANCE = 0.8
 /** Items that are only a scorecard or a photo caption are not worth a human's time. */
 const LOW_VALUE_REASON = /\b(scorecard|live[- ]?score|photo caption)\b/i
 
@@ -77,7 +80,10 @@ function minutesSince(iso: string, now: Date): number {
 }
 
 /** Code rules from ARCHITECTURE §6.3 — pure, testable. */
-export function applyTriageRules(triage: TriageResult, ctx: TriageContext): TriageDecision {
+export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): TriageDecision {
+  const triage = GLOBAL_DESKS.has(rawTriage.category)
+    ? { ...rawTriage, pakistanRelevance: Math.max(rawTriage.pakistanRelevance, GLOBAL_DESK_RELEVANCE) }
+    : rawTriage
   const now = ctx.now ?? new Date()
   const weightedScore = computeWeightedScore(triage, ctx.settings)
   const publishThreshold = ctx.settings.thresholds?.publish ?? DEFAULT_PUBLISH
