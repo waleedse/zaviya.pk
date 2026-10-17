@@ -200,7 +200,8 @@ function textPart(text) {
 /** Drops the quoted history under "On ... wrote:" / Outlook's "From:" block / ">" lines. */
 function trimQuoted(t) {
   const lines = t.replace(/\r\n/g, '\n').split('\n')
-  const cut = lines.findIndex((l, i) => /^On .+wrote:\s*$/.test(l) || (/^-{2,}\s*Original Message/i.test(l)) || (/^From:\s/.test(l) && i > 0 && /^\s*$/.test(lines[i - 1] ?? '')) || /^_{10,}/.test(l))
+  // Outlook for iOS glues "Get Outlook for iOS" to the quoted mail with no line break, so that line starts the history
+  const cut = lines.findIndex((l, i) => /^On .+wrote:\s*$/.test(l) || (/^-{2,}\s*Original Message/i.test(l)) || (/^From:\s/.test(l) && i > 0 && /^\s*$/.test(lines[i - 1] ?? '')) || /^_{10,}/.test(l) || /^Get Outlook for /i.test(l) || /^Sent from my (iPhone|iPad|Android|mobile|Galaxy)/i.test(l))
   return (cut >= 0 ? lines.slice(0, cut) : lines).filter((l) => !l.startsWith('>')).join('\n').trim()
 }
 

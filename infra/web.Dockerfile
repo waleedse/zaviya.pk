@@ -17,7 +17,9 @@ WORKDIR /app
 ARG NEXT_PUBLIC_SITE_URL=https://zaviya.pk
 ARG NEXT_PUBLIC_WHATSAPP_CHANNEL_URL=
 ARG NEXT_PUBLIC_ADSENSE_CLIENT=
-ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_WHATSAPP_CHANNEL_URL=$NEXT_PUBLIC_WHATSAPP_CHANNEL_URL NEXT_PUBLIC_ADSENSE_CLIENT=$NEXT_PUBLIC_ADSENSE_CLIENT
+# Google Analytics 4 measurement id (G-...), read at build time by AnalyticsScripts
+ARG NEXT_PUBLIC_GA_ID=
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_WHATSAPP_CHANNEL_URL=$NEXT_PUBLIC_WHATSAPP_CHANNEL_URL NEXT_PUBLIC_ADSENSE_CLIENT=$NEXT_PUBLIC_ADSENSE_CLIENT NEXT_PUBLIC_GA_ID=$NEXT_PUBLIC_GA_ID
 # Static pages are pre-rendered at build time, so the build needs a reachable database.
 # docker-compose.yml passes the Compose Postgres (build runs on the host network); the
 # ARG only exists in this build stage and never reaches the final image.
