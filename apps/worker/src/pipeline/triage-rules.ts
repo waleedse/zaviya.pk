@@ -79,6 +79,18 @@ function minutesSince(iso: string, now: Date): number {
   return (now.getTime() - new Date(iso).getTime()) / 60_000
 }
 
+/** A cluster whose newest item is older than this is not news, whatever the model scores it. */
+export const MAX_NEWS_AGE_HOURS = 72
+
+/** Returns a reject reason when every item in the cluster is stale, else null. Pure, runs before the LLM. */
+export function staleClusterReason(items: { publishedAt?: string }[], now: Date = new Date()): string | null {
+  const times = items.map((i) => (i.publishedAt ? new Date(i.publishedAt).getTime() : NaN)).filter((t) => Number.isFinite(t))
+  if (times.length === 0) return null
+  const ageH = (now.getTime() - Math.max(...times)) / 3_600_000
+  if (ageH <= MAX_NEWS_AGE_HOURS) return null
+  return `Stale: newest source item is ${Math.round(ageH / 24)} days old`
+}
+
 /** Code rules from ARCHITECTURE §6.3 — pure, testable. */
 export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): TriageDecision {
   const triage = GLOBAL_DESKS.has(rawTriage.category)
