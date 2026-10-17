@@ -1,0 +1,31 @@
+{
+ "url": "https://x.com/i/flow/login",
+ "title": "Log in",
+ "elements": [
+  {
+   "i": 0,
+   "tag": "button",
+   "text": "Log in",
+   "ariaLabel": "",
+   "href": "",
+   "x": 640,
+   "y": 454,
+   "inDialog": false,
+   "visible": true
+  },
+  {
+   "i": 1,
+   "tag": "button",
+   "text": "Create account",
+   "ariaLabel": "",
+   "href": "",
+   "x": 640,
+   "y": 499,
+   "inDialog": false,
+   "visible": true
+  }
+ ],
+ "dialogs": [],
+ "toasts": [],
+ "pageText": "Log in to continue Welcome back. Enter your password to see what is happening. Log in Create account"
+}

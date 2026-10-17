@@ -11,6 +11,8 @@ export interface Msg {
   toolCalls?: ToolCall[]
   /** Gemini Interactions API: lets the next call continue this turn statefully */
   interactionId?: string
+  /** Inline images (base64) sent with a user message; only the Gemini provider reads them */
+  images?: { mimeType: string; base64: string }[]
 }
 
 export interface ToolCall {
@@ -57,12 +59,15 @@ export interface LLMProvider {
   health(): Promise<boolean>
 }
 
-export type LLMTask = 'triage' | 'write_en' | 'write_ur' | 'qa' | 'embed' | 'social' | 'seo'
+export type LLMTask = 'triage' | 'write_en' | 'write_ur' | 'qa' | 'embed' | 'social' | 'seo' | 'vision'
 
 /** Writing models: best first. Each model has its own free-tier quota, so the chain rotates when one runs out. */
 export const GEMINI_WRITER_CHAIN = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview'
 /** Cheap models for scoring, keyword research and QA. */
 export const GEMINI_LITE_CHAIN = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemma-4-26b-a4b-it'
+
+/** Models that read screenshots (the extension's "eyes"): free-tier Gemini only, never a local or paid fallback. */
+export const GEMINI_VISION_CHAIN = 'gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite'
 
 /**
  * Free hybrid: short JSON jobs run on the local model; the free Gemini quota is saved for
@@ -76,6 +81,7 @@ export const DEFAULT_ACTIVE_MODELS: Record<LLMTask, string> = {
   embed: 'ollama:nomic-embed-text',
   social: 'ollama:qwen3:8b',
   seo: 'ollama:qwen3:8b',
+  vision: `gemini:${GEMINI_VISION_CHAIN}`,
 }
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'

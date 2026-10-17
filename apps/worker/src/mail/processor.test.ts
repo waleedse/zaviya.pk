@@ -144,3 +144,33 @@ describe('buildMessage', () => {
     expect(Buffer.from(raw.split('\r\n\r\n')[1]!.replace(/\r\n/g, ''), 'base64').toString()).toBe('خیریت\n.dot')
   })
 })
+
+describe('buildMessage with attachments', () => {
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 250]).toString('base64')
+  const mail = { to: 'waleed@zaviya.pk', subject: 'Zaviya needs you: X', body: 'Log in again.\n.dot', attachments: [{ filename: 'x screen\r\n.jpg', contentType: 'image/jpeg', base64: jpeg }] }
+
+  it('builds multipart/mixed with a text part and a JPEG part', () => {
+    const raw = buildMessage('ops@zaviya.pk', mail, '<id@zaviya.pk>')
+    const [head, ...rest] = raw.split('\r\n\r\n')
+    const boundary = /boundary="([^"]+)"/.exec(head!)![1]!
+    expect(head).toContain('Content-Type: multipart/mixed')
+    const body = rest.join('\r\n\r\n')
+    expect(body.startsWith(`--${boundary}\r\n`)).toBe(true)
+    expect(body.trimEnd().endsWith(`--${boundary}--`)).toBe(true)
+    const parts = body.split(`--${boundary}`).filter((p) => p.trim() && p.trim() !== '--')
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toContain('text/plain; charset=utf-8')
+    const text = parts[0]!.split('\r\n\r\n')[1]!.replace(/\r\n/g, '')
+    expect(Buffer.from(text, 'base64').toString()).toBe('Log in again.\n.dot')
+    expect(parts[1]).toContain('Content-Type: image/jpeg; name="x screen .jpg"')
+    expect(parts[1]).toContain('Content-Disposition: attachment; filename=')
+    const data = parts[1]!.split('\r\n\r\n')[1]!.replace(/\r\n/g, '')
+    expect(Buffer.from(data, 'base64').equals(Buffer.from(jpeg, 'base64'))).toBe(true)
+  })
+
+  it('keeps every line at most 998 characters and the file name header-safe', () => {
+    const raw = buildMessage('ops@zaviya.pk', { ...mail, attachments: [{ ...mail.attachments[0]!, base64: Buffer.alloc(200_000, 7).toString('base64') }] }, '<id@zaviya.pk>')
+    expect(Math.max(...raw.split('\r\n').map((l) => l.length))).toBeLessThanOrEqual(78)
+    expect(raw.split('\r\n').filter((l) => /^(Bcc|X):/.test(l))).toHaveLength(0)
+  })
+})

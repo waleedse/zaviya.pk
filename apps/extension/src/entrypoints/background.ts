@@ -1,9 +1,11 @@
 import { BridgeClient } from '../lib/bridge-client'
 import { runBridgeJob } from '../lib/jobs'
+import { readHealLog, runWithHealing } from '../lib/heal'
 import { runTrustedInput } from '../lib/trusted-input'
 
 export default defineBackground(() => {
-  const client = new BridgeClient((job) => runBridgeJob(job))
+  // A job that fails on a stuck page is looked at, healed with an allow-listed action and retried (lib/heal.ts)
+  const client: BridgeClient = new BridgeClient((job) => runWithHealing(job, runBridgeJob, client))
   client.start()
   // MV3 service workers sleep after ~30s idle; an alarm wakes it so the socket reconnects.
   chrome.alarms.create('zaviya-keepalive', { periodInMinutes: 0.5 })
@@ -26,6 +28,10 @@ export default defineBackground(() => {
     if (msg.action === 'status') {
       sendResponse({ connected: client.isAuthenticated() })
       return
+    }
+    if (msg.action === 'healLog') {
+      readHealLog().then((log) => sendResponse({ log }))
+      return true
     }
     if (msg.action === 'testGemini') {
       runBridgeJob({ id: `test_${Date.now()}`, type: 'gemini.image', payload: { prompt: String(msg.prompt ?? '') } })

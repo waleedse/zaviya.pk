@@ -66,8 +66,11 @@ export async function postX(
 
   if (deps.bridge?.isConnected('x')) {
     try {
-      const result = await deps.bridge.send({ id: key, type: 'x.post', payload: { text, mediaUrls: input.mediaUrls ?? [] } })
+      // Long timeout: a stuck page may be looked at and healed (a few seconds each) before the job is retried
+      const result = await deps.bridge.send({ id: key, type: 'x.post', payload: { text, mediaUrls: input.mediaUrls ?? [] } }, 300_000)
       const externalId = (result as { externalId?: string }).externalId
+      // "healed: ..." when the extension had to get past a popup first
+      const healed = (result as { healed?: string }).healed
       await deps.payload.upsertSocialPost({
         idempotencyKey: key,
         article: input.articleId,
@@ -78,11 +81,26 @@ export async function postX(
         status: 'posted',
         externalId,
         via: 'extension',
+        error: healed ? `healed: ${healed}` : undefined,
         postedAt: new Date().toISOString(),
       })
       return
     } catch (e) {
       logger.warn({ err: e }, 'X bridge post failed')
+      // The error text says what the extension saw and did: "... | healed: ..." or "... | needs you: ..."
+      await deps.payload
+        .upsertSocialPost({
+          idempotencyKey: key,
+          article: input.articleId,
+          platform: 'x',
+          format,
+          copy: text,
+          mediaUrls: input.mediaUrls ?? [],
+          status: 'failed',
+          via: 'extension',
+          error: (e instanceof Error ? e.message : String(e)).slice(0, 900),
+        })
+        .catch((e2) => logger.warn({ err: e2 }, 'could not record the failed X post'))
     }
   }
 

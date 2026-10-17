@@ -172,3 +172,14 @@ export async function navigateLeavingDrafts(tabId: number, url: string): Promise
     if (attached) await chrome.debugger.detach(target).catch(() => undefined)
   }
 }
+
+/** The tab a stuck job ran in: our own tab for the platform if it is still there, else any tab of that platform. */
+export async function findHealTab(platform: PlatformKey): Promise<number | undefined> {
+  const key = OWN_TAB_KEY(platform)
+  const stored = (await chrome.storage.session.get(key))[key] as number | undefined
+  if (stored !== undefined) {
+    const tab = await chrome.tabs.get(stored).catch(() => undefined)
+    if (tab?.id !== undefined) return tab.id
+  }
+  return (await findTabForPlatform(platform))?.id
+}

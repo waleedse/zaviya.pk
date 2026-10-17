@@ -13,6 +13,10 @@ import {
 } from './queues.js'
 import { startHeartbeat } from './heartbeat.js'
 import { startMailCommands } from './mail/scheduler.js'
+import { createHealService } from './heal/service.js'
+import { smtpMailer } from './mail/transport.js'
+import { redisKv } from './mail/kv.js'
+import { WALEED } from './mail/auth.js'
 
 async function main() {
   const env = loadConfig()
@@ -50,6 +54,17 @@ async function main() {
 
   runtime = await createWorkerRuntime(env, bridge, telegram)
   await scheduleIngestSources(runtime)
+  // The extension's "eyes": a stuck page is looked at by Gemini (vision), only allow-listed actions come back,
+  // and Waleed gets an email (screenshot attached) only when a person is really needed.
+  bridge.setHealHandler(
+    createHealService({
+      router: runtime.router,
+      mailer: env.OPS_MAIL_USER && env.OPS_MAIL_PASSWORD ? smtpMailer({ host: env.MAIL_HOST, user: env.OPS_MAIL_USER, password: env.OPS_MAIL_PASSWORD }) : null,
+      kv: redisKv(runtime.redis),
+      to: WALEED,
+      log: (obj, msg) => logger.info(obj, msg),
+    }),
+  )
   const heartbeatTimer = startHeartbeat(runtime)
   // Off unless MAIL_COMMANDS_ENABLED=true (and the ops@ login is set)
   const stopMailCommands = await startMailCommands(runtime).catch((e) => {

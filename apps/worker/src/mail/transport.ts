@@ -26,6 +26,8 @@ export interface OutgoingMail {
   body: string
   inReplyTo?: string | null
   references?: string | null
+  /** Files to attach (multipart/mixed); the content is base64 already */
+  attachments?: { filename: string; contentType: string; base64: string }[]
 }
 
 export interface Mailer {
@@ -91,8 +93,14 @@ async function smtpCmd(conv: Conv, line: string | null, ok: number[]): Promise<v
   }
 }
 
-/** Plain-text mail with the right threading headers; base64 body so dots and Urdu are safe */
+const wrap76 = (b64text: string) => b64text.replace(/.{1,76}/g, '$&\r\n')
+/** Header parameter values (file names) keep to a safe ASCII subset */
+const safeName = (s: string) => oneLine(s).replace(/[^\w.\- ]/g, '_').slice(0, 80) || 'file'
+
+/** Plain-text mail with the right threading headers; base64 body so dots and Urdu are safe. With attachments: multipart/mixed. */
 export function buildMessage(from: string, mail: OutgoingMail, id: string, date = new Date()): string {
+  const attachments = mail.attachments ?? []
+  const boundary = `zaviya_${id.replace(/[^\w]/g, '').slice(0, 24)}_mix`
   const headers = [
     `From: Zaviya Ops <${from}>`,
     `To: <${oneLine(mail.to)}>`,
@@ -104,10 +112,31 @@ export function buildMessage(from: string, mail: OutgoingMail, id: string, date 
       : []),
     'Auto-Submitted: auto-replied',
     'MIME-Version: 1.0',
+  ]
+  if (!attachments.length) {
+    return `${[...headers, 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: base64'].join('\r\n')}\r\n\r\n${wrap76(b64(mail.body))}`
+  }
+  const parts = [
+    `--${boundary}`,
     'Content-Type: text/plain; charset=utf-8',
     'Content-Transfer-Encoding: base64',
+    '',
+    wrap76(b64(mail.body)),
+    ...attachments.flatMap((a) => {
+      const name = safeName(a.filename)
+      return [
+        `--${boundary}`,
+        `Content-Type: ${oneLine(a.contentType).replace(/[^\w/.+-]/g, '')}; name="${name}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-Disposition: attachment; filename="${name}"`,
+        '',
+        wrap76(a.base64.replace(/[^A-Za-z0-9+/=]/g, '')),
+      ]
+    }),
+    `--${boundary}--`,
+    '',
   ]
-  return `${headers.join('\r\n')}\r\n\r\n${b64(mail.body).replace(/.{1,76}/g, '$&\r\n')}`
+  return `${[...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`].join('\r\n')}\r\n\r\n${parts.join('\r\n')}`
 }
 
 export function smtpMailer(account: MailAccount): Mailer {

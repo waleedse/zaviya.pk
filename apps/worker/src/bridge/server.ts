@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws'
-import { BridgeJobSchema, BridgeMessageSchema, type BridgeJob } from '@zaviya/shared'
+import { BridgeJobSchema, BridgeMessageSchema, type BridgeJob, type HealActionMessage, type HealReport, type HealRequest } from '@zaviya/shared'
 import { logger } from '../logger.js'
 
 interface Pending {
@@ -14,6 +14,7 @@ export class BridgeServer {
   private authenticated = false
   private tabs: Record<string, boolean> = {}
   private pending = new Map<string, Pending>()
+  private heal: { decide: (r: HealRequest) => Promise<HealActionMessage>; report: (r: HealReport) => Promise<void> } | null = null
 
   constructor(
     private readonly port: number,
@@ -43,6 +44,11 @@ export class BridgeServer {
   stop(): void {
     this.wss?.close()
     this.wss = null
+  }
+
+  /** The extension's "eyes": answers heal.request with an allowed action and records heal.report */
+  setHealHandler(h: NonNullable<BridgeServer['heal']>): void {
+    this.heal = h
   }
 
   /** Extension is connected and authenticated (it opens platform tabs itself when needed). */
@@ -78,6 +84,21 @@ export class BridgeServer {
     }
     if ('type' in data && data.type === 'heartbeat') {
       this.tabs = data.tabs
+      return
+    }
+    if ('type' in data && data.type === 'heal.request') {
+      if (ws !== this.socket || !this.authenticated) return
+      const req = data
+      void (this.heal?.decide(req) ?? Promise.resolve({ type: 'heal.action' as const, id: req.id, source: 'rules' as const, diagnosis: 'no heal handler', action: 'give_up' as const, needsHuman: false }))
+        .catch((e): HealActionMessage => ({ type: 'heal.action', id: req.id, source: 'rules', diagnosis: `heal failed: ${e instanceof Error ? e.message : String(e)}`, action: 'give_up', needsHuman: false }))
+        .then((reply) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(reply))
+        })
+      return
+    }
+    if ('type' in data && data.type === 'heal.report') {
+      if (ws !== this.socket || !this.authenticated) return
+      void this.heal?.report(data).catch((e) => logger.warn({ err: e }, 'heal report failed'))
       return
     }
     if ('id' in data && 'ok' in data) {

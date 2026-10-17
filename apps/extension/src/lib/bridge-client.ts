@@ -1,7 +1,11 @@
 import {
   BridgeJobSchema,
   BridgeMessageSchema,
+  HealActionMessageSchema,
   type BridgeJob,
+  type HealActionMessage,
+  type HealReport,
+  type HealRequest,
 } from '@zaviya/shared'
 import { getSettings, type PlatformKey } from './storage'
 import { scanOpenPlatforms } from './tabs'
@@ -16,6 +20,7 @@ export class BridgeClient {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private authenticated = false
   private running = false
+  private healWaiters = new Map<string, (a: HealActionMessage) => void>()
 
   constructor(private readonly onJob: JobHandler) {}
 
@@ -31,6 +36,27 @@ export class BridgeClient {
 
   isAuthenticated(): boolean {
     return this.authenticated
+  }
+
+  /** Asks the worker what to do about a stuck page; null when it is offline or does not answer in time. */
+  requestHeal(req: HealRequest, timeoutMs = 45_000): Promise<HealActionMessage | null> {
+    if (!this.authenticated) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.healWaiters.delete(req.id)
+        resolve(null)
+      }, timeoutMs)
+      this.healWaiters.set(req.id, (a) => {
+        clearTimeout(timer)
+        this.healWaiters.delete(req.id)
+        resolve(a)
+      })
+      this.sendRaw(req)
+    })
+  }
+
+  sendReport(report: HealReport): void {
+    this.sendRaw(report)
   }
 
   /** Called from the keep-alive alarm; reconnects if the socket died while the worker slept. */
@@ -123,6 +149,12 @@ export class BridgeClient {
       if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
       this.heartbeatTimer = setInterval(() => void this.sendHeartbeat(), 15_000)
       void this.sendHeartbeat()
+      return
+    }
+
+    const heal = HealActionMessageSchema.safeParse(parsed)
+    if (heal.success) {
+      this.healWaiters.get(heal.data.id)?.(heal.data)
       return
     }
 

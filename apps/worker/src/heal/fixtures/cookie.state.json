@@ -1,0 +1,55 @@
+{
+ "url": "https://x.com/home",
+ "title": "Daily Ledger - Markets",
+ "elements": [
+  {
+   "i": 0,
+   "tag": "button",
+   "text": "Accept all cookies",
+   "ariaLabel": "",
+   "href": "",
+   "x": 96,
+   "y": 766,
+   "inDialog": true,
+   "visible": true
+  },
+  {
+   "i": 1,
+   "tag": "button",
+   "text": "Decline optional cookies",
+   "ariaLabel": "",
+   "href": "",
+   "x": 268,
+   "y": 766,
+   "inDialog": true,
+   "visible": true
+  },
+  {
+   "i": 2,
+   "tag": "button",
+   "text": "Manage settings",
+   "ariaLabel": "",
+   "href": "",
+   "x": 434,
+   "y": 766,
+   "inDialog": true,
+   "visible": true
+  },
+  {
+   "i": 3,
+   "tag": "a",
+   "text": "Post a comment",
+   "ariaLabel": "",
+   "href": "file:///post/1",
+   "x": 319,
+   "y": 261,
+   "inDialog": false,
+   "visible": true
+  }
+ ],
+ "dialogs": [
+  "We use cookies to improve your experience and show relevant ads. Accept all cookiesDecline optional cookiesManage settings"
+ ],
+ "toasts": [],
+ "pageText": "Daily Ledger Markets · Politics · Sport Rupee steadies as petrol prices hold The rupee ended flat against the dollar on Friday as traders waited for the central bank decision next week. Petrol prices were left unchanged for the fortnight, officials said. Post a comment We use cookies to improve your experience and show relevant ads. Accept all cookiesDecline optional cookiesManage settings"
+}
