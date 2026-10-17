@@ -5,7 +5,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
-import { editorApproved } from './pitch.js'
+import { editorApproved, hasFreshSource } from './pitch.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
 export function publisherName(title: string, feedName: string): string {
@@ -191,6 +191,13 @@ export async function processPublishJob(
   if (blocker) {
     logger.warn({ clusterId: data.clusterId, articleId: data.articleId, blocker }, 'publish blocked: article text is incomplete')
     await deps.payload.patchCluster(data.clusterId, { status: 'triaged' }).catch(() => undefined)
+    return null
+  }
+
+  // Stale story (ZAV-89): newest source older than 48h means no publish; the cluster is rejected with the reason.
+  if (!triage?.isUpdateOfExisting && cluster.items.length && !hasFreshSource(cluster.items)) {
+    logger.warn({ clusterId: data.clusterId, articleId: data.articleId }, 'publish blocked: stale sources')
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...(triage ?? {}), deferReason: 'stale sources' } }).catch(() => undefined)
     return null
   }
 
