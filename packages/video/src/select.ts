@@ -140,6 +140,8 @@ export interface SelectOptions {
   date: string
   /** story ids already used by an earlier edition: skipped first, used only to top up */
   exclude?: Set<number>
+  /** breaking flash: use exactly this article (if it is in `articles`) */
+  onlyId?: number
   /** resolves a story's hero image to the `image` field (a local file name once downloaded) */
   imageFor?: (a: ApiArticle) => string
 }
@@ -150,7 +152,9 @@ export function selectEdition(o: SelectOptions): { input: EditionInput; picked: 
   let picked: SelectedArticle[]
   switch (o.format) {
     case 'flash15':
-      picked = pickStories(all, { windowHours: 6, limit: 1, exclude: o.exclude })
+      picked = o.onlyId !== undefined
+        ? pickStories(all.filter((a) => a.id === o.onlyId), { windowHours: 6, limit: 1 })
+        : pickStories(all, { windowHours: 6, limit: 1, exclude: o.exclude })
       break
     case 'roundup60':
       picked = pickStories(all, { windowHours: 12, limit: 12, caps: { default: 4, pakistan: 5 }, exclude: o.exclude })

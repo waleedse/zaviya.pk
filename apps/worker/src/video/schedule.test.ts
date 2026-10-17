@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SLOTS, editionKey, hhmm, karachiDate, parseSlots, postAtMs, repeatFor, schedulerId, slotTimeMs, staleSchedulers } from './schedule.js'
 
 describe('parseSlots', () => {
-  it('has the two default slots', () => {
+  it('has the planned default slots', () => {
     const s = parseSlots(undefined)
-    expect(s.map((x) => [x.name, x.hour, x.minute, x.format, x.edition])).toEqual([
-      ['morning', 7, 40, 'headlines30', 'morning'],
-      ['evening', 19, 40, 'roundup60', 'evening'],
+    expect(s.map((x) => [x.name, x.hour, x.minute, x.format, x.edition, x.days])).toEqual([
+      ['morning', 7, 40, 'headlines30', 'morning', '*'],
+      ['money', 12, 40, 'money45', 'morning', '1-6'],
+      ['ai', 17, 10, 'topic60', 'evening', '2,4,6'],
+      ['evening', 19, 40, 'roundup60', 'evening', '*'],
     ])
     expect(parseSlots('')).toEqual(parseSlots(DEFAULT_SLOTS))
   })
@@ -51,5 +53,23 @@ describe('keys and times (Karachi)', () => {
   it('a manual run far from the slot counts the veto from now', () => {
     const now = Date.UTC(2026, 9, 17, 9, 0)
     expect(postAtMs(morning!, now, 20)).toBe(now + 20 * 60_000)
+  })
+})
+
+describe('weekday slots', () => {
+  it('parses ranges and lists into the cron day field', () => {
+    const [money, ai] = parseSlots('money@12:40/mon-sat=money45,ai@17:10/tue+thu+sat=topic60')
+    expect(repeatFor(money!)).toEqual({ pattern: '40 12 * * 1-6', tz: 'Asia/Karachi' })
+    expect(repeatFor(ai!)).toEqual({ pattern: '10 17 * * 2,4,6', tz: 'Asia/Karachi' })
+    expect(parseSlots(undefined)[0]!.days).toBe('*')
+  })
+  it('knows which days a slot runs', async () => {
+    const { runsOn } = await import('./schedule.js')
+    const [money, ai] = parseSlots('money@12:40/mon-sat=money45,ai@17:10/tue+thu+sat=topic60')
+    expect([0, 1, 6].map((d) => runsOn(money!, d))).toEqual([false, true, true])
+    expect([2, 3, 6].map((d) => runsOn(ai!, d))).toEqual([true, false, true])
+  })
+  it('rejects unknown day names', () => {
+    expect(() => parseSlots('x@12:00/mon-fun=money45')).toThrow(/unknown days/)
   })
 })

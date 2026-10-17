@@ -52,7 +52,7 @@ function setup(over: Partial<JobDeps> = {}, cfgOver: Partial<VideoConfig> = {}) 
   const upserts: Record<string, unknown>[] = []
   const posts: string[] = []
   const deps: JobDeps = {
-    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, ...cfgOver },
+    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, ...cfgOver },
     redis,
     payload: { upsertSocialPost: vi.fn(async (b) => void upserts.push(b)) },
     fetchArticles: vi.fn(async () => Array.from({ length: 8 }, (_, i) => article(i))),
@@ -184,7 +184,7 @@ describe('runEdition', () => {
   it('the evening edition skips stories the morning used', async () => {
     const { deps, redis } = setup()
     redis.store.set('video:used:2026-10-17', JSON.stringify([100, 101]))
-    const evening = parseSlots(undefined)[1]!
+    const evening = parseSlots(undefined).find((s) => s.name === 'evening')!
     const out = await runEdition(deps, evening, { dry: true })
     expect(out.status === 'dry' || out.status === 'not-enough').toBe(true)
     if (out.status === 'dry') {

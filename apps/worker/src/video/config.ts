@@ -10,6 +10,8 @@ export interface VideoConfig {
   /** empty = dry run */
   platforms: VideoPlatform[]
   vetoMin: number
+  /** 15 s breaking flashes (checked every 10 min); VIDEO_FLASH=false turns them off */
+  flash: boolean
   dataDir: string
   bundleDir: string
   concurrency: number
@@ -30,6 +32,7 @@ export function loadVideoConfig(env: NodeJS.ProcessEnv = process.env): VideoConf
     enabled: env.VIDEO_ENABLED === 'true',
     slots: parseSlots(env.VIDEO_SLOTS),
     platforms,
+    flash: env.VIDEO_FLASH !== 'false',
     vetoMin: Math.max(0, Number(env.VIDEO_VETO_MIN ?? 20) || 0),
     dataDir: env.VIDEO_DATA_DIR ?? '/data/videos',
     bundleDir: env.VIDEO_BUNDLE_DIR ?? path.resolve(HERE, '../../../../packages/video/build/bundle'),

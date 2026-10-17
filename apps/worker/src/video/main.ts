@@ -8,6 +8,7 @@ import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
 import { loadVideoConfig } from './config.js'
 import { createJobDeps } from './deps.js'
+import { flashKeys, flashSlot, pickFlash } from './flash.js'
 import { runEdition } from './job.js'
 import { repeatFor, schedulerId, staleSchedulers } from './schedule.js'
 
@@ -33,6 +34,9 @@ async function main() {
   for (const slot of cfg.slots) {
     await queue.upsertJobScheduler(schedulerId(slot), repeatFor(slot), { name: 'run', data: { slot: slot.name } })
   }
+  // Breaking flash: a check every 10 minutes (its id has no "video-" prefix, so the stale cleanup leaves it alone)
+  if (cfg.flash) await queue.upsertJobScheduler('flash-check', { every: 10 * 60_000 }, { name: 'flash-check', data: {} })
+  else await queue.removeJobScheduler('flash-check').catch(() => {})
   const existing = await queue.getJobSchedulers()
   for (const id of staleSchedulers(existing.map((s) => s.key ?? s.id ?? ''), cfg.slots)) {
     await queue.removeJobScheduler(id)
@@ -44,6 +48,29 @@ async function main() {
   const worker = new Worker(
     VIDEO_QUEUE,
     async (job) => {
+      if (job.name === 'flash-check') {
+        const now = Date.now()
+        const k = flashKeys(now)
+        const [done, count, last] = await Promise.all([redis.smembers(k.done), redis.get(k.count), redis.get(k.last)])
+        const pick = pickFlash(
+          await deps.fetchArticles(1),
+          { done: new Set(done.map(Number)), countToday: Number(count ?? 0), lastAt: Number(last ?? 0) },
+          cfg.slots,
+          now,
+        )
+        if ('skip' in pick) return { flash: 'none', reason: pick.skip }
+        // Claim first so a slow render can never be picked twice by the next check
+        await redis.sadd(k.done, String(pick.id))
+        await redis.expire(k.done, 7 * 86400)
+        const outcome = await runEdition(deps, flashSlot(pick.id, now), { articleId: pick.id, vetoMin: 5 })
+        if (outcome.status === 'posted') {
+          await redis.incr(k.count)
+          await redis.expire(k.count, 2 * 86400)
+          await redis.set(k.last, String(Date.now()), 'EX', 86400)
+        }
+        logger.info({ outcome }, 'breaking flash finished')
+        return outcome
+      }
       const slot = cfg.slots.find((s) => s.name === (job.data as { slot?: string }).slot)
       if (!slot) throw new Error(`unknown slot ${JSON.stringify(job.data)}`)
       const outcome = await runEdition(deps, slot)
