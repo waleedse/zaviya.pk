@@ -71,9 +71,11 @@ async function main() {
         logger.info({ outcome }, 'breaking flash finished')
         return outcome
       }
-      const slot = cfg.slots.find((s) => s.name === (job.data as { slot?: string }).slot)
+      const data = job.data as { slot?: string; now?: boolean }
+      const slot = cfg.slots.find((s) => s.name === data.slot)
       if (!slot) throw new Error(`unknown slot ${JSON.stringify(job.data)}`)
-      const outcome = await runEdition(deps, slot)
+      // `now` (email command "video now"): post without the veto wait; the Skip button / skip key still applies
+      const outcome = await runEdition(deps, slot, data.now === true ? { now: true } : {})
       logger.info({ outcome }, 'video job finished')
       return outcome
     },

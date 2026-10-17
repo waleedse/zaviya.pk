@@ -290,6 +290,11 @@ export class PayloadClient {
     return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', payload)
   }
 
+  /** Sets one social platform's daily cap (the settings global is admin-only, so this goes through the pipeline API) */
+  setDailyCap(platform: string, perDay: number) {
+    return this.request<{ ok: true; dailyCaps: Record<string, number> }>('PUT', '/api/pipeline/daily-cap', { platform, perDay })
+  }
+
   getSettings() {
     return this.request<PipelineSettings>('GET', '/api/pipeline/settings')
   }
