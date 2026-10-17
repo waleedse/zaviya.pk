@@ -79,3 +79,38 @@ async function refreshConn(): Promise<void> {
 void load()
 void refreshConn()
 setInterval(() => void refreshConn(), 5000)
+
+const RESULT_TEXT: Record<string, string> = {
+  retry_ok: 'fixed, job went through',
+  retry_failed: 'retried, still failing',
+  not_retried: 'looked, nothing to fix',
+  refused: 'refused (not allowed)',
+  needs_human: 'needs you (email sent)',
+  limit_reached: 'limit reached (email sent)',
+}
+
+async function showHealLog(): Promise<void> {
+  try {
+    const res = (await chrome.runtime.sendMessage({ kind: 'zaviya-options', action: 'healLog' })) as {
+      log: { at: number; jobType: string; platform: string; diagnosis: string; action: string; result: string }[]
+    }
+    const body = document.querySelector('#healLog tbody')!
+    body.textContent = ''
+    for (const e of res.log) {
+      const tr = document.createElement('tr')
+      // textContent only: the diagnosis comes from a model and from page text
+      for (const text of [new Date(e.at).toLocaleString(), e.jobType, e.action, RESULT_TEXT[e.result] ?? e.result, e.diagnosis]) {
+        const td = document.createElement('td')
+        td.textContent = text
+        td.style.cssText = 'padding:3px 6px;border-top:1px solid #ddd;vertical-align:top'
+        tr.appendChild(td)
+      }
+      body.appendChild(tr)
+    }
+    document.getElementById('healEmpty')!.style.display = res.log.length ? 'none' : 'block'
+  } catch {
+    /* background asleep: the next refresh shows it */
+  }
+}
+void showHealLog()
+setInterval(() => void showHealLog(), 10_000)

@@ -4,9 +4,10 @@ import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL } from './types.js'
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 type TextContent = { type: 'text'; text: string }
+type ImageContent = { type: 'image'; data: string; mime_type: string }
 
 type Step =
-  | { type: 'user_input'; content: TextContent[] }
+  | { type: 'user_input'; content: (TextContent | ImageContent)[] }
   | { type: 'model_output'; content: TextContent[] }
   | { type: 'function_result'; call_id: string; name: string; result: string }
 
@@ -99,7 +100,8 @@ export function toInteractionInput(messages: Msg[]): {
     } else if (m.role === 'assistant') {
       if (m.content) steps.push({ type: 'model_output', content: text(m.content) })
     } else {
-      steps.push({ type: 'user_input', content: text(m.content) })
+      const images: ImageContent[] = (m.images ?? []).map((im) => ({ type: 'image', data: im.base64, mime_type: im.mimeType }))
+      steps.push({ type: 'user_input', content: [...text(m.content), ...images] })
     }
   }
 

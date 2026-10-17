@@ -41,6 +41,24 @@ describe('GeminiProvider', () => {
     expect(body.response_format).toEqual({ type: 'object', properties: { ok: { type: 'boolean' } } })
   })
 
+  it('sends inline images as image content next to the text', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(interaction([{ type: 'model_output', content: [{ type: 'text', text: 'seen' }] }]))
+    await new GeminiProvider('key').chat({
+      model: 'gemini-3.5-flash',
+      messages: [{ role: 'user', content: 'what is on screen?', images: [{ mimeType: 'image/jpeg', base64: 'QUJD' }] }],
+    })
+    const body = JSON.parse(String((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body))
+    expect(body.input).toEqual([
+      {
+        type: 'user_input',
+        content: [
+          { type: 'text', text: 'what is on screen?' },
+          { type: 'image', data: 'QUJD', mime_type: 'image/jpeg' },
+        ],
+      },
+    ])
+  })
+
   it('parses function calls', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       interaction([{ type: 'function_call', id: 'call_1', name: 'get_rate', arguments: { series: 'gold' } }]),

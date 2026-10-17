@@ -72,6 +72,13 @@
       <img id="testImage" alt="" style="max-width:100%;border-radius:8px;display:none" />
     </fieldset>
 
+    <fieldset>
+      <legend>Recent self-heals</legend>
+      <p class="hint">When a job gets stuck on a popup or a dialog the extension looks at the page, closes what is in the way and retries. The last 10 are listed here.</p>
+      <table id="healLog" style="width:100%;border-collapse:collapse;font-size:12px"><tbody></tbody></table>
+      <p id="healEmpty" class="hint">Nothing yet.</p>
+    </fieldset>
+
     <p class="hint">Worker connection: <strong id="conn">checking…</strong></p>
 
     <fieldset>

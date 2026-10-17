@@ -1,0 +1,42 @@
+{
+ "url": "https://x.com/home",
+ "title": "Something went wrong",
+ "elements": [
+  {
+   "i": 0,
+   "tag": "a",
+   "text": "Home",
+   "ariaLabel": "",
+   "href": "https://example.com/",
+   "x": 34,
+   "y": 21,
+   "inDialog": false,
+   "visible": true
+  },
+  {
+   "i": 1,
+   "tag": "a",
+   "text": "Premium",
+   "ariaLabel": "",
+   "href": "https://example.com/premium",
+   "x": 100,
+   "y": 21,
+   "inDialog": false,
+   "visible": true
+  },
+  {
+   "i": 2,
+   "tag": "button",
+   "text": "Try again",
+   "ariaLabel": "",
+   "href": "",
+   "x": 640,
+   "y": 471,
+   "inDialog": false,
+   "visible": true
+  }
+ ],
+ "dialogs": [],
+ "toasts": [],
+ "pageText": "Home Premium Something went wrong, but don't fret Let's give it another shot. Try again"
+}

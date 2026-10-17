@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CATEGORY_SLUGS, PRIORITIES, SENSITIVITY_FLAGS } from './constants'
+import { HealRequestSchema, HealReportSchema } from './heal'
 
 /** LLM triage output. Validated before any rule runs. */
 export const TriageResultSchema = z.object({
@@ -110,6 +111,9 @@ export const BridgeMessageSchema = z.union([
   z.object({ type: z.literal('heartbeat'), tabs: z.record(z.boolean()) }),
   z.object({ id: z.string(), ok: z.literal(true), result: z.unknown() }),
   z.object({ id: z.string(), ok: z.literal(false), error: z.string() }),
+  /** Extension "eyes": a stuck job asks the worker what to do, then reports how it went */
+  HealRequestSchema,
+  HealReportSchema,
 ])
 export type BridgeMessage = z.infer<typeof BridgeMessageSchema>
 

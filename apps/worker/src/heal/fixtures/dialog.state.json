@@ -1,0 +1,44 @@
+{
+ "url": "https://x.com/home",
+ "title": "Home / Social",
+ "elements": [
+  {
+   "i": 0,
+   "tag": "button",
+   "text": "Turn on",
+   "ariaLabel": "",
+   "href": "",
+   "x": 640,
+   "y": 435,
+   "inDialog": true,
+   "visible": true
+  },
+  {
+   "i": 1,
+   "tag": "button",
+   "text": "Not now",
+   "ariaLabel": "",
+   "href": "",
+   "x": 640,
+   "y": 484,
+   "inDialog": true,
+   "visible": true
+  },
+  {
+   "i": 2,
+   "tag": "button",
+   "text": "Post",
+   "ariaLabel": "",
+   "href": "",
+   "x": 1219,
+   "y": 757,
+   "inDialog": false,
+   "visible": true
+  }
+ ],
+ "dialogs": [
+  "Turn on notifications? Get alerts for new posts from accounts you follow. Turn on Not now"
+ ],
+ "toasts": [],
+ "pageText": "@newsdesk Markets open higher. @weather Heat advisory for Lahore. Post Turn on notifications? Get alerts for new posts from accounts you follow. Turn on Not now"
+}

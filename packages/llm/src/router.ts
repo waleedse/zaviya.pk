@@ -4,7 +4,7 @@ import { OllamaProvider } from './ollama.js'
 import { Semaphore } from './semaphore.js'
 import type { CliProvider } from './cli.js'
 import type { ChatResult, LLMProvider, LLMTask, Msg, ToolDef, JSONSchema } from './types.js'
-import { DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
+import { DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
 
 export interface RouterSettings {
   activeModels?: Partial<Record<LLMTask, string>>
@@ -49,6 +49,7 @@ const LOCAL_TIMEOUT_MS = 25 * 60_000
 
 function geminiFallbackModel(task: LLMTask): string {
   if (task === 'embed') return DEFAULT_GEMINI_EMBED_MODEL
+  if (task === 'vision') return GEMINI_VISION_CHAIN
   return task === 'write_en' || task === 'write_ur' ? GEMINI_WRITER_CHAIN : GEMINI_LITE_CHAIN
 }
 
@@ -149,7 +150,8 @@ export class LLMRouter {
     },
   ): Promise<ChatResult> {
     // Plain-text jobs only: the CLIs do not take our tool definitions.
-    if (!opts.tools?.length) {
+    // (never for screenshots: those go to Gemini only)
+    if (!opts.tools?.length && task !== 'vision') {
       for (const engine of this.subscriptionChain) {
         if (!engine.tasks.includes(task) || engine.provider.isResting()) continue
         try {
@@ -192,6 +194,8 @@ export class LLMRouter {
     try {
       return await run(primary, primaryModel)
     } catch (err) {
+      // Screenshots only go to Gemini: a text-only local or paid fallback would answer blind
+      if (task === 'vision') throw err
       if ((primary.id === 'ollama' || primary.id === 'api') && this.gemini) {
         return run(this.gemini, geminiFallbackModel(task))
       }

@@ -10,6 +10,7 @@
 export type CdpAction =
   | { action: 'insertText'; text: string }
   | { action: 'pressEnter' }
+  | { action: 'pressEscape' }
   | { action: 'clickAt'; x: number; y: number }
   | { action: 'beginVisible' }
   | { action: 'endVisible' }
@@ -91,6 +92,10 @@ export async function runTrustedInput(tabId: number, cmd: CdpAction): Promise<{ 
       const key = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 }
       await send(tabId, 'Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
       await send(tabId, 'Input.dispatchKeyEvent', { type: 'char', text: '\r', ...key })
+      await send(tabId, 'Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    } else if (cmd.action === 'pressEscape') {
+      const key = { key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }
+      await send(tabId, 'Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
       await send(tabId, 'Input.dispatchKeyEvent', { type: 'keyUp', ...key })
     } else if (cmd.action === 'clickAt') {
       const base = { x: cmd.x, y: cmd.y, button: 'left', clickCount: 1 }
