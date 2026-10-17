@@ -168,6 +168,8 @@ const DENIED_WORDS = [
   'buy', 'purchas', 'pay', 'premium', 'upgrad', 'verif', 'follow', 'unfollow', 'block', 'report', 'mute', 'accept', 'allow',
   'agree', 'confirm', 'submit', 'share', 'tweet', 'reply', 'repost', 'retweet', 'like', 'turn on', 'enabl', 'install', 'download',
   'creat', 'publish', 'schedul', 'save', 'add', 'join', 'group', 'community', 'account', 'password',
+  // third-party sign-in buttons start with an allowed word ("Continue with Google")
+  'continue with', 'with google', 'with apple', 'with facebook', 'google', 'apple',
 ]
 const DENIED_RE = new RegExp(`(^|[^\\p{L}\\p{N}])(${DENIED_WORDS.map((w) => w.replace(/ /g, '\\s+')).join('|')})`, 'iu')
 

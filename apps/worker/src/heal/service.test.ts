@@ -239,3 +239,13 @@ describe('emails', () => {
     expect(svc.recent()).toHaveLength(2)
   })
 })
+
+describe('allow-list: third-party sign-in', () => {
+  it('never clicks "Continue with Google" or "Sign in with Apple", but still clicks plain Continue', async () => {
+    const { labelAllowed } = await import('@zaviya/shared')
+    expect(labelAllowed('Continue with Google')).toBe(false)
+    expect(labelAllowed('Continue with Apple')).toBe(false)
+    expect(labelAllowed('Continue')).toBe(true)
+    expect(labelAllowed('Not now')).toBe(true)
+  })
+})
