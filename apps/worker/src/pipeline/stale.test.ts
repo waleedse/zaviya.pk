@@ -22,7 +22,7 @@ describe('processPublishJob with stale sources', () => {
       patchCluster: vi.fn(async () => ({})),
     }
     const res = await processPublishJob(
-      { clusterId: '9', write: { en: {} } as never, qaScore: 1, priority: 'normal' },
+      { clusterId: '9', write: { en: { bodyMarkdown: Array.from({ length: 120 }, (_, i) => `w${i}`).join(' '), whatItMeans: 'x' } } as never, qaScore: 1, priority: 'normal' },
       { payload: payload as never, socialQueue: { add: vi.fn() } as never },
     )
     expect(res).toBeNull()

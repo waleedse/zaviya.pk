@@ -91,3 +91,24 @@ export const keepHeroImage: CollectionBeforeChangeHook = ({ data, originalDoc })
   if (!incoming && currentId) data.heroImage = currentId
   return data
 }
+
+const KEEP_TEXT_FIELDS = ['dek', 'keyPoints', 'body', 'whatItMeans', 'faqs'] as const
+
+const hasContent = (v: unknown): boolean => {
+  if (v === null || v === undefined || v === '') return false
+  if (Array.isArray(v)) return v.length > 0
+  return true
+}
+
+/**
+ * A partial edit (title, slug, priority) never blanks the article text (ZAV-80). On 15 Oct a PATCH
+ * without ?locale=en left dek, body and whatItMeans null on articles 868, 817 and 862. When an update
+ * leaves one of these fields missing or empty and the saved article has it, the saved value is kept.
+ */
+export const keepArticleText: CollectionBeforeChangeHook = ({ data, originalDoc, operation }) => {
+  if (!data || !originalDoc || operation !== 'update') return data
+  for (const f of KEEP_TEXT_FIELDS) {
+    if (!hasContent(data[f]) && hasContent(originalDoc[f])) data[f] = originalDoc[f]
+  }
+  return data
+}

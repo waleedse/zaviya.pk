@@ -1,0 +1,279 @@
+{
+  "edition": "evening",
+  "date": "2026-10-16T21:21:15.446Z",
+  "format": "topic60",
+  "topic": "ai-tech",
+  "stories": [
+    {
+      "id": 1030,
+      "slug": "raast-payment-system-306-percent-digital-points-cashless-pakistan",
+      "title": "Raast payment system drives 306% digital points rise",
+      "titleUr": null,
+      "dek": "A Finance Ministry document told the National Assembly that the Raast payment system and Cashless Pakistan push lifted active digital commerce points to 2.03 million by June 2026.",
+      "category": "tech-telecom",
+      "image": "1030.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T13:57:49.335Z",
+      "tags": [
+        "Raast",
+        "Cashless Pakistan",
+        "State Bank of Pakistan",
+        "Finance Ministry",
+        "National Assembly",
+        "Benazir Income Support Programme",
+        "Digital payments",
+        "QR payments"
+      ]
+    },
+    {
+      "id": 1002,
+      "slug": "ke-unplanned-outages-road-digging-karachi",
+      "title": "K-Electric links 1,935 unplanned outages to uncoordinated road digging",
+      "titleUr": null,
+      "dek": "K-Electric said uncoordinated road digging was a leading cause of 1,935 unplanned outages in FY26; the statement does not name a specific outage today.",
+      "category": "tech-telecom",
+      "image": "1002.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-16T09:24:43.378Z",
+      "tags": [
+        "K Electric",
+        "Karachi",
+        "Power outages",
+        "Road digging",
+        "Underground cables",
+        "Civic agencies"
+      ]
+    },
+    {
+      "id": 993,
+      "slug": "sindh-cm-invites-huawei-technology-labs-karachi",
+      "title": "Murad Ali Shah invites Huawei to Karachi Education City labs",
+      "titleUr": null,
+      "dek": "Syed Murad Ali Shah made the invitation in Shanghai, proposing Huawei technology labs in Karachi and cloud work for Sindh; no reply from the company has been reported.",
+      "category": "tech-telecom",
+      "image": "993.jpg",
+      "sources": [
+        {
+          "name": "ARYnews.tv",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-16T07:19:42.937Z",
+      "tags": [
+        "Huawei",
+        "Sindh government",
+        "Murad Ali Shah",
+        "Karachi",
+        "Shanghai",
+        "Karachi Education City",
+        "Lianqiu Lake Centre"
+      ]
+    },
+    {
+      "id": 968,
+      "slug": "connected-punjab-programme-world-bank-delay",
+      "title": "Connected Punjab programme records no disbursement so far",
+      "titleUr": null,
+      "dek": "The $70 million project covers broadband, AI-enabled public services and cashless payments, runs to June 2031, and has no loan money drawn yet.",
+      "category": "tech-telecom",
+      "image": "968.jpg",
+      "sources": [
+        {
+          "name": "Business Recorder",
+          "tier": 2
+        },
+        {
+          "name": "TechJuice",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-16T01:07:07.170Z",
+      "tags": [
+        "Connected Punjab Programme",
+        "World Bank",
+        "Punjab Information Technology Board",
+        "Provincial Development Working Party",
+        "e-Biz portal",
+        "cashless payments",
+        "Punjab broadband"
+      ]
+    },
+    {
+      "id": 949,
+      "slug": "world-bank-connected-punjab-funding-delays",
+      "title": "Regulatory hurdles delay World Bank Connected Punjab funding",
+      "titleUr": null,
+      "dek": "World Bank Connected Punjab funding has seen no disbursements so far, with financing agreements unsigned and AI and data rules still to be met.",
+      "category": "tech-telecom",
+      "image": "949.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-15T15:29:02.075Z",
+      "tags": [
+        "World Bank",
+        "Connected Punjab Programme",
+        "Punjab Information Technology Board",
+        "Government of Punjab",
+        "Punjab, Pakistan",
+        "Right-of-way permits",
+        "AI oversight",
+        "Digital payments"
+      ]
+    },
+    {
+      "id": 698,
+      "slug": "ai-management-in-pakistan-global-ai-safety-warnings",
+      "title": "AI Management in Pakistan Needs Enforceable Global Safety Norms",
+      "titleUr": null,
+      "dek": "AI management in Pakistan is part of a wider debate: leaders and researchers at leading AI companies warn advanced models could pose serious risks, and an editorial says self-policing is not enough.",
+      "category": "ai",
+      "image": "698.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-14T22:23:02.293Z",
+      "tags": [
+        "Artificial Intelligence",
+        "AI governance",
+        "AI safety",
+        "AI regulation",
+        "AI agents",
+        "Pakistan"
+      ]
+    },
+    {
+      "id": 643,
+      "slug": "customize-facebook-feed-with-your-algorithm",
+      "title": "Meta's Your Algorithm Lets Users Type Feed Preferences",
+      "titleUr": null,
+      "dek": "Meta's Your Algorithm lets people customize Facebook feed and Reels by typing plain-language requests, and the company says recommendations update in the same session.",
+      "category": "ai",
+      "image": "643.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "TechCrunch AI",
+          "tier": 2
+        },
+        {
+          "name": "The Verge AI",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-14T13:14:05.871Z",
+      "tags": [
+        "Facebook",
+        "Meta",
+        "Your Algorithm",
+        "Instagram",
+        "Threads",
+        "Dear Algo",
+        "Reels",
+        "Meta AI"
+      ]
+    },
+    {
+      "id": 689,
+      "slug": "openai-engineer-arrested-hidden-recorder",
+      "title": "OpenAI engineer arrested; complaint unsealed Oct 13",
+      "titleUr": null,
+      "dek": "The OpenAI engineer arrested by the FBI is accused of hiding a roughly $14 audio recorder in an executive conference room and faces up to five years in prison.",
+      "category": "ai",
+      "image": "689.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "TechJuice AI",
+          "tier": 2
+        },
+        {
+          "name": "The Verge AI",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-14T11:31:05.000Z",
+      "tags": [
+        "Abdulrahman Alfozan",
+        "OpenAI",
+        "FBI",
+        "Kash Patel",
+        "Alex G. Tse",
+        "San Francisco",
+        "Seeed Xiao ESP32-S3"
+      ]
+    }
+  ],
+  "rates": [
+    {
+      "series": "usd_interbank",
+      "value": 276.98,
+      "previous": 276.88,
+      "unit": "PKR",
+      "source": "exchangerate-api.com (mid-market)",
+      "observedAt": "2026-10-16T19:05:30.472Z"
+    },
+    {
+      "series": "gold_24k_tola",
+      "value": 432722,
+      "previous": 433023,
+      "unit": "PKR/tola",
+      "source": "International spot × PKR (estimate)",
+      "observedAt": "2026-10-16T21:05:30.253Z"
+    },
+    {
+      "series": "petrol_super",
+      "value": 386.3,
+      "previous": 390.23,
+      "unit": "PKR/litre",
+      "source": "Govt notification as reported by 2+ outlets",
+      "observedAt": "2026-10-16T18:35:30.401Z"
+    }
+  ]
+}

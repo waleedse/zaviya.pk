@@ -32,6 +32,23 @@ export function cleanTags(tags: string[]): string[] {
   return tags.filter((t) => t.trim() && !outlet.test(t.trim()))
 }
 
+const NOT_A_SOURCE_HOST = /(^|\.)(google\.com|googleusercontent\.com|x\.com|twitter\.com|instagram\.com|facebook\.com|fb\.com|youtube\.com|youtu\.be|tiktok\.com|t\.co)$/i
+
+/** Only an outlet's own pages are sources: Google News redirects and social posts are not (ZAV-56). */
+export function isOutletUrl(url: string): boolean {
+  try {
+    return !NOT_A_SOURCE_HOST.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Sources shown under an article: outlet pages only. If every item is a wrapper, keep them all rather than none. */
+export function articleSources<T extends { url: string }>(items: T[]): T[] {
+  const own = items.filter((i) => isOutletUrl(i.url))
+  return own.length ? own : items
+}
+
 /** Social posts found during discovery are embedded (officially supported), never re-hosted. */
 export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: string }[] {
   const out: { type: 'x' | 'instagram'; url: string }[] = []
@@ -52,8 +69,38 @@ export function embedsFromUrls(urls: string[]): { type: 'x' | 'instagram'; url: 
   return out.slice(0, 3)
 }
 
+/** Shortest English body that may go live: an empty or stub body must stay a draft (ZAV-90). */
+export const MIN_BODY_WORDS = 80
+
+/** Why this written story must not be published, or null when it is fine. */
+export function publishBlocker(write: { en: { bodyMarkdown?: string; whatItMeans?: string } }): string | null {
+  const words = (write.en.bodyMarkdown ?? '').trim().split(/\s+/).filter(Boolean).length
+  if (words < MIN_BODY_WORDS) return `empty or short body (${words} words)`
+  if (!(write.en.whatItMeans ?? '').trim()) return 'empty whatItMeans'
+  return null
+}
+
 /** Redis hash of stories waiting for the editor: articleId → publish job data */
 export const GATE_KEY = 'zaviya:gate'
+
+/**
+ * A rejected gate draft must not kill the story (ZAV-54). If the cluster already has a live article the
+ * cluster keeps pointing at it (the draft had overwritten the link); otherwise it goes back to triaged
+ * so a corrected draft can be written.
+ */
+export async function releaseRejectedDraft(clusterId: string, payload: Pick<PayloadClient, 'request' | 'patchCluster'>): Promise<'kept-live' | 'triaged'> {
+  const live = await payload.request<{ docs: { id: string | number }[] }>(
+    'GET',
+    `/api/articles?where[storyCluster][equals]=${clusterId}&where[_status][equals]=published&sort=-publishedAt&limit=1&depth=0`,
+  )
+  const liveId = live.docs[0]?.id
+  if (liveId !== undefined) {
+    await payload.patchCluster(clusterId, { article: String(liveId) })
+    return 'kept-live'
+  }
+  await payload.patchCluster(clusterId, { status: 'triaged' })
+  return 'triaged'
+}
 
 /** Publish (or drop) a story the editor decided on. Publishing reuses the normal path with its article id. */
 export async function finishGated(
@@ -66,8 +113,8 @@ export async function finishGated(
   await deps.redis.hdel(GATE_KEY, articleId)
   const data = JSON.parse(raw) as Parameters<typeof processPublishJob>[0]
   if (action === 'reject') {
-    await deps.payload.patchCluster(data.clusterId, { status: 'rejected' }).catch(() => undefined)
-    logger.info({ articleId }, 'editor rejected the story')
+    const outcome = await releaseRejectedDraft(data.clusterId, deps.payload).catch(() => undefined)
+    logger.info({ articleId, outcome }, 'editor rejected the story')
     return true
   }
   // Approved text draft: make its image and cards now; the media step then publishes it
@@ -139,6 +186,14 @@ export async function processPublishJob(
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
 
+  // Never publish an empty or stub article (ZAV-90): it stays a draft and the cluster goes back to triaged.
+  const blocker = triage?.isUpdateOfExisting ? null : publishBlocker(data.write)
+  if (blocker) {
+    logger.warn({ clusterId: data.clusterId, articleId: data.articleId, blocker }, 'publish blocked: article text is incomplete')
+    await deps.payload.patchCluster(data.clusterId, { status: 'triaged' }).catch(() => undefined)
+    return null
+  }
+
   // Stale story (ZAV-89): newest source older than 48h means no publish; the cluster is rejected with the reason.
   if (!triage?.isUpdateOfExisting && cluster.items.length && !hasFreshSource(cluster.items)) {
     logger.warn({ clusterId: data.clusterId, articleId: data.articleId }, 'publish blocked: stale sources')
@@ -176,7 +231,7 @@ export async function processPublishJob(
   }
 
   const category = triage?.category ?? 'pakistan'
-  const sources = cluster.items.map((i) => ({
+  const sources = articleSources(cluster.items).map((i) => ({
     name: publisherName(i.title, i.source.name),
     url: i.url,
     tier: i.source.trustTier,

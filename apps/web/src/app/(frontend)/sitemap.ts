@@ -35,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entries.push({ url: `${siteUrl}/namaz-timings/${c.slug}`, changeFrequency: 'daily', priority: 0.8 })
   }
   entries.push({ url: `${siteUrl}/baby-names`, changeFrequency: 'weekly', priority: 0.8 })
+  entries.push({ url: `${siteUrl}/prize-bond-schedule`, changeFrequency: 'weekly', priority: 0.8 })
 
   const pages = await payload.find({ collection: 'pages', limit: 50, depth: 0 })
   for (const p of pages.docs) {

@@ -4,14 +4,23 @@ import { socialIdempotencyKey } from '../lib/idempotency.js'
 import { logger } from '../logger.js'
 import { pickCard, withLink } from './link.js'
 
+type PublishingLimit = { data?: { quota_usage?: number; config?: { quota_total?: number } }[] }
+
+/**
+ * Room left in Instagram's rolling 24 h API publishing quota (100 posts for this account). `config` only comes back
+ * when asked for in `fields`; without it the old code assumed 50 and stopped posting at the 51st post of the day.
+ */
+export function hasPublishingRoom(data: PublishingLimit): boolean {
+  const usage = data.data?.[0]?.quota_usage ?? 0
+  const total = data.data?.[0]?.config?.quota_total ?? 100
+  return usage < total
+}
+
 async function checkPublishingLimit(igUserId: string, token: string): Promise<boolean> {
-  const url = `https://graph.facebook.com/v21.0/${igUserId}/content_publishing_limit?access_token=${encodeURIComponent(token)}`
+  const url = `https://graph.facebook.com/v21.0/${igUserId}/content_publishing_limit?fields=config,quota_usage&access_token=${encodeURIComponent(token)}`
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
   if (!res.ok) return true
-  const data = (await res.json()) as { data?: { quota_usage?: number; config?: { quota_total?: number } }[] }
-  const usage = data.data?.[0]?.quota_usage ?? 0
-  const total = data.data?.[0]?.config?.quota_total ?? 50
-  return usage < total
+  return hasPublishingRoom((await res.json()) as PublishingLimit)
 }
 
 export async function postInstagram(

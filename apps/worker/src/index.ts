@@ -42,6 +42,9 @@ async function main() {
       if (runtime) await resumeAll(runtime)
     },
     getStats: async () => (runtime ? getQueueStats(runtime) : 'starting…'),
+    skipVideo: async (key) => {
+      if (runtime) await runtime.redis.set(`video:skip:${key}`, '1', 'EX', 6 * 3600)
+    },
   })
 
   runtime = await createWorkerRuntime(env, bridge, telegram)
