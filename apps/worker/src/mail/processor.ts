@@ -1,4 +1,4 @@
-import { authenticateSender } from './auth.js'
+import { authenticateSender, type AuthOptions } from './auth.js'
 import { confirmRetract, executeAction, type ExecDeps, type MailContext } from './execute.js'
 import type { Kv } from './kv.js'
 import { parseMail } from './mime.js'
@@ -15,8 +15,8 @@ export interface ProcessorDeps {
   mailer: Mailer
   kv: Kv
   exec: ExecDeps
-  /** Allowed sender addresses and our host, for the authentication rule */
-  auth: { host: string; allowed: string[] }
+  /** Allowed sender addresses and the DKIM key lookup, for the authentication rule */
+  auth: AuthOptions
   router: Parameters<typeof understandWithModel>[0]
   notifyAdmin: (text: string) => Promise<void>
   log: (line: Record<string, unknown>, msg: string) => void
@@ -70,7 +70,7 @@ export async function processMailbox(deps: ProcessorDeps): Promise<RunSummary> {
       }
 
       // 2. Who is this? Anything that fails is silent: no reply (no backscatter)
-      const auth = authenticateSender(mail, deps.auth)
+      const auth = await authenticateSender(raw, mail, deps.auth)
       if (!auth.ok) {
         await markSeen()
         sum.rejected++

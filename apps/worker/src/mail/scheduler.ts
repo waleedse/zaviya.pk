@@ -40,7 +40,7 @@ export function buildDeps(
     box: parts.box,
     mailer: smtpMailer(account),
     kv: parts.kv,
-    auth: { host: env.MAIL_HOST, allowed: allowedSenders(env) },
+    auth: { allowed: allowedSenders(env) },
     router: parts.router,
     notifyAdmin: parts.notifyAdmin,
     log: (line, msg) => logger.info({ mailcmd: line }, msg),

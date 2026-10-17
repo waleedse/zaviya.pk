@@ -24,10 +24,10 @@ describe('parseMail', () => {
     expect(m.subject).toBe('شام کی ویڈیو')
   })
 
-  it('keeps every Received line in order, topmost first', () => {
-    const rec = parseMail(gmail()).headers.filter((h) => h.name === 'received')
-    expect(rec).toHaveLength(2)
-    expect(rec[0]!.value).toContain('LMTP')
+  it('keeps headers in file order, topmost first (LMTP hop, then the DKIM signature)', () => {
+    const names = parseMail(gmail()).headers.map((h) => h.name)
+    expect(names[0]).toBe('received')
+    expect(names.indexOf('dkim-signature')).toBeLessThan(names.indexOf('from'))
   })
 })
 

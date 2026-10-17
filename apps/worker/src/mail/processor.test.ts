@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AUTH_HOP, plain, spoofedFromOutside } from './fixtures.js'
+import { plain, spoofedFromOutside, TEST_KEY_LOOKUP } from './fixtures.js'
 import { makeExec } from './harness.js'
 import { processMailbox, type ProcessorDeps } from './processor.js'
 import { buildMessage } from './transport.js'
@@ -21,7 +21,7 @@ function setup(mails: Record<number, string>, llm: 'ok-status' | 'down' | { acti
     return { content: JSON.stringify({ actions, reply_summary: 'sum' }), toolCalls: [] }
   })
   const notify = vi.fn(async () => {})
-  const deps: ProcessorDeps = { box, mailer, kv: h.kv, exec: h.exec, auth: { host: 'mail.zaviya.pk', allowed: ['waleed@zaviya.pk'] }, router: { chat } as never, notifyAdmin: notify, log: () => {} }
+  const deps: ProcessorDeps = { box, mailer, kv: h.kv, exec: h.exec, auth: { allowed: ['waleed@zaviya.pk'], lookup: TEST_KEY_LOOKUP }, router: { chat } as never, notifyAdmin: notify, log: () => {} }
   return { deps, box, sent, chat, notify, seen, h }
 }
 
@@ -144,4 +144,3 @@ describe('buildMessage', () => {
     expect(Buffer.from(raw.split('\r\n\r\n')[1]!.replace(/\r\n/g, ''), 'base64').toString()).toBe('خیریت\n.dot')
   })
 })
-void AUTH_HOP
