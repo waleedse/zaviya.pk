@@ -683,6 +683,21 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Email command "set cap": the settings global is admin-only, so the bot changes one platform's cap here
+    path: '/pipeline/daily-cap',
+    method: 'put',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ platform: z.enum(['facebook', 'instagram', 'x']), perDay: z.number().int().min(0).max(100) }))
+      if ('error' in parsed) return parsed.error
+      const settings = await req.payload.findGlobal({ slug: 'settings', overrideAccess: true })
+      const dailyCaps = { ...(settings.dailyCaps ?? {}), [parsed.data.platform]: parsed.data.perDay }
+      await req.payload.updateGlobal({ slug: 'settings', data: { dailyCaps }, overrideAccess: true })
+      return json({ ok: true, dailyCaps })
+    },
+  },
+  {
     path: '/pipeline/metrics/daily',
     method: 'post',
     handler: async (req) => {

@@ -74,14 +74,8 @@ export function createConnection(env: WorkerEnv): ConnectionOptions {
   return { url: env.REDIS_URL, maxRetriesPerRequest: null }
 }
 
-export async function createWorkerRuntime(
-  env: WorkerEnv,
-  bridge: BridgeServer,
-  telegram: TelegramAlerts,
-): Promise<WorkerRuntime> {
-  const connection = createConnection(env)
-  const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
-  const router = new LLMRouter({
+export function buildRouter(env: WorkerEnv): LLMRouter {
+  return new LLMRouter({
     ollamaUrl: env.OLLAMA_URL,
     geminiApiKey: env.GEMINI_API_KEY,
     localModel: env.LOCAL_MODEL,
@@ -92,6 +86,16 @@ export async function createWorkerRuntime(
     subscriptionChain: subscriptionChain(env),
     embedder: embedder(env),
   })
+}
+
+export async function createWorkerRuntime(
+  env: WorkerEnv,
+  bridge: BridgeServer,
+  telegram: TelegramAlerts,
+): Promise<WorkerRuntime> {
+  const connection = createConnection(env)
+  const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
+  const router = buildRouter(env)
 
   try {
     const settings = await payload.getSettings()

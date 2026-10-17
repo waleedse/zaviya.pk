@@ -12,6 +12,7 @@ import {
   type WorkerRuntime,
 } from './queues.js'
 import { startHeartbeat } from './heartbeat.js'
+import { startMailCommands } from './mail/scheduler.js'
 
 async function main() {
   const env = loadConfig()
@@ -50,6 +51,11 @@ async function main() {
   runtime = await createWorkerRuntime(env, bridge, telegram)
   await scheduleIngestSources(runtime)
   const heartbeatTimer = startHeartbeat(runtime)
+  // Off unless MAIL_COMMANDS_ENABLED=true (and the ops@ login is set)
+  const stopMailCommands = await startMailCommands(runtime).catch((e) => {
+    logger.warn({ err: e }, 'mail commands failed to start')
+    return null
+  })
 
   if (telegram.bot) {
     telegram.bot.start({ onStart: () => logger.info('Telegram bot started') }).catch((e) => {
@@ -61,6 +67,7 @@ async function main() {
     logger.info({ signal }, 'shutting down')
     clearInterval(heartbeatTimer)
     telegram.bot?.stop()
+    await stopMailCommands?.()
     bridge.stop()
     if (runtime) await shutdownRuntime(runtime)
     process.exit(0)

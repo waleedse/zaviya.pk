@@ -1,0 +1,28 @@
+Return-Path: <seo@zaviya.pk>
+Delivered-To: ops@zaviya.pk
+Received: from mail.zaviya.pk
+	by mail.zaviya.pk with LMTP
+	id S3tYIevm02qQXAUAwOKRIw
+	(envelope-from <seo@zaviya.pk>)
+	for <ops@zaviya.pk>; Sat, 17 Oct 2026 23:21:47 +0200
+From: Zaviya SEO <seo@zaviya.pk>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=zaviya.pk; s=mail;
+	t=1792272107;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	 to:to:cc:mime-version:mime-version:content-type:content-type:
+	 content-transfer-encoding:content-transfer-encoding;
+	bh=IyaxnNVojfVZ4UCxZop+Cn114xGCatC8g0KbjmZCfx0=;
+	b=cy82y6CEcS8XYFWI4Sa0KvRBjWXW3kS5/B0idMvZED2qlMIKuXuaGefTYtbfjMX6E32I+N
+	Xt3V/Stu162ANCAN3pn7mahUOdKi1zqyPxl5jCcYh9wrLj+oEdhBJrf1/eUgcYQd/QikQW
+	6nicuCrqKkzaCWrrDvCSXJH/jGR6eKk7mPFdyh5K5gvtRtVgqPQBupGW5mvUvZytBOAP9o
+	OpLLv/MIJCnbkKTwZqFC8fu+TmiUFLvn2IoYWAeXi33jiDJGsKhjnI5fzi6/8iB7kVaAZ9
+	UAE9rhp8jWxvvhAT91N1DhPTzB2dM1XjEy7kkSXXNKrnKeyYXFbySL5S5mO3Jg==
+To: <ops@zaviya.pk>
+Subject: status
+Date: Sat, 17 Oct 2026 21:21:44 +0000
+Message-ID: <29851320-7b8d-4c62-9f65-1e2f944a37bc@zaviya.pk>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+c3RhdHVzCg==
