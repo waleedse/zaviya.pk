@@ -187,6 +187,18 @@ export function organizationId(): string {
   return `${siteUrl()}/#organization`
 }
 
+/** Official Zaviya profiles (Waleed, 17 Oct); SOCIAL_PROFILE_URLS (comma-separated) replaces them when set. */
+export const OFFICIAL_PROFILE_URLS = [
+  'https://x.com/zaviyapk',
+  'https://www.facebook.com/profile.php?id=61595098214182',
+  'https://www.instagram.com/zaviyapk/',
+]
+
+export function socialProfileUrls(env: string | undefined = process.env.SOCIAL_PROFILE_URLS): string[] {
+  const set = (env ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u))
+  return set.length ? set : OFFICIAL_PROFILE_URLS
+}
+
 export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
@@ -205,7 +217,7 @@ export function organizationJsonLd() {
     correctionsPolicy: absoluteUrl('/p/corrections'),
     contactPoint: { '@type': 'ContactPoint', contactType: 'editorial', url: absoluteUrl('/p/contact'), availableLanguage: ['English', 'Urdu'] },
     // Official profiles only (comma-separated in SOCIAL_PROFILE_URLS); they tie the brand together for Google
-    sameAs: (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)),
+    sameAs: socialProfileUrls(),
   }
 }
 
