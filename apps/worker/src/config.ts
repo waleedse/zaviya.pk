@@ -89,6 +89,18 @@ const envSchema = z.object({
   CHROMIUM_PATH: optionalStr,
   BRIDGE_TOKEN: optionalStr,
   GOLD_API_URL: optionalUrl,
+  /** Email commands: Waleed mails ops@zaviya.pk and the worker carries it out (everything below is inert unless enabled) */
+  MAIL_COMMANDS_ENABLED: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
+  OPS_MAIL_USER: optionalStr,
+  OPS_MAIL_PASSWORD: optionalStr,
+  MAIL_HOST: z.string().default('mail.zaviya.pk'),
+  /** TEST ONLY: extra sender addresses accepted besides waleed@zaviya.pk (comma separated) */
+  MAIL_COMMANDS_ALLOW_FROM: optionalStr,
+  /** Hand-offs to the agents are Linear issues */
+  LINEAR_API_KEY: optionalStr,
+  LINEAR_TEAM_KEY: z.string().default('ZAV'),
+  /** Slot list of the video service (same value as the video container's) */
+  VIDEO_SLOTS: optionalStr,
   WORKER_VERSION: z.string().default('0.1.0'),
   LOG_LEVEL: optionalStr,
 })
@@ -112,6 +124,7 @@ export function integrationStatus(env: WorkerEnv) {
     xReader: Boolean(env.X_BEARER_TOKEN),
     bridge: Boolean(env.BRIDGE_TOKEN),
     goldRates: Boolean(env.GOLD_API_URL),
+    mailCommands: env.MAIL_COMMANDS_ENABLED && Boolean(env.OPS_MAIL_USER && env.OPS_MAIL_PASSWORD),
   }
 }
 
