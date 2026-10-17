@@ -1,0 +1,240 @@
+{
+  "edition": "evening",
+  "date": "2026-10-16T21:21:15.446Z",
+  "format": "headlines30",
+  "topic": null,
+  "stories": [
+    {
+      "id": 1050,
+      "slug": "pakistan-weekly-inflation-slips-0-04-percent",
+      "title": "Five killed as flood waters hit Swat valley villages",
+      "titleUr": null,
+      "dek": null,
+      "category": "business",
+      "image": "1050.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T17:17:50.111Z",
+      "tags": [
+        "Pakistan Bureau of Statistics",
+        "Sensitive Price Indicator",
+        "Pakistan weekly inflation",
+        "Petrol prices",
+        "Tomatoes",
+        "Sona urea",
+        "Cement prices"
+      ],
+      "_test": true
+    },
+    {
+      "id": 1040,
+      "slug": "foreign-investment-in-pakistan-2026-fdi-up-18-sept",
+      "title": "Pakistan's net FDI reaches $720m in 3MFY27, up 20%",
+      "titleUr": null,
+      "dek": "Net foreign direct investment rose 18% year-on-year to $219 million in September, while the first quarter of FY27 reached $720 million, up 20%.",
+      "category": "business",
+      "image": "1040.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T16:16:11.912Z",
+      "tags": [
+        "State Bank of Pakistan",
+        "Foreign Direct Investment",
+        "FY27",
+        "Canada",
+        "United Kingdom",
+        "mining",
+        "financial business"
+      ]
+    },
+    {
+      "id": 1033,
+      "slug": "ihc-seeks-pti-response-imran-khan-x-account-case",
+      "title": "Imran Khan X account case: IHC gives PTI more time to reply",
+      "titleUr": null,
+      "dek": "The Imran Khan X account case, brought by Ghulam Murtaza, seeks a ban on the official account, and the party says it does not claim ownership.",
+      "category": "pakistan",
+      "image": "1033.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T14:43:10.141Z",
+      "tags": [
+        "Imran Khan",
+        "Pakistan Tehreek-e-Insaf",
+        "Islamabad High Court",
+        "Gohar Ali Khan",
+        "Ghulam Murtaza",
+        "Adiala Jail",
+        "X (social media platform)"
+      ]
+    },
+    {
+      "id": 1031,
+      "slug": "hrcp-minorities-rights-violations-despite-new-laws",
+      "title": "HRCP: minorities still face rights abuses despite new laws",
+      "titleUr": null,
+      "dek": "The commission’s seventh freedom-of-religion report says blasphemy cases linger unresolved, while a new minorities body remains unformed months after Parliament passed the law.",
+      "category": "pakistan",
+      "image": "1031.jpg",
+      "sources": [
+        {
+          "name": "ANI News",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T14:12:55.440Z",
+      "tags": [
+        "HRCP",
+        "religious minorities",
+        "blasphemy laws",
+        "National Commission for Minorities",
+        "Chenab Nagar",
+        "Sheikhupura",
+        "Punjab",
+        "Farah Zia"
+      ]
+    },
+    {
+      "id": 1030,
+      "slug": "raast-payment-system-306-percent-digital-points-cashless-pakistan",
+      "title": "Raast payment system drives 306% digital points rise",
+      "titleUr": null,
+      "dek": "A Finance Ministry document told the National Assembly that the Raast payment system and Cashless Pakistan push lifted active digital commerce points to 2.03 million by June 2026.",
+      "category": "tech-telecom",
+      "image": "1030.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T13:57:49.335Z",
+      "tags": [
+        "Raast",
+        "Cashless Pakistan",
+        "State Bank of Pakistan",
+        "Finance Ministry",
+        "National Assembly",
+        "Benazir Income Support Programme",
+        "Digital payments",
+        "QR payments"
+      ]
+    },
+    {
+      "id": 1016,
+      "slug": "pakistan-brain-drain-statistics-90000-professionals-overseas",
+      "title": "Over 90,000 professionals leave Pakistan for overseas jobs",
+      "titleUr": null,
+      "dek": "Pakistan brain drain statistics show more than 90,000 managers, engineers, doctors and other tracked professionals took overseas jobs across 2024, 2025 and 2026 so far.",
+      "category": "education-jobs",
+      "image": "1016.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T10:44:04.331Z",
+      "tags": [
+        "Pakistan brain drain",
+        "Overseas Employment",
+        "Pakistani professionals",
+        "doctors",
+        "engineers",
+        "managers",
+        "IT workers",
+        "teachers"
+      ]
+    }
+  ],
+  "rates": [
+    {
+      "series": "usd_interbank",
+      "value": 276.98,
+      "previous": 276.88,
+      "unit": "PKR",
+      "source": "exchangerate-api.com (mid-market)",
+      "observedAt": "2026-10-16T19:05:30.472Z"
+    },
+    {
+      "series": "gold_24k_tola",
+      "value": 432722,
+      "previous": 433023,
+      "unit": "PKR/tola",
+      "source": "International spot × PKR (estimate)",
+      "observedAt": "2026-10-16T21:05:30.253Z"
+    },
+    {
+      "series": "petrol_super",
+      "value": 386.3,
+      "previous": 390.23,
+      "unit": "PKR/litre",
+      "source": "Govt notification as reported by 2+ outlets",
+      "observedAt": "2026-10-16T18:35:30.401Z"
+    }
+  ]
+}

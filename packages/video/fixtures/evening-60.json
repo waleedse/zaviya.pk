@@ -1,0 +1,440 @@
+{
+  "edition": "evening",
+  "date": "2026-10-16T21:21:15.446Z",
+  "format": "roundup60",
+  "topic": null,
+  "stories": [
+    {
+      "id": 1050,
+      "slug": "pakistan-weekly-inflation-slips-0-04-percent",
+      "title": "Pakistan weekly inflation dips 0.04pc, annual rate 11.38%",
+      "titleUr": null,
+      "dek": "Tomatoes fell 23.05% in the week, but wheat flour, chicken and pulses became dearer, and year-on-year SPI inflation stayed high at 11.38%, the statistics bureau said.",
+      "category": "business",
+      "image": "1050.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T17:17:50.111Z",
+      "tags": [
+        "Pakistan Bureau of Statistics",
+        "Sensitive Price Indicator",
+        "Pakistan weekly inflation",
+        "Petrol prices",
+        "Tomatoes",
+        "Sona urea",
+        "Cement prices"
+      ]
+    },
+    {
+      "id": 1040,
+      "slug": "foreign-investment-in-pakistan-2026-fdi-up-18-sept",
+      "title": "Pakistan's net FDI reaches $720m in 3MFY27, up 20%",
+      "titleUr": null,
+      "dek": "Net foreign direct investment rose 18% year-on-year to $219 million in September, while the first quarter of FY27 reached $720 million, up 20%.",
+      "category": "business",
+      "image": "1040.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T16:16:11.912Z",
+      "tags": [
+        "State Bank of Pakistan",
+        "Foreign Direct Investment",
+        "FY27",
+        "Canada",
+        "United Kingdom",
+        "mining",
+        "financial business"
+      ]
+    },
+    {
+      "id": 1033,
+      "slug": "ihc-seeks-pti-response-imran-khan-x-account-case",
+      "title": "Imran Khan X account case: IHC gives PTI more time to reply",
+      "titleUr": null,
+      "dek": "The Imran Khan X account case, brought by Ghulam Murtaza, seeks a ban on the official account, and the party says it does not claim ownership.",
+      "category": "pakistan",
+      "image": "1033.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Google Trends — Pakistan daily",
+          "tier": 3
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T14:43:10.141Z",
+      "tags": [
+        "Imran Khan",
+        "Pakistan Tehreek-e-Insaf",
+        "Islamabad High Court",
+        "Gohar Ali Khan",
+        "Ghulam Murtaza",
+        "Adiala Jail",
+        "X (social media platform)"
+      ]
+    },
+    {
+      "id": 1031,
+      "slug": "hrcp-minorities-rights-violations-despite-new-laws",
+      "title": "HRCP: minorities still face rights abuses despite new laws",
+      "titleUr": null,
+      "dek": "The commission’s seventh freedom-of-religion report says blasphemy cases linger unresolved, while a new minorities body remains unformed months after Parliament passed the law.",
+      "category": "pakistan",
+      "image": "1031.jpg",
+      "sources": [
+        {
+          "name": "ANI News",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T14:12:55.440Z",
+      "tags": [
+        "HRCP",
+        "religious minorities",
+        "blasphemy laws",
+        "National Commission for Minorities",
+        "Chenab Nagar",
+        "Sheikhupura",
+        "Punjab",
+        "Farah Zia"
+      ]
+    },
+    {
+      "id": 1030,
+      "slug": "raast-payment-system-306-percent-digital-points-cashless-pakistan",
+      "title": "Raast payment system drives 306% digital points rise",
+      "titleUr": null,
+      "dek": "A Finance Ministry document told the National Assembly that the Raast payment system and Cashless Pakistan push lifted active digital commerce points to 2.03 million by June 2026.",
+      "category": "tech-telecom",
+      "image": "1030.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T13:57:49.335Z",
+      "tags": [
+        "Raast",
+        "Cashless Pakistan",
+        "State Bank of Pakistan",
+        "Finance Ministry",
+        "National Assembly",
+        "Benazir Income Support Programme",
+        "Digital payments",
+        "QR payments"
+      ]
+    },
+    {
+      "id": 1028,
+      "slug": "aurangzeb-sbp-fitch-bangkok-pakistan-credit-outlook",
+      "title": "Finance minister meets Fitch in Bangkok on economy",
+      "titleUr": null,
+      "dek": "In Bangkok during the 2026 World Bank–IMF meetings, Pakistan’s finance leadership and central bank chief outlined market access, buffers and reform plans while asking what a move toward BB would require.",
+      "category": "business",
+      "image": "1028.jpg",
+      "sources": [
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        },
+        {
+          "name": "| Associated Press Of Pakistan",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T13:27:38.908Z",
+      "tags": [
+        "Muhammad Aurangzeb",
+        "Fitch Ratings",
+        "State Bank of Pakistan",
+        "IMF",
+        "Bangkok",
+        "sovereign credit rating",
+        "BB rating"
+      ]
+    },
+    {
+      "id": 1026,
+      "slug": "na-passes-motion-parliamentary-committee-electoral-reforms",
+      "title": "Parliamentary committee on electoral reforms: NA passes motion",
+      "titleUr": null,
+      "dek": "The National Assembly approved a motion for a parliamentary committee on electoral reforms with members from both Houses, tasked to propose free, fair and transparent polls.",
+      "category": "pakistan",
+      "image": "1026.jpg",
+      "sources": [
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T13:00:14.654Z",
+      "tags": [
+        "National Assembly",
+        "electoral reforms",
+        "Dr Tariq Fazal Chaudhary",
+        "Speaker of the National Assembly",
+        "Senate",
+        "Rule 244B",
+        "Islamabad"
+      ]
+    },
+    {
+      "id": 1025,
+      "slug": "pm-shehbaz-rejects-lpg-auction-plan-state-firms",
+      "title": "Shehbaz Sharif stops state LPG auctions after August bids",
+      "titleUr": null,
+      "dek": "PM Shehbaz rejects LPG auction proposals until a full policy and legal framework exist, after August bids that risked about Rs900 more per domestic cylinder.",
+      "category": "business",
+      "image": "1025.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T12:45:04.530Z",
+      "tags": [
+        "Shehbaz Sharif",
+        "LPG",
+        "Petroleum Division",
+        "OGRA",
+        "OGDCL",
+        "Pakistan Petroleum Limited",
+        "Gwadar",
+        "Port Qasim"
+      ]
+    },
+    {
+      "id": 1022,
+      "slug": "fo-condemns-indian-defence-minister-statement-pakistan",
+      "title": "Foreign Office rejects Indian defence minister statement threat",
+      "titleUr": null,
+      "dek": "Pakistan’s Foreign Office rejected an Indian defence minister statement warning of a larger strike, calling the remarks reckless and a risk to South Asian peace.",
+      "category": "pakistan",
+      "image": "1022.jpg",
+      "sources": [
+        {
+          "name": "Business Recorder",
+          "tier": 2
+        },
+        {
+          "name": "Business Recorder",
+          "tier": 2
+        },
+        {
+          "name": "The Express Tribune",
+          "tier": 2
+        },
+        {
+          "name": "Geo English",
+          "tier": 2
+        },
+        {
+          "name": "UA.NEWS",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T11:59:43.961Z",
+      "tags": [
+        "Foreign Office",
+        "Rajnath Singh",
+        "Sajjad Haider Khan",
+        "Pakistan",
+        "India",
+        "South Asia",
+        "defence"
+      ]
+    },
+    {
+      "id": 1016,
+      "slug": "pakistan-brain-drain-statistics-90000-professionals-overseas",
+      "title": "Over 90,000 professionals leave Pakistan for overseas jobs",
+      "titleUr": null,
+      "dek": "Pakistan brain drain statistics show more than 90,000 managers, engineers, doctors and other tracked professionals took overseas jobs across 2024, 2025 and 2026 so far.",
+      "category": "education-jobs",
+      "image": "1016.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T10:44:04.331Z",
+      "tags": [
+        "Pakistan brain drain",
+        "Overseas Employment",
+        "Pakistani professionals",
+        "doctors",
+        "engineers",
+        "managers",
+        "IT workers",
+        "teachers"
+      ]
+    },
+    {
+      "id": 1003,
+      "slug": "pakistan-school-collapse-peshawar-inspections",
+      "title": "Pakistan school collapse: relatives claim warnings were ignored",
+      "titleUr": null,
+      "dek": "AP reports 34 children and a teacher died in the Peshawar school collapse; Lady Reading Hospital told Dawn the toll is 33. Relatives say warnings were ignored; KP ordered private-school inspections.",
+      "category": "pakistan",
+      "image": "1003.jpg",
+      "sources": [
+        {
+          "name": "AP News",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T09:39:48.021Z",
+      "tags": [
+        "Pakistan school collapse",
+        "Khyber Pakhtunkhwa",
+        "Peshawar",
+        "Al-Khair school",
+        "Mohammad Khan",
+        "Samar Haroon Bilour",
+        "Dir Colony",
+        "School building inspections"
+      ]
+    },
+    {
+      "id": 1064,
+      "slug": "fakhar-zaman-eyes-last-shot-2027-world-cup",
+      "title": "Fakhar Zaman sets sights on final 2027 World Cup glory",
+      "titleUr": null,
+      "dek": "Fakhar Zaman news from Rawalpindi: the 36-year-old says Pakistan is serious about ending its long ICC trophy drought ahead of the 2027 World Cup.",
+      "category": "cricket",
+      "image": "1064.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "normal",
+      "publishedAt": "2026-10-16T21:19:10.570Z",
+      "tags": [
+        "Fakhar Zaman",
+        "Pakistan cricket",
+        "2027 World Cup",
+        "ODI tri-series",
+        "Rawalpindi Cricket Stadium",
+        "Babar Azam",
+        "Shaheen Shah Afridi",
+        "Gaddafi Stadium"
+      ]
+    }
+  ],
+  "rates": [
+    {
+      "series": "usd_interbank",
+      "value": 276.98,
+      "previous": 276.88,
+      "unit": "PKR",
+      "source": "exchangerate-api.com (mid-market)",
+      "observedAt": "2026-10-16T19:05:30.472Z"
+    },
+    {
+      "series": "gold_24k_tola",
+      "value": 432722,
+      "previous": 433023,
+      "unit": "PKR/tola",
+      "source": "International spot × PKR (estimate)",
+      "observedAt": "2026-10-16T21:05:30.253Z"
+    },
+    {
+      "series": "petrol_super",
+      "value": 386.3,
+      "previous": 390.23,
+      "unit": "PKR/litre",
+      "source": "Govt notification as reported by 2+ outlets",
+      "observedAt": "2026-10-16T18:35:30.401Z"
+    }
+  ]
+}

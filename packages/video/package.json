@@ -1,0 +1,48 @@
+{
+  "name": "@zaviya/video",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "fixtures": "tsx scripts/fetch-fixtures.ts",
+    "audio": "tsx scripts/make-audio.ts",
+    "studio": "remotion studio src/remotion/index.ts",
+    "samples": "tsx scripts/render-samples.ts",
+    "qa": "tsx scripts/qa.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "bundle": "tsx scripts/bundle.ts"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/noto-nastaliq-urdu": "5.3.0",
+    "@fontsource/space-mono": "5.3.0",
+    "@fontsource/unbounded": "5.3.0",
+    "@remotion/bundler": "4.0.536",
+    "@remotion/cli": "4.0.536",
+    "@remotion/fonts": "4.0.536",
+    "@remotion/layout-utils": "4.0.536",
+    "@remotion/renderer": "4.0.536",
+    "@remotion/transitions": "4.0.536",
+    "@zaviya/shared": "workspace:*",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "remotion": "4.0.536",
+    "sharp": "0.35.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "4.23.15",
+    "typescript": "5.7.3",
+    "vitest": "4.0.18"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./render": "./src/render.ts",
+    "./qa": "./src/qa.ts"
+  }
+}

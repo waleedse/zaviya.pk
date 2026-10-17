@@ -3,7 +3,7 @@
 #   1. build the web + worker images for the release (the live site keeps serving)
 #   2. start web on the idle colour (3100 blue / 3101 green) and wait until it is healthy
 #   3. point nginx at it (graceful reload), then stop the old colour
-#   4. recreate the worker and agents on the new images (no user-facing traffic)
+#   4. recreate the worker, agents and video service on the new images (no user-facing traffic)
 # If the new web never gets healthy, nginx is not touched and the old colour stays live.
 #   bash infra/scripts/deploy.sh v2026.10.12-1
 set -euo pipefail
@@ -57,7 +57,7 @@ if [ "${FREE_GB:-0}" -lt 12 ]; then
   exit 1
 fi
 web "$NEXT" "$RELEASE" build
-stack "$RELEASE" build worker agents
+stack "$RELEASE" build worker agents video
 
 web "$NEXT" "$RELEASE" up -d --force-recreate
 if ! web_healthy "$NEXT_PORT"; then
@@ -74,7 +74,7 @@ web "$LIVE" "${PREVIOUS:-latest}" down --remove-orphans 2>/dev/null || true
 # One-time cleanup: the web service used to live in the main stack
 docker rm -f zaviya-web-1 >/dev/null 2>&1 || true
 
-stack "$RELEASE" up -d --remove-orphans postgres redis worker agents
+stack "$RELEASE" up -d --remove-orphans postgres redis worker agents video
 for _ in $(seq 1 20); do
   [ "$(docker inspect -f '{{.State.Running}}' zaviya-worker-1 2>/dev/null)" = true ] && break
   sleep 3
@@ -84,7 +84,7 @@ echo "$RELEASE" > "$STATE/current"
 echo "$NEXT" > "$STATE/colour"
 echo "$(date -u +%FT%TZ) $RELEASE $SHA ok ($NEXT)" >> "$STATE/history.log"
 # Each release is several GB: keep only this release and the previous one (for rollback).
-for repo in zaviya-web zaviya-worker zaviya-agents; do
+for repo in zaviya-web zaviya-worker zaviya-agents zaviya-video; do
   docker images "$repo" --format '{{.Tag}}' | while read -r tag; do
     [ "$tag" = "$RELEASE" ] || [ "$tag" = "$PREVIOUS" ] || docker rmi "$repo:$tag" >/dev/null 2>&1 || true
   done
