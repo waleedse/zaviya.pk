@@ -47,6 +47,10 @@ export interface RunOptions {
   dry?: boolean
   /** ignore `video:done:<key>` (the per-platform `video:posted` claims still apply) */
   force?: boolean
+  /** breaking flash: the one article to use */
+  articleId?: number
+  /** minutes between preview and posting (default: the configured veto) */
+  vetoMin?: number
 }
 
 export interface Outcome {
@@ -127,6 +131,7 @@ export async function runEdition(deps: JobDeps, slot: Slot, opts: RunOptions = {
       topic: slot.topic,
       date,
       exclude: slot.edition === 'evening' ? used : undefined,
+      onlyId: opts.articleId,
     })
 
     // 3. photos (a missing or broken photo becomes a category gradient)
@@ -162,7 +167,7 @@ export async function runEdition(deps: JobDeps, slot: Slot, opts: RunOptions = {
   }
 
   // 5. preview
-  const postAt = postAtMs(slot, startedAt, cfg.vetoMin)
+  const postAt = postAtMs(slot, startedAt, opts.vetoMin ?? cfg.vetoMin)
   const targets = cfg.platforms.map((p) => NAMES[p]).join(' + ')
   const hook = timeline.scenes[0]?.kind === 'hook' ? timeline.scenes[0].title.join(' ') : timeline.format
   const caption =
