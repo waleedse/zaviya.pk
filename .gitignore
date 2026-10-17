@@ -12,3 +12,9 @@ coverage
 !.env.example
 apps/web/media
 .secrets/
+
+packages/video/out/
+packages/video/fixtures/images/
+packages/video/public/fixtures-images/
+packages/video/public/audio/*.wav
+packages/video/build/

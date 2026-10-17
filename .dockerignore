@@ -13,3 +13,9 @@
 apps/web/media
 dist
 .git
+# video package: samples, bundles and generated media are rebuilt inside the image
+packages/video/out
+packages/video/build
+packages/video/fixtures/images
+packages/video/public/fixtures-images
+packages/video/public/audio/*.wav

@@ -70,7 +70,34 @@ services:
     # Watchdog + one CLI agent run at a time: keep it small next to the web app
     mem_limit: 1g
 
+  # Daily videos: rendering is CPU heavy, so it lives in its own container with hard limits and can never slow the
+  # news worker. Off until VIDEO_ENABLED=true in compose.env (it just idles). Rollback: VIDEO_ENABLED=false, or
+  # `docker stop zaviya-video-1`. It only SENDS to Telegram (the main worker owns the long poll).
+  video:
+    image: zaviya-video:${RELEASE:-latest}
+    build:
+      context: ..
+      dockerfile: infra/video.Dockerfile
+    restart: unless-stopped
+    env_file: ${ENV_DIR:-../../env}/worker.env
+    environment:
+      PAYLOAD_URL: http://web:3000
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      VIDEO_ENABLED: ${VIDEO_ENABLED:-false}
+      VIDEO_SLOTS: ${VIDEO_SLOTS:-}
+      VIDEO_PLATFORMS: ${VIDEO_PLATFORMS-instagram,facebook}
+      VIDEO_VETO_MIN: ${VIDEO_VETO_MIN:-20}
+    volumes:
+      - videodata:/data/videos
+    cpus: 2
+    mem_limit: 3g
+    depends_on:
+      redis:
+        condition: service_healthy
+
 volumes:
   agentdata:
   pgdata:
   redisdata:
+  videodata:

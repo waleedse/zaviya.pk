@@ -27,8 +27,8 @@ export function SiteFooter({ locale }: { locale: Locale }) {
           <p className="mt-4 max-w-sm font-display text-xl font-bold text-white">{isUr ? SITE.taglineUr : SITE.tagline}</p>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-400">
             {isUr
-              ? 'زاویہ پاکستان کی اہم خبریں آسان زبان میں پیش کرتا ہے۔ ہر خبر کے ساتھ ذرائع درج ہیں۔'
-              : 'Zaviya News explains the news that matters to Pakistan in clear English and Urdu, with every source listed.'}
+              ? 'زاویہ پاکستان کی اہم خبریں آسان زبان میں پیش کرتا ہے۔'
+              : 'Zaviya News explains the news that matters to Pakistan in clear English and Urdu.'}
           </p>
           <div className="mt-6">
             <WhatsAppCTA locale={locale} compact />

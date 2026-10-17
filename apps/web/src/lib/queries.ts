@@ -19,6 +19,7 @@ import {
 } from '@zaviya/shared'
 import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './mock'
 import { getPayloadClient } from './payload'
+import { findReplacementHref, type FindApi } from './duplicate-redirect'
 import { getLearning } from './learning'
 import { isActive, parsePlan, PIN_SECTIONS, sectionOrder, type FrontPagePlan, type FrontSection, type PinSection, type PlanSlot } from './front-page'
 import type { Where } from 'payload'
@@ -905,4 +906,11 @@ export const getFrontPagePlan = cache(async (locale: Locale): Promise<ResolvedFr
     order: sectionOrder(plan),
     note,
   }
+})
+
+/** Live article of the same story for a removed duplicate's URL (ZAV-92), or null. */
+export const getDuplicateReplacementHref = cache(async (locale: Locale, slug: string): Promise<string | null> => {
+  if (demoData()) return null
+  const payload = await getPayloadClient()
+  return findReplacementHref(payload as unknown as FindApi, locale, slug)
 })
