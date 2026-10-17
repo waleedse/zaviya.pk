@@ -1,7 +1,7 @@
 import type { BridgeJob, GeminiImageResult } from '@zaviya/shared'
 import type { GeminiSelectors, GeneratedImage } from './gemini-dom'
 import { getSettings } from './storage'
-import { ensureGeminiWindowTab, ensureTab, findTabForPlatform, sendToTab, showBriefly, withTimeout } from './tabs'
+import { ensureGeminiWindowTab, ensureOwnTab, ensureTab, findTabForPlatform, sendToTab, showBriefly, withTimeout } from './tabs'
 
 function unwrapTabResponse<T>(res: T): T {
   if (res && typeof res === 'object' && 'error' in res && typeof (res as { error: string }).error === 'string') {
@@ -104,7 +104,7 @@ async function readPage(url: string): Promise<unknown> {
 }
 
 async function runXReadList(job: Extract<BridgeJob, { type: 'x.readList' }>): Promise<unknown> {
-  const tabId = await ensureTab(job.payload.listUrl, 'x')
+  const tabId = await ensureOwnTab(job.payload.listUrl, 'x')
   const settings = await getSettings()
   return unwrapTabResponse(
     await sendToTab<{ posts: unknown[] }>(tabId, {
@@ -120,12 +120,12 @@ async function runXReadList(job: Extract<BridgeJob, { type: 'x.readList' }>): Pr
 
 async function runXSearch(job: Extract<BridgeJob, { type: 'x.search' }>): Promise<unknown> {
   const url = `https://x.com/search?q=${encodeURIComponent(job.payload.query)}&src=typed_query&f=live`
-  const tabId = await ensureTab(url, 'x')
+  const tabId = await ensureOwnTab(url, 'x')
   return unwrapTabResponse(await sendToTab(tabId, { kind: 'zaviya', action: 'x.scrape', limit: job.payload.limit }))
 }
 
 async function runXTrending(): Promise<unknown> {
-  const tabId = await ensureTab('https://x.com/explore/tabs/trending', 'x')
+  const tabId = await ensureOwnTab('https://x.com/explore/tabs/trending', 'x')
   return unwrapTabResponse(await sendToTab(tabId, { kind: 'zaviya', action: 'x.trends' }))
 }
 
@@ -152,7 +152,7 @@ async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<un
   // Always start from the home timeline, and bring the tab forward while posting: X does not
   // reliably mount its composer in a background tab or on a page without the Post button.
   const [previous] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-  const tabId = await ensureTab('https://x.com/home', 'x')
+  const tabId = await ensureOwnTab('https://x.com/home', 'x')
   await chrome.tabs.update(tabId, { active: true })
   const settings = await getSettings()
   const image = await fetchXImage(job.payload.mediaUrls)

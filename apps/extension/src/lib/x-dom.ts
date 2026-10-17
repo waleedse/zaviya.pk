@@ -91,16 +91,72 @@ export async function postTweet(
     }
   }
 
-  const postBtn =
-    document.querySelector('[data-testid="tweetButton"]') ??
-    document.querySelector('[data-testid="tweetButtonInline"]')
-  if (!(postBtn instanceof HTMLElement)) throw new Error('post_button_not_found')
-  postBtn.click()
-  await randomDelay(delayMinMs, delayMaxMs)
+  const findPostBtn = () =>
+    (document.querySelector('[data-testid="tweetButton"]') ?? document.querySelector('[data-testid="tweetButtonInline"]')) as HTMLElement | null
+  if (!findPostBtn()) throw new Error('post_button_not_found')
 
-  // Best-effort: read latest status id from timeline (may not be the new tweet).
-  const first = scrapeTimelinePosts(undefined, 1)[0]
-  return { externalId: first?.id }
+  // The button stays disabled while the image uploads or the link card loads: wait for it instead of clicking a dead button
+  await waitFor(() => isEnabled(findPostBtn()), 45_000)
+  if (!isEnabled(findPostBtn())) {
+    await discardComposer()
+    throw new Error(`post_not_sent: Post button stayed disabled${pageMessage() ? ` (${pageMessage()})` : ''}`)
+  }
+
+  // Click, then confirm X really sent it: the composer closes or the "Your post was sent" toast shows. One retry.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    findPostBtn()?.click()
+    const sent = await waitFor(() => !composerOpen() || /your post was sent/i.test(toastText()), 30_000)
+    if (sent) {
+      await randomDelay(delayMinMs, delayMaxMs)
+      // Best-effort: read latest status id from timeline (may not be the new tweet).
+      const first = scrapeTimelinePosts(undefined, 1)[0]
+      return { externalId: first?.id }
+    }
+  }
+  const why = pageMessage() || 'composer still open after clicking Post twice'
+  await discardComposer()
+  throw new Error(`post_not_sent: ${why}`)
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function waitFor(check: () => boolean, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (check()) return true
+    await sleep(500)
+  }
+  return check()
+}
+
+function isEnabled(el: HTMLElement | null): boolean {
+  return !!el && el.getAttribute('aria-disabled') !== 'true' && !(el as HTMLButtonElement).disabled
+}
+
+function composerOpen(): boolean {
+  return !!document.querySelector('[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea_1"]')
+}
+
+function toastText(): string {
+  return (document.querySelector('[data-testid="toast"]') as HTMLElement | null)?.innerText?.trim() ?? ''
+}
+
+/** What X is telling us (error toast, alert, limit notice), so a failure says why. */
+function pageMessage(): string {
+  const parts = [toastText(), ...Array.from(document.querySelectorAll('[role="alert"], [data-testid="error-detail"]')).map((e) => (e as HTMLElement).innerText?.trim() ?? '')]
+  return parts.filter(Boolean).join(' | ').replace(/\s+/g, ' ').slice(0, 300)
+}
+
+/** Close the composer and discard the draft, so the next job starts clean (and no "Leave site?" dialog appears). */
+export async function discardComposer(): Promise<void> {
+  if (!composerOpen()) return
+  const close = document.querySelector('[data-testid="app-bar-close"], [aria-label="Close"]') as HTMLElement | null
+  if (close) close.click()
+  else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await sleep(1_000)
+  const discard = document.querySelector('[data-testid="confirmationSheetConfirm"]') as HTMLElement | null
+  if (discard && /discard/i.test(discard.innerText)) discard.click()
+  await sleep(800)
 }
 
 /** Trend names from x.com/explore (uses the account's location setting, so set it to Pakistan). */
