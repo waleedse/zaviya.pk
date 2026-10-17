@@ -1,0 +1,37 @@
+[
+  {
+    "id": "bright-a",
+    "file": "audio/bright-a.wav",
+    "bpm": 120,
+    "firstBeatMs": 2000,
+    "mood": "bright"
+  },
+  {
+    "id": "bright-b",
+    "file": "audio/bright-b.wav",
+    "bpm": 120,
+    "firstBeatMs": 2000,
+    "mood": "bright"
+  },
+  {
+    "id": "night-a",
+    "file": "audio/night-a.wav",
+    "bpm": 110,
+    "firstBeatMs": 2182,
+    "mood": "night"
+  },
+  {
+    "id": "night-b",
+    "file": "audio/night-b.wav",
+    "bpm": 110,
+    "firstBeatMs": 2182,
+    "mood": "night"
+  },
+  {
+    "id": "calm",
+    "file": "audio/calm.wav",
+    "bpm": 80,
+    "firstBeatMs": 3000,
+    "mood": "calm"
+  }
+]

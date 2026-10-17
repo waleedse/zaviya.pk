@@ -17,6 +17,8 @@ export function createTelegramBot(
     pauseAll: () => Promise<void>
     resumeAll: () => Promise<void>
     getStats: () => Promise<string>
+    /** Telegram "Skip this video" button from the separate video service */
+    skipVideo?: (key: string) => Promise<void>
   },
 ): TelegramAlerts {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_ADMIN_CHAT_ID) {
@@ -71,6 +73,11 @@ export function createTelegramBot(
     const data = ctx.callbackQuery.data
     const [action, reviewId] = data.split(':')
     if (!reviewId) return
+    if (action === 'videoskip') {
+      await deps.skipVideo?.(reviewId)
+      await ctx.answerCallbackQuery({ text: 'Video skipped' })
+      return
+    }
     if (action === 'approve') {
       const res = await deps.payload.patchReview(reviewId, { decision: 'approve', decidedBy: 'telegram' })
       await deps.payload.patchCluster(res.clusterId, { status: 'writing' })

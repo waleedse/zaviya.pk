@@ -1,0 +1,264 @@
+{
+  "edition": "morning",
+  "date": "2026-10-16T21:21:15.446Z",
+  "format": "flash15",
+  "topic": null,
+  "stories": [
+    {
+      "id": 1058,
+      "slug": "pakistan-targets-8-billion-mineral-exports",
+      "title": "Pakistan aims for $8bn mineral exports, ICMA estimates",
+      "titleUr": null,
+      "dek": "ICMA puts mineral reserves at about $8 trillion across some 600,000 sq km, yet mining still contributes under 3% of GDP as Islamabad courts investors.",
+      "category": "business",
+      "image": "1058.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        },
+        {
+          "name": "Biz Today",
+          "tier": 2
+        },
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        },
+        {
+          "name": "| Associated Press Of Pakistan",
+          "tier": 2
+        },
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        },
+        {
+          "name": "Mettis Global",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T18:56:28.265Z",
+      "tags": [
+        "mineral exports",
+        "ICMA",
+        "Reko Diq",
+        "critical minerals",
+        "Pakistan Minerals Investment Forum 2026",
+        "Islamabad",
+        "US Strategic Metals",
+        "Tethyan Metallogenic Belt"
+      ]
+    },
+    {
+      "id": 1054,
+      "slug": "auto-parts-duty-pakistan-11-percent-13-imported-items",
+      "title": "11% Customs Duty on 13 Imported Auto Parts Made Locally",
+      "titleUr": null,
+      "dek": "Auto parts duty in Pakistan now reaches 13 more imported components, with an extra 11% levy meant to favour local makers; price effects remain unclear.",
+      "category": "business",
+      "image": "1054.jpg",
+      "sources": [
+        {
+          "name": "TechJuice",
+          "tier": 3
+        },
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": true,
+      "priority": "breaking",
+      "publishedAt": "2026-10-16T18:12:37.892Z",
+      "tags": [
+        "Economic Coordination Committee",
+        "Federal Board of Revenue",
+        "Revenue Division",
+        "Ministry of Industries and Production",
+        "Engineering Development Board",
+        "SRO 693(I)/2006",
+        "Pakistan customs duty",
+        "Automobile parts"
+      ]
+    },
+    {
+      "id": 1052,
+      "slug": "ubc-phd-funding-cad-40000-pakistan-applicants",
+      "title": "UBC guarantees CAD 160,000 PhD support over four years",
+      "titleUr": null,
+      "dek": "Eligible full-time doctoral students at UBC’s Vancouver campus, including applicants from Pakistan, can receive the minimum package for the first four years of study.",
+      "category": "education-jobs",
+      "image": "1052.jpg",
+      "sources": [
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        },
+        {
+          "name": "ProPakistani",
+          "tier": 3
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T17:41:23.536Z",
+      "tags": [
+        "University of British Columbia",
+        "UBC PhD funding",
+        "Counselling Psychology",
+        "Botany",
+        "Canada",
+        "Vancouver",
+        "Pakistan students"
+      ]
+    },
+    {
+      "id": 1051,
+      "slug": "hina-javed-murder-news-dna-report-husband-domestic-worker",
+      "title": "Hina Javed case: DNA links husband and domestic worker",
+      "titleUr": null,
+      "dek": "A DNA report summary ties Faisal Asghar and Zeeshan Arshad to crime-scene material as Punjab CCD opens a fresh probe; findings alone do not settle guilt.",
+      "category": "pakistan",
+      "image": "1051.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Geo English",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T17:32:52.554Z",
+      "tags": [
+        "Hina Javed",
+        "Faisal Asghar",
+        "Zeeshan Arshad",
+        "Punjab Crime Control Department",
+        "Rawalpindi",
+        "Civil Lines police station",
+        "Maryam Nawaz Sharif"
+      ]
+    },
+    {
+      "id": 1037,
+      "slug": "ship-attack-hormuz-today-record-oil-exports",
+      "title": "Oil through Hormuz slows after weekly high in ship hits",
+      "titleUr": null,
+      "dek": "Twelve vessels were struck around the Strait of Hormuz between 5 and 11 October, a weekly record, while oil flows through the strait slowed to about 12.6 million barrels a day.",
+      "category": "world",
+      "image": "1037.jpg",
+      "sources": [
+        {
+          "name": "BBC World",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T15:44:14.936Z",
+      "tags": [
+        "Strait of Hormuz",
+        "UKMTO",
+        "IRGC",
+        "Petro Dolphin",
+        "GFS Pride",
+        "Kpler",
+        "US Central Command",
+        "Gulf of Oman"
+      ]
+    },
+    {
+      "id": 1034,
+      "slug": "pakistan-islamic-states-condemn-colombia-jerusalem-embassy",
+      "title": "Islamic FMs including Pakistan reject Colombia Jerusalem embassy",
+      "titleUr": null,
+      "dek": "A Foreign Office joint statement on Friday said Colombia’s embassy inauguration in Jerusalem has no legal effect and urged Bogotá to reverse the step.",
+      "category": "world",
+      "image": "1034.jpg",
+      "sources": [
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "The Express Tribune",
+          "tier": 2
+        },
+        {
+          "name": "Arab News PK",
+          "tier": 2
+        },
+        {
+          "name": "Dawn",
+          "tier": 2
+        },
+        {
+          "name": "APP (Associated Press of Pakistan)",
+          "tier": 1
+        },
+        {
+          "name": "Business Recorder",
+          "tier": 2
+        },
+        {
+          "name": "Business Recorder",
+          "tier": 2
+        }
+      ],
+      "isBreaking": false,
+      "priority": "high",
+      "publishedAt": "2026-10-16T14:58:49.342Z",
+      "tags": [
+        "Pakistan",
+        "Foreign Office",
+        "Colombia",
+        "Jerusalem",
+        "Palestine",
+        "United Nations Security Council",
+        "East Jerusalem",
+        "two-state solution"
+      ]
+    }
+  ],
+  "rates": [
+    {
+      "series": "usd_interbank",
+      "value": 276.98,
+      "previous": 276.88,
+      "unit": "PKR",
+      "source": "exchangerate-api.com (mid-market)",
+      "observedAt": "2026-10-16T19:05:30.472Z"
+    },
+    {
+      "series": "gold_24k_tola",
+      "value": 432722,
+      "previous": 433023,
+      "unit": "PKR/tola",
+      "source": "International spot × PKR (estimate)",
+      "observedAt": "2026-10-16T21:05:30.253Z"
+    },
+    {
+      "series": "petrol_super",
+      "value": 386.3,
+      "previous": 390.23,
+      "unit": "PKR/litre",
+      "source": "Govt notification as reported by 2+ outlets",
+      "observedAt": "2026-10-16T18:35:30.401Z"
+    }
+  ]
+}
