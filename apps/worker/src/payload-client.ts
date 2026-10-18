@@ -290,6 +290,26 @@ export class PayloadClient {
     return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', payload)
   }
 
+  /** Posts of the last 50 h that have an external id, with stored metrics (ZAV-108) */
+  getRecentSocialPosts50h() {
+    return this.request<{ posts: { id: string | number; platform: string; externalId: string; postedAt: string; metrics: unknown }[] }>(
+      'GET',
+      '/api/pipeline/social-posts/recent?hours=50',
+    )
+  }
+
+  putSocialMetrics(id: string | number, window: 'h1' | 'h24', data: Record<string, number | string | null>) {
+    return this.request<{ ok: true }>('PUT', `/api/pipeline/social-posts/${id}/metrics`, { window, data })
+  }
+
+  getFollowers(days = 14) {
+    return this.request<{ followers: { date: string; facebook?: number; instagram?: number; x?: number }[] }>('GET', `/api/pipeline/followers?days=${days}`)
+  }
+
+  putFollowers(body: { date: string; facebook?: number; instagram?: number; x?: number }) {
+    return this.request<{ ok: true }>('POST', '/api/pipeline/followers', body)
+  }
+
   /** Sets one social platform's daily cap (the settings global is admin-only, so this goes through the pipeline API) */
   setDailyCap(platform: string, perDay: number) {
     return this.request<{ ok: true; dailyCaps: Record<string, number> }>('PUT', '/api/pipeline/daily-cap', { platform, perDay })

@@ -21,6 +21,7 @@ import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
+import { runSocialMetrics } from './social/metrics.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
@@ -379,7 +380,8 @@ export async function createWorkerRuntime(
   workers.push(
     new Worker(
       'metrics',
-      async () => runLearningJob({ payload, router, telegram }),
+      async (job) =>
+        job.name === 'social-metrics' ? runSocialMetrics({ env, payload }) : runLearningJob({ payload, router, telegram }),
       { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
@@ -436,6 +438,8 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     { every: 24 * 60 * 60 * 1000 },
     { name: 'daily', data: {} },
   )
+  // ZAV-108: 1 h / 24 h post metrics and the daily follower counts
+  await runtime.queues.metrics.upsertJobScheduler('social-metrics', { every: 30 * 60 * 1000 }, { name: 'social-metrics', data: {} })
 }
 
 export async function pauseAll(runtime: WorkerRuntime): Promise<void> {
