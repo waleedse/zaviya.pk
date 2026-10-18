@@ -29,7 +29,7 @@ export function webStoryPath(slug: string): string {
 }
 
 export function buildWebStoryHtml(article: ArticleFull, locale: string, canonicalArticlePath: string): string {
-  const publisher = locale === 'ur' ? SITE.nameUr : SITE.name
+  const publisher = locale === 'ur' ? SITE.nameUr : SITE.brandName
   const canonical = absoluteUrl(canonicalArticlePath)
   const poster = storyPosterUrl(article)
   const title = escapeHtml(article.title)
