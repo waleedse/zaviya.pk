@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { classifySource, deviceFromUa, isBot, recordPageview, visitorId } from '@/lib/analytics'
+import { isMetaIp } from '@/lib/ip-ranges'
 import { siteUrl } from '@/lib/seo'
 
 const bodySchema = z.object({
@@ -10,10 +11,21 @@ const bodySchema = z.object({
   utmSource: z.string().max(100).optional(),
 })
 
-/** Privacy-friendly first-party pageview beacon (no cookies, no IP storage). */
+const NOT_HUMAN = () => NextResponse.json({ human: false })
+
+/**
+ * Privacy-friendly first-party pageview beacon (no cookies, no IP storage). It also answers whether the visitor is a
+ * person, so the page loads Google Analytics only for people: Meta's link checkers open every link we post with a
+ * real browser from its data centres (US, Sweden, Ireland), which showed up as Facebook traffic in both counters.
+ */
 export async function POST(request: Request) {
   const ua = request.headers.get('user-agent')
-  if (isBot(ua)) return new NextResponse(null, { status: 204 })
+  if (isBot(ua)) return NOT_HUMAN()
+  const ip = (request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim()
+  if (isMetaIp(ip)) {
+    console.info(`[analytics] skipped a Meta crawler view (${request.headers.get('cf-ipcountry') ?? '?'})`)
+    return NOT_HUMAN()
+  }
 
   let json: unknown
   try {
@@ -25,9 +37,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return new NextResponse(null, { status: 400 })
 
   const { path, locale, referrer, utmSource } = parsed.data
-  if (path.startsWith('/admin') || path.startsWith('/api')) return new NextResponse(null, { status: 204 })
+  if (path.startsWith('/admin') || path.startsWith('/api')) return NextResponse.json({ human: true })
 
-  const ip = (request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim()
   let refHost: string | undefined
   try {
     refHost = referrer ? new URL(referrer).hostname : undefined
@@ -48,5 +59,5 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error('[analytics] pageview insert failed', e)
   }
-  return new NextResponse(null, { status: 204 })
+  return NextResponse.json({ human: true })
 }

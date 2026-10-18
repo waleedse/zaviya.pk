@@ -4,6 +4,15 @@ import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import type { Locale } from '@zaviya/shared'
 
+export const HUMAN_EVENT = 'zaviya:human'
+
+function markHuman() {
+  const w = window as Window & { __zaviyaHuman?: boolean }
+  if (w.__zaviyaHuman) return
+  w.__zaviyaHuman = true
+  window.dispatchEvent(new Event(HUMAN_EVENT))
+}
+
 export function PageviewBeacon({ locale }: { locale: Locale }) {
   const pathname = usePathname()
   const lastSent = useRef<string | null>(null)
@@ -22,17 +31,18 @@ export function PageviewBeacon({ locale }: { locale: Locale }) {
       utmSource: isLanding ? utmSource : undefined,
     })
 
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/analytics/pageview', new Blob([body], { type: 'application/json' }))
-      return
-    }
-
+    // The answer says whether this is a person; Google Analytics loads only then (see GoogleAnalytics)
     void fetch('/api/analytics/pageview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       keepalive: true,
     })
+      .then((r) => (r.ok ? (r.json() as Promise<{ human?: boolean }>) : { human: true }))
+      .catch(() => ({ human: true }))
+      .then((res) => {
+        if (res.human !== false) markHuman()
+      })
   }, [pathname, locale])
 
   return null

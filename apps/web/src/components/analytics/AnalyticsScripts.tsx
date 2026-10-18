@@ -1,4 +1,5 @@
 import Script from 'next/script'
+import { GoogleAnalytics } from './GoogleAnalytics'
 
 export function AnalyticsScripts() {
   const plausible = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN
@@ -16,19 +17,7 @@ export function AnalyticsScripts() {
           strategy="afterInteractive"
         />
       ) : null}
-      {gaId ? (
-        <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />
-          <Script id="ga-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${gaId}', { anonymize_ip: true });
-            `}
-          </Script>
-        </>
-      ) : null}
+      {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
     </>
   )
 }
