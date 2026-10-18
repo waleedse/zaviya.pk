@@ -21,6 +21,7 @@ import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
+import { findDuplicateStory } from './social/guards.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
@@ -304,6 +305,17 @@ export async function createWorkerRuntime(
           mediaUrls: string[]
           priority: Priority
           url?: string
+          title?: string
+          clusterId?: string
+        }
+        // One story, one post per platform (ZAV-120): a sister article about the same event in the last 6h is skipped
+        if (d.title) {
+          const recent = await payload.getRecentSocialPosts(d.platform, 6)
+          const dup = findDuplicateStory({ articleId: String(d.articleId), clusterId: d.clusterId, title: d.title }, recent.posts)
+          if (dup) {
+            logger.info({ articleId: d.articleId, platform: d.platform, duplicateOf: dup.articleId }, 'social post skipped: same story already posted')
+            return { skipped: `duplicate of article ${dup.articleId}` }
+          }
         }
         const settings = await payload.getSettings().catch(
           () => ({}) as import('./payload-client.js').PipelineSettings,
