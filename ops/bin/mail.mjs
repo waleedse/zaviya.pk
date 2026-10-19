@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Email for the Zaviya agents (@zaviya.pk, our own mail server), with no dependencies and no password on the command line.
-//   mail.mjs send --to waleed@zaviya.pk --subject "SEO weekly plan" --body-file plan.md [--reply-to-id "<msg-id>"]
+//   mail.mjs send --to waleed@zaviya.pk --subject "SEO weekly plan" --body-file plan.md [--reply-to-id "<msg-id>"] [--name "News" | --from-name "Waleed, Zaviya News"]
 //   mail.mjs inbox [--all] [--from waleed@zaviya.pk]   unread (or all) mail, newest first: uid, date, from, subject
 //   mail.mjs read <uid>                                 headers + plain-text body (quoted history trimmed); does not mark it read
 //   mail.mjs seen <uid>                                 mark as read once handled
@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import tls from 'node:tls'
+import { encWord, fromHeader } from './mail-header.mjs'
 
 function fromFile(name) {
   for (const file of [process.env.ZAVIYA_AGENT_ENV, `${homedir()}/.zaviya-agents/.env`, '/data/.env'].filter(Boolean)) {
@@ -81,14 +82,13 @@ async function smtp(conv, line, ok) {
   return r
 }
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64')
-const encWord = (s) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${b64(s)}?=`)
 
 async function send(a) {
   if (!a.to || !a.subject || !a['body-file']) throw new Error('send needs --to, --subject and --body-file')
   const body = readFileSync(a['body-file'], 'utf8')
   const id = `<${randomUUID()}@zaviya.pk>`
   const headers = [
-    `From: Zaviya ${encWord(a.name || 'Agent')} <${USER}>`,
+    `From: ${fromHeader(a.name, a['from-name'], USER)}`,
     `To: <${a.to}>`,
     `Subject: ${encWord(a.subject)}`,
     `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,
