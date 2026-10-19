@@ -290,6 +290,14 @@ export class PayloadClient {
     return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', payload)
   }
 
+  /** Posts that went out since `sinceIso` (posted, in flight, or marked failed but live), per platform, with the last post time (ZAV-115) */
+  getSocialCount(sinceIso: string) {
+    return this.request<{ counts: Record<string, number>; lastPostedAt: Record<string, string | null> }>(
+      'GET',
+      `/api/pipeline/social-count?since=${encodeURIComponent(sinceIso)}`,
+    )
+  }
+
   /** Sets one social platform's daily cap (the settings global is admin-only, so this goes through the pipeline API) */
   setDailyCap(platform: string, perDay: number) {
     return this.request<{ ok: true; dailyCaps: Record<string, number> }>('PUT', '/api/pipeline/daily-cap', { platform, perDay })

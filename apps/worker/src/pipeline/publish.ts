@@ -317,7 +317,8 @@ export async function processPublishJob(
       },
       {
         // Posted the moment the article goes live (breaking included); the social worker is serial, so the three go one after another
-        priority: data.priority === 'breaking' ? 1 : 5,
+        // Within a peak window the better stories go first (newsworthiness 0..1 maps to priority 2..9), so the daily cap keeps the best (ZAV-115)
+        priority: data.priority === 'breaking' ? 1 : 2 + Math.round((1 - (triage?.newsworthiness ?? 0.5)) * 7),
       },
     )
   }

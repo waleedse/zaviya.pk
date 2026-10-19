@@ -70,9 +70,9 @@ export default async function LocaleLayout({
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
   const locale = raw as Locale
-  const title = locale === 'ur' ? `${SITE.nameUr} — ${SITE.taglineUr}` : `${SITE.name} — ${SITE.tagline}`
+  const title = locale === 'ur' ? `${SITE.nameUr} — ${SITE.taglineUr}` : `${SITE.brandName} — ${SITE.tagline}`
   return {
-    title: { default: title, template: `%s | ${locale === 'ur' ? SITE.nameUr : SITE.name}` },
+    title: { default: title, template: `%s | ${locale === 'ur' ? SITE.nameUr : SITE.brandName}` },
     description: SITE.tagline,
   }
 }
