@@ -656,6 +656,46 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // ZAV-115: what already went out today, so the social worker can hold to settings.dailyCaps.
+    // Counts posted rows, rows in flight, and "failed" rows that carry an external id (they are live, ZAV-114).
+    path: '/pipeline/social-count',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const since = new Date(req.searchParams?.get('since') ?? '')
+      if (Number.isNaN(since.getTime())) return badRequest('since must be an ISO date')
+      const platforms = ['facebook', 'instagram', 'x'] as const
+      const counts: Record<string, number> = {}
+      const lastPostedAt: Record<string, string | null> = {}
+      for (const platform of platforms) {
+        const live = await req.payload.find({
+          collection: 'social-posts',
+          where: {
+            and: [
+              { platform: { equals: platform } },
+              { createdAt: { greater_than_equal: since.toISOString() } },
+              {
+                or: [
+                  { status: { in: ['posted', 'posting'] } },
+                  { and: [{ status: { equals: 'failed' } }, { externalId: { exists: true } }] },
+                ],
+              },
+            ],
+          },
+          sort: '-createdAt',
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+        counts[platform] = live.totalDocs
+        const last = live.docs[0] as { postedAt?: string | null; createdAt?: string } | undefined
+        lastPostedAt[platform] = last?.postedAt ?? last?.createdAt ?? null
+      }
+      return json({ since: since.toISOString(), counts, lastPostedAt })
+    },
+  },
+  {
     // ZAV-108: posts that went out lately and have an external id, with the metrics already stored, so the worker knows what to fetch.
     path: '/pipeline/social-posts/recent',
     method: 'get',

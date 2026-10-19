@@ -1,8 +1,9 @@
+import { SITE } from '@zaviya/shared'
 import { getPayloadClient } from '@/lib/payload'
 import { newsSitemapEntry } from '@/lib/news-sitemap'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-const publicationName = 'Zaviya'
+const publicationName = SITE.brandName
 
 export async function GET() {
   const payload = await getPayloadClient()
