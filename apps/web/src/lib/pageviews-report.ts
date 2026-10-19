@@ -43,7 +43,7 @@ export async function pageviewsReport(payload: Payload, days: number): Promise<P
   const rows = await run<{ day: string; source: string; pv: string; uv: string }>(
     sql`SELECT (ts AT TIME ZONE 'Asia/Karachi')::date::text AS day, source, count(*) AS pv, count(DISTINCT visitor) AS uv
       FROM zaviya_pageviews
-      WHERE ts >= ((now() AT TIME ZONE 'Asia/Karachi')::date - ${n - 1}::int) AT TIME ZONE 'Asia/Karachi'
+      WHERE ts >= ((now() AT TIME ZONE 'Asia/Karachi')::date - ${n - 1}::int)::timestamp AT TIME ZONE 'Asia/Karachi'
       GROUP BY 1, 2 ORDER BY 1, 2`,
   )
   const refs = await run<{ host: string; pv: string }>(
