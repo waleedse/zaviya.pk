@@ -14,12 +14,17 @@ export function canBuildWebStory(article: ArticleFull): boolean {
   return Boolean(article.title && (article.dek || article.keyPoints.length > 0))
 }
 
-function storyPosterUrl(article: ArticleFull): string {
-  if (article.image?.url) return article.image.url
+/** Google wants a 3:4 portrait poster of at least 640x853; this is served by /api/story-poster (cropped hero) or /api/og?variant=story. */
+export const STORY_POSTER_WIDTH = 720
+export const STORY_POSTER_HEIGHT = 960
+
+export function storyPosterUrl(article: ArticleFull): string {
+  if (article.image?.url) return absoluteUrl(`/api/story-poster?src=${encodeURIComponent(article.image.url)}`)
   const q = new URLSearchParams({
     title: article.title,
     kicker: article.category?.name ?? 'Zaviya',
     category: article.category?.slug ?? 'news',
+    variant: 'story',
   })
   return absoluteUrl(`/api/og?${q.toString()}`)
 }
@@ -50,7 +55,7 @@ export function buildWebStoryHtml(article: ArticleFull, locale: string, canonica
       ? `
     <amp-story-page id="dek" auto-advance-after="6s">
       <amp-story-grid-layer template="fill">
-        <amp-img src="${escapeHtml(poster)}" width="720" height="1280" layout="responsive"></amp-img>
+        <amp-img src="${escapeHtml(poster)}" width="${STORY_POSTER_WIDTH}" height="${STORY_POSTER_HEIGHT}" layout="responsive"></amp-img>
       </amp-story-grid-layer>
       <amp-story-grid-layer template="vertical">
         <p>${dek}</p>
@@ -84,7 +89,7 @@ export function buildWebStoryHtml(article: ArticleFull, locale: string, canonica
     poster-portrait-src="${escapeHtml(poster)}">
     <amp-story-page id="cover" auto-advance-after="7s">
       <amp-story-grid-layer template="fill">
-        <amp-img src="${escapeHtml(poster)}" width="720" height="1280" layout="responsive" alt=""></amp-img>
+        <amp-img src="${escapeHtml(poster)}" width="${STORY_POSTER_WIDTH}" height="${STORY_POSTER_HEIGHT}" layout="responsive" alt=""></amp-img>
       </amp-story-grid-layer>
       <amp-story-grid-layer template="vertical">
         <h1>${title}</h1>
