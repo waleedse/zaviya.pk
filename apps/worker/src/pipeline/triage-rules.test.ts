@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyTriageRules, computeWeightedScore } from './triage-rules.js'
+import { applyTriageRules, computeWeightedScore, staleClusterReason } from './triage-rules.js'
 import type { TriageResult } from '@zaviya/shared'
 
 const baseTriage: TriageResult = {
@@ -116,5 +116,20 @@ describe('applyTriageRules', () => {
       const d = applyTriageRules({ ...baseTriage, category: 'cricket', sensitivityFlags: ['death'] }, thin)
       expect(d.outcome).toBe('review')
     })
+  })
+})
+
+describe('staleClusterReason', () => {
+  const now = new Date('2026-10-12T06:00:00.000Z')
+  it('flags a cluster whose newest item is months old', () => {
+    expect(staleClusterReason([{ publishedAt: '2026-04-27T08:00:00.000Z' }], now)).toMatch(/Stale/)
+  })
+  it('keeps a cluster with any recent item', () => {
+    expect(
+      staleClusterReason([{ publishedAt: '2026-04-27T08:00:00.000Z' }, { publishedAt: '2026-10-12T01:00:00.000Z' }], now),
+    ).toBeNull()
+  })
+  it('does not reject when no item has a usable date', () => {
+    expect(staleClusterReason([{}], now)).toBeNull()
   })
 })

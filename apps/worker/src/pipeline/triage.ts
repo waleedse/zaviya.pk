@@ -4,7 +4,7 @@ import type { LLMRouter } from '@zaviya/llm'
 import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
 import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../prompts/triage.js'
-import { applyTriageRules } from './triage-rules.js'
+import { applyTriageRules, staleClusterReason } from './triage-rules.js'
 import { logger } from '../logger.js'
 import { hasFreshSource, shouldPitch } from './pitch.js'
 
@@ -23,6 +23,16 @@ export async function processTriageJob(
 ): Promise<void> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const settings = await deps.payload.getSettings().catch(() => ({}) as import('../payload-client.js').PipelineSettings)
+
+  const stale = staleClusterReason(cluster.items)
+  if (stale) {
+    logger.info({ clusterId: data.clusterId, reason: stale }, 'triage: stale cluster rejected')
+    await deps.payload.patchCluster(data.clusterId, {
+      status: 'rejected',
+      triage: { codeOutcome: 'reject', reason: stale },
+    })
+    return
+  }
 
   let triage
   try {
