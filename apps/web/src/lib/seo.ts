@@ -196,6 +196,11 @@ export function organizationId(): string {
   return `${siteUrl()}/#organization`
 }
 
+/** Official social profiles (comma-separated https URLs in SOCIAL_PROFILE_URLS): schema sameAs and the /about links */
+export function socialProfileUrls(): string[] {
+  return (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u))
+}
+
 export function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
@@ -214,7 +219,7 @@ export function organizationJsonLd() {
     correctionsPolicy: absoluteUrl('/p/corrections'),
     contactPoint: { '@type': 'ContactPoint', contactType: 'editorial', url: absoluteUrl('/p/contact'), availableLanguage: ['English', 'Urdu'] },
     // Official profiles only (comma-separated in SOCIAL_PROFILE_URLS); they tie the brand together for Google
-    sameAs: (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)),
+    sameAs: socialProfileUrls(),
   }
 }
 
@@ -241,9 +246,9 @@ export function aboutPageJsonLd(locale: Locale) {
   return {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
-    url: absoluteUrl(`${prefix}/p/about`),
+    url: absoluteUrl(`${prefix}/about`),
     name: 'About Zaviya News',
-    about: { '@id': organizationId() },
+    about: organizationJsonLd(),
     publisher: { '@id': organizationId() },
   }
 }

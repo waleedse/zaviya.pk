@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/zaviya-news', destination: '/about', permanent: true },
+      { source: '/ur/zaviya-news', destination: '/ur/about', permanent: true },
+    ]
+  },
   webpack: (webpackConfig) => {
     webpackConfig.resolve.extensionAlias = {
       '.cjs': ['.cts', '.cjs'],

@@ -74,7 +74,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
           <ul className="space-y-2.5">
             {POLICIES.map((p) => (
               <li key={p.slug}>
-                <Link href={localePath(locale, `/p/${p.slug}`)} className="hover:text-white">
+                <Link href={localePath(locale, p.slug === 'about' ? '/about' : `/p/${p.slug}`)} className="hover:text-white">
                   {isUr ? p.ur : p.en}
                 </Link>
               </li>
