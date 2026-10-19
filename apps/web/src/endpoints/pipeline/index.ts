@@ -745,6 +745,99 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // ZAV-108: posts that went out lately and have an external id, with the metrics already stored, so the worker knows what to fetch.
+    path: '/pipeline/social-posts/recent',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const hours = Math.min(Math.max(Number(req.searchParams?.get('hours') ?? 50) || 50, 1), 200)
+      const rows = await req.payload.find({
+        collection: 'social-posts',
+        where: {
+          and: [
+            { createdAt: { greater_than_equal: new Date(Date.now() - hours * 3_600_000).toISOString() } },
+            { externalId: { exists: true } },
+            { status: { in: ['posted', 'failed'] } },
+          ],
+        },
+        sort: '-createdAt',
+        limit: 300,
+        depth: 0,
+        overrideAccess: true,
+      })
+      return json({
+        posts: rows.docs.map((d) => ({
+          id: d.id,
+          platform: d.platform,
+          externalId: d.externalId,
+          postedAt: d.postedAt ?? d.createdAt,
+          metrics: d.metrics ?? null,
+        })),
+      })
+    },
+  },
+  {
+    // Stores one metrics snapshot ("h1" or "h24") on a social post, keeping the other snapshots.
+    path: '/pipeline/social-posts/:id/metrics',
+    method: 'put',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(
+        req,
+        z.object({ window: z.enum(['h1', 'h24']), data: z.record(z.union([z.number(), z.string(), z.null()])) }),
+      )
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      const doc = await req.payload.findByID({ collection: 'social-posts', id, depth: 0, overrideAccess: true })
+      const previous = doc.metrics && typeof doc.metrics === 'object' && !Array.isArray(doc.metrics) ? (doc.metrics as Record<string, unknown>) : {}
+      const metrics = { ...previous, [parsed.data.window]: { ...parsed.data.data, at: new Date().toISOString() } }
+      await req.payload.update({ collection: 'social-posts', id, data: { metrics }, overrideAccess: true, req })
+      return json({ ok: true })
+    },
+  },
+  {
+    // Daily follower counts per platform. metrics-daily is per article, so they live in the learning store (no schema change).
+    path: '/pipeline/followers',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(
+        req,
+        z.object({
+          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          facebook: z.number().int().nonnegative().optional(),
+          instagram: z.number().int().nonnegative().optional(),
+          x: z.number().int().nonnegative().optional(),
+        }),
+      )
+      if ('error' in parsed) return parsed.error
+      const { date, ...counts } = parsed.data
+      const key = `followers:${date}`
+      const existing = (await getLearning<Record<string, number>>(req.payload, key)) ?? {}
+      await setLearning(req.payload, key, { ...existing, ...counts })
+      return json({ ok: true, date, followers: { ...existing, ...counts } })
+    },
+  },
+  {
+    path: '/pipeline/followers',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const days = Math.min(Math.max(Number(req.searchParams?.get('days') ?? 14) || 14, 1), 90)
+      const out: { date: string; facebook?: number; instagram?: number; x?: number }[] = []
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(Date.now() + 5 * 3_600_000 - i * 86_400_000).toISOString().slice(0, 10)
+        const row = await getLearning<Record<string, number>>(req.payload, `followers:${date}`)
+        if (row) out.push({ date, ...row })
+      }
+      return json({ followers: out })
+    },
+  },
+  {
     path: '/pipeline/settings',
     method: 'get',
     handler: async (req) => {

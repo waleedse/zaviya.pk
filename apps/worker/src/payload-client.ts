@@ -298,6 +298,26 @@ export class PayloadClient {
     )
   }
 
+  /** Posts of the last 50 h that have an external id, with stored metrics (ZAV-108) */
+  getRecentSocialPosts50h() {
+    return this.request<{ posts: { id: string | number; platform: string; externalId: string; postedAt: string; metrics: unknown }[] }>(
+      'GET',
+      '/api/pipeline/social-posts/recent?hours=50',
+    )
+  }
+
+  putSocialMetrics(id: string | number, window: 'h1' | 'h24', data: Record<string, number | string | null>) {
+    return this.request<{ ok: true }>('PUT', `/api/pipeline/social-posts/${id}/metrics`, { window, data })
+  }
+
+  getFollowers(days = 14) {
+    return this.request<{ followers: { date: string; facebook?: number; instagram?: number; x?: number }[] }>('GET', `/api/pipeline/followers?days=${days}`)
+  }
+
+  putFollowers(body: { date: string; facebook?: number; instagram?: number; x?: number }) {
+    return this.request<{ ok: true }>('POST', '/api/pipeline/followers', body)
+  }
+
   /** Stories already posted (or queued) on a platform in the last `hours` (ZAV-120) */
   getRecentSocialPosts(platform: string, hours = 6) {
     return this.request<{ posts: { articleId: string; clusterId: string | null; title: string }[] }>(

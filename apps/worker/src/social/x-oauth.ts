@@ -31,6 +31,8 @@ export function buildOAuthHeader(
     accessTokenSecret: string
   },
   extraParams: Record<string, string> = {},
+  /** Query-string parameters: they are part of the signature but not of the header (GET requests) */
+  signedQuery: Record<string, string> = {},
 ): string {
   const oauthParams: Record<string, string> = {
     oauth_consumer_key: creds.consumerKey,
@@ -41,7 +43,7 @@ export function buildOAuthHeader(
     oauth_version: '1.0',
     ...extraParams,
   }
-  const signature = oauth1Signature(method, url, oauthParams, creds.consumerSecret, creds.accessTokenSecret)
+  const signature = oauth1Signature(method, url, { ...oauthParams, ...signedQuery }, creds.consumerSecret, creds.accessTokenSecret)
   oauthParams.oauth_signature = signature
   const header =
     'OAuth ' +
