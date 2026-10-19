@@ -30,6 +30,10 @@ const envSchema = z.object({
    * stories about minors (legal/safety risk in Pakistan); "all" approves those too; "off" keeps the review queue.
    */
   AUTO_APPROVE: z.enum(['off', 'safe', 'all']).default('safe'),
+  /** ZAV-111: Facebook posts carry the article link as the Page's first comment instead of in the caption (set 0 to switch back) */
+  FB_LINK_IN_COMMENT: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
+  /** ZAV-132: reply to comments on our own Facebook and Instagram posts (kill switch: set 0) */
+  COMMENT_REPLIES: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** Also write the Urdu version (off while the site runs English-only) */
   WRITE_URDU: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
   /** Distinct outlets a story needs before it is triaged */

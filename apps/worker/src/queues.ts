@@ -22,6 +22,7 @@ import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
 import { runSocialMetrics } from './social/metrics.js'
+import { redisKv, runCommentReplies } from './social/comments.js'
 import { findDuplicateStory } from './social/guards.js'
 import { decideSlot, pktDayStart } from './social/caps.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
@@ -414,7 +415,11 @@ export async function createWorkerRuntime(
     new Worker(
       'metrics',
       async (job) =>
-        job.name === 'social-metrics' ? runSocialMetrics({ env, payload }) : runLearningJob({ payload, router, telegram }),
+        job.name === 'social-metrics'
+          ? runSocialMetrics({ env, payload })
+          : job.name === 'comment-replies'
+            ? runCommentReplies({ env, payload, kv: redisKv(redis) })
+            : runLearningJob({ payload, router, telegram }),
       { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
@@ -473,6 +478,8 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
   )
   // ZAV-108: 1 h / 24 h post metrics and the daily follower counts
   await runtime.queues.metrics.upsertJobScheduler('social-metrics', { every: 30 * 60 * 1000 }, { name: 'social-metrics', data: {} })
+  // ZAV-111 / ZAV-132: friendly replies to comments on our own FB and IG posts (kill switch: COMMENT_REPLIES=0)
+  await runtime.queues.metrics.upsertJobScheduler('comment-replies', { every: 30 * 60 * 1000 }, { name: 'comment-replies', data: {} })
 }
 
 export async function pauseAll(runtime: WorkerRuntime): Promise<void> {

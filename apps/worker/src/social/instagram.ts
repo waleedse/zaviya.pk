@@ -2,7 +2,7 @@ import type { WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
 import { logger } from '../logger.js'
-import { pickCard, withLink } from './link.js'
+import { limitHashtags, pickCard, withLink } from './link.js'
 
 type PublishingLimit = { data?: { quota_usage?: number; config?: { quota_total?: number } }[] }
 
@@ -71,7 +71,7 @@ export async function postInstagram(
     return
   }
 
-  const caption = withLink(input.copy.instagram, input.url, 'instagram')
+  const caption = withLink(limitHashtags(input.copy.instagram, 3), input.url, 'instagram')
   const startedAt = Date.now()
   const token = deps.env.META_PAGE_TOKEN
   try {
