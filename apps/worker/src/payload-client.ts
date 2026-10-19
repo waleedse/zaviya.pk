@@ -298,6 +298,14 @@ export class PayloadClient {
     )
   }
 
+  /** Stories already posted (or queued) on a platform in the last `hours` (ZAV-120) */
+  getRecentSocialPosts(platform: string, hours = 6) {
+    return this.request<{ posts: { articleId: string; clusterId: string | null; title: string }[] }>(
+      'GET',
+      `/api/pipeline/social-recent?platform=${platform}&hours=${hours}`,
+    )
+  }
+
   /** Sets one social platform's daily cap (the settings global is admin-only, so this goes through the pipeline API) */
   setDailyCap(platform: string, perDay: number) {
     return this.request<{ ok: true; dailyCaps: Record<string, number> }>('PUT', '/api/pipeline/daily-cap', { platform, perDay })
