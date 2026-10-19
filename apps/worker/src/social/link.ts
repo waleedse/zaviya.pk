@@ -22,3 +22,24 @@ export function pickCard(mediaUrls: string[], platform: 'facebook' | 'instagram'
   const portrait = mediaUrls.find((u) => /-portrait(-\d+)?\.(png|jpe?g)$/i.test(u))
   return platform === 'instagram' ? portrait ?? mediaUrls[0] : wide ?? mediaUrls[0]
 }
+
+/** Keeps the first `max` hashtags and drops the rest (growth strategy: 1-3 relevant tags, not a wall of them). */
+export function limitHashtags(text: string, max: number): string {
+  let n = 0
+  return text
+    .replace(/(^|\s)#[\p{L}\p{N}_]+/gu, (m, lead: string) => (++n > max ? '' : m))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+/** The Facebook caption when the link goes into the first comment: no URL and no "Read the full story" line. */
+export function captionWithoutLink(text: string, url: string | undefined): string {
+  let t = text
+  if (url) t = t.split(url).join('')
+  return t
+    .replace(/^.*read the full story:?\s*$/gim, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
