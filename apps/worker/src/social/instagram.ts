@@ -23,12 +23,35 @@ async function checkPublishingLimit(igUserId: string, token: string): Promise<bo
   return hasPublishingRoom((await res.json()) as PublishingLimit)
 }
 
+type GraphError = { message?: string; code?: number; error_user_msg?: string }
+
+/** Meta's own words for a failed call, so the Control Room shows why instead of an empty error. */
+export function graphErrorText(body: { error?: GraphError } | null | undefined, status: number): string {
+  const e = body?.error
+  const why = e?.error_user_msg ?? e?.message ?? `HTTP ${status}`
+  return `${why}${e?.code ? ` (code ${e.code})` : ''}`
+}
+
+type RecentMedia = { id?: string; caption?: string; timestamp?: string }
+
+/** Instagram stamps timestamps as "2026-10-17T21:40:26+0000"; make that parseable everywhere. */
+function mediaTime(ts: string | undefined): number {
+  return ts ? Date.parse(ts.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')) : NaN
+}
+
+/** A post of ours that is already live: same caption, published after we started. Used when media_publish answers with an error. */
+export function findPublishedMedia(media: RecentMedia[], caption: string, since: number): RecentMedia | undefined {
+  return media.find((m) => m.id && (m.caption ?? '').trim() === caption.trim() && mediaTime(m.timestamp) >= since - 60_000)
+}
+
 export async function postInstagram(
   input: { articleId: string; copy: { instagram: string }; mediaUrls: string[]; url?: string },
-  deps: { env: WorkerEnv; payload: PayloadClient; postedToday?: number; settingsDailyCap?: number },
+  deps: { env: WorkerEnv; payload: PayloadClient; postedToday?: number; settingsDailyCap?: number; sleep?: (ms: number) => Promise<void> },
 ): Promise<void> {
-  const format = input.mediaUrls.length > 1 ? 'carousel' : 'card'
+  // One image goes out (pickCard): the extra URLs are the same card in other sizes, not carousel slides.
+  const format = 'card'
   const key = socialIdempotencyKey(input.articleId, 'instagram', format)
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
 
   if (!deps.env.IG_USER_ID || !deps.env.META_PAGE_TOKEN) {
     logger.debug('Instagram skipped — API not configured')
@@ -48,34 +71,43 @@ export async function postInstagram(
     return
   }
 
+  const caption = withLink(input.copy.instagram, input.url, 'instagram')
+  const startedAt = Date.now()
+  const token = deps.env.META_PAGE_TOKEN
   try {
     const createUrl = `https://graph.facebook.com/v21.0/${deps.env.IG_USER_ID}/media`
-    const createBody = new URLSearchParams({
-      image_url: image,
-      caption: withLink(input.copy.instagram, input.url, 'instagram'),
-      access_token: deps.env.META_PAGE_TOKEN,
-    })
+    const createBody = new URLSearchParams({ image_url: image, caption, access_token: token })
     const createRes = await fetch(createUrl, { method: 'POST', body: createBody })
-    const created = (await createRes.json()) as { id?: string; error?: { message?: string; code?: number; error_user_msg?: string } }
+    const created = (await createRes.json()) as { id?: string; error?: GraphError }
     // Keep Meta's reason (e.g. "The Instagram account is restricted.", code 25) so the Control Room shows it
-    if (!created.id) {
-      const why = created.error?.error_user_msg ?? created.error?.message ?? `HTTP ${createRes.status}`
-      throw new Error(`IG container create failed: ${why}${created.error?.code ? ` (code ${created.error.code})` : ''}`)
-    }
+    if (!created.id) throw new Error(`IG container create failed: ${graphErrorText(created, createRes.status)}`)
 
-    for (let i = 0; i < 10; i++) {
-      await new Promise((r) => setTimeout(r, 2000))
-      const statusUrl = `https://graph.facebook.com/v21.0/${created.id}?fields=status_code&access_token=${encodeURIComponent(deps.env.META_PAGE_TOKEN)}`
-      const st = await fetch(statusUrl)
-      const stData = (await st.json()) as { status_code?: string }
-      if (stData.status_code === 'FINISHED') break
-      if (stData.status_code === 'ERROR') throw new Error('IG container error')
+    // Publishing before the container is FINISHED is rejected, so wait for it (up to ~40 s)
+    let finished = false
+    for (let i = 0; i < 20 && !finished; i++) {
+      await sleep(2000)
+      const statusUrl = `https://graph.facebook.com/v21.0/${created.id}?fields=status_code&access_token=${encodeURIComponent(token)}`
+      const stData = (await (await fetch(statusUrl)).json()) as { status_code?: string }
+      if (stData.status_code === 'FINISHED') finished = true
+      else if (stData.status_code === 'ERROR') throw new Error('IG container error')
     }
+    if (!finished) throw new Error('IG container was not ready after 40 s')
 
     const pubUrl = `https://graph.facebook.com/v21.0/${deps.env.IG_USER_ID}/media_publish`
-    const pubBody = new URLSearchParams({ creation_id: created.id!, access_token: deps.env.META_PAGE_TOKEN })
+    const pubBody = new URLSearchParams({ creation_id: created.id, access_token: token })
     const pubRes = await fetch(pubUrl, { method: 'POST', body: pubBody })
-    const pub = (await pubRes.json()) as { id?: string }
+    const pub = (await pubRes.json().catch(() => ({}))) as { id?: string; error?: GraphError }
+
+    let externalId = pubRes.ok ? pub.id : undefined
+    if (!externalId) {
+      // media_publish answered with an error, but Instagram often publishes anyway: look for the post before calling it failed (ZAV-114)
+      await sleep(3000)
+      const listUrl = `https://graph.facebook.com/v21.0/${deps.env.IG_USER_ID}/media?fields=id,caption,timestamp&limit=10&access_token=${encodeURIComponent(token)}`
+      const list = (await (await fetch(listUrl)).json().catch(() => ({}))) as { data?: RecentMedia[] }
+      externalId = findPublishedMedia(list.data ?? [], caption, startedAt)?.id
+      if (!externalId) throw new Error(`IG publish failed: ${graphErrorText(pub, pubRes.status)}`)
+      logger.warn({ articleId: input.articleId, igMediaId: externalId, why: graphErrorText(pub, pubRes.status) }, 'Instagram publish answered with an error but the post is live')
+    }
 
     await deps.payload.upsertSocialPost({
       idempotencyKey: key,
@@ -84,10 +116,10 @@ export async function postInstagram(
       format,
       copy: input.copy.instagram,
       mediaUrls: input.mediaUrls,
-      status: pubRes.ok ? 'posted' : 'failed',
-      externalId: pub.id,
+      status: 'posted',
+      externalId,
       via: 'api',
-      postedAt: pubRes.ok ? new Date().toISOString() : undefined,
+      postedAt: new Date().toISOString(),
     })
   } catch (e) {
     logger.warn({ err: e }, 'Instagram post failed')
