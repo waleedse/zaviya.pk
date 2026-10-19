@@ -1,0 +1,33 @@
+name: Uptime
+# Runs on GitHub, not on our VPS, so a dead server still raises an incident (ZAV-126).
+# Two failed checks in a row (45 s apart) open a Linear `incident` issue (or comment on the open one) and
+# turn this run red, which makes GitHub email the schedule owner. Recovery comments the downtime.
+# Test it: run the workflow by hand on a branch with base_url set to a URL that 404s (e.g. https://zaviya.pk/nope).
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to check
+        default: https://zaviya.pk
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ops/bin/uptime-check.mjs --base "${{ inputs.base_url || 'https://zaviya.pk' }}"
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

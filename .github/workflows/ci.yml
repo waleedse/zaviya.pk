@@ -28,3 +28,5 @@ jobs:
         run: pnpm --filter @zaviya/shared --filter @zaviya/llm --filter @zaviya/worker --filter @zaviya/web run typecheck
       - name: Unit tests
         run: pnpm --filter @zaviya/llm --filter @zaviya/worker --filter @zaviya/extension run test
+      - name: Ops scripts
+        run: node --test ops/bin/uptime-check.test.mjs
