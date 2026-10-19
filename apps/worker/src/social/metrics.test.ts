@@ -46,6 +46,31 @@ describe('fetchers', () => {
     })
     expect(await fetchFacebookMetrics('9_1', 't', f)).toEqual({ reactions: 5, comments: 2, shares: 1, reach: 90, linkClicks: 7 })
   })
+  it('resolves a photo id to its post id before reading Facebook metrics (ZAV-130)', async () => {
+    const urls: string[] = []
+    const inner = reply({
+      'fields=page_story_id': { body: { page_story_id: '99_123', id: '123' } },
+      '/99_123/insights': { body: { data: [{ name: 'post_total_media_view_unique', values: [{ value: 40 }] }] } },
+      '/99_123?': { body: { reactions: { summary: { total_count: 3 } }, comments: { summary: { total_count: 0 } }, shares: { count: 0 } } },
+    })
+    const f = (async (u: unknown, i?: RequestInit) => (urls.push(String(u)), inner(u as RequestInfo, i))) as unknown as typeof fetch
+    const m = await fetchFacebookMetrics('123', 't', f)
+    expect(m).toMatchObject({ reactions: 3, reach: 40 })
+    expect(m.error).toBeUndefined()
+    expect(m.insightsError).toBeUndefined()
+    expect(urls[0]).toContain('/123?fields=page_story_id')
+  })
+  it('falls back to the older reach metric and only reports insights errors when nothing came back', async () => {
+    const f = reply({
+      'metric=post_total_media_view_unique': { ok: false, body: { error: { message: '(#100) The value must be a valid insights metric' } } },
+      'metric=post_impressions_unique': { body: { data: [{ name: 'post_impressions_unique', values: [{ value: 12 }] }] } },
+      'metric=post_clicks': { ok: false, body: { error: { message: '(#100) The value must be a valid insights metric' } } },
+      '/9_1?': { body: { reactions: { summary: { total_count: 1 } } } },
+    })
+    const m = await fetchFacebookMetrics('9_1', 't', f)
+    expect(m.reach).toBe(12)
+    expect(m.insightsError).toBeUndefined()
+  })
   const creds = { consumerKey: 'a', consumerSecret: 'b', accessToken: 'c', accessTokenSecret: 'd' }
   it('reads X public_metrics and reports an auth failure', async () => {
     const ok = reply({ '/2/tweets/55': { body: { data: { public_metrics: { impression_count: 100, like_count: 4, reply_count: 1, retweet_count: 2, quote_count: 1 } } } } })

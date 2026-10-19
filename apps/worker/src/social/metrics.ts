@@ -52,8 +52,23 @@ export async function fetchInstagramMetrics(mediaId: string, token: string, fetc
   return out
 }
 
-export async function fetchFacebookMetrics(postId: string, token: string, fetchFn: FetchFn = fetch): Promise<MetricValues> {
+/**
+ * Facebook photo posts used to be stored under the photo id, a node that has no reactions, shares or insights
+ * ("Tried accessing nonexisting field"). page_story_id turns it into the post id; ids that already have an
+ * underscore are post ids.
+ */
+async function resolveFacebookPostId(fetchFn: FetchFn, id: string, token: string): Promise<string> {
+  if (id.includes('_')) return id
+  const r = await getJson(fetchFn, `${GRAPH}/${id}?fields=page_story_id&access_token=${encodeURIComponent(token)}`)
+  return r.ok && typeof r.body?.page_story_id === 'string' ? r.body.page_story_id : id
+}
+
+/** Reach: the current metric first, the one Meta retired as fallback; a bad metric name must not hide the others */
+const FB_REACH_METRICS = ['post_total_media_view_unique', 'post_impressions_unique']
+
+export async function fetchFacebookMetrics(rawId: string, token: string, fetchFn: FetchFn = fetch): Promise<MetricValues> {
   const out: MetricValues = {}
+  const postId = await resolveFacebookPostId(fetchFn, rawId, token)
   const base = await getJson(
     fetchFn,
     `${GRAPH}/${postId}?fields=reactions.summary(true).limit(0),comments.summary(true).limit(0),shares&access_token=${encodeURIComponent(token)}`,
@@ -66,16 +81,26 @@ export async function fetchFacebookMetrics(postId: string, token: string, fetchF
     // e.g. "(#10) requires pages_read_user_content": the Meta token needs more permissions
     out.error = graphError(base.body)
   }
-  const ins = await getJson(fetchFn, `${GRAPH}/${postId}/insights?metric=post_impressions_unique,post_clicks&access_token=${encodeURIComponent(token)}`)
-  if (ins.ok) {
-    for (const m of ins.body.data ?? []) {
-      const v = Number(m.values?.[0]?.value ?? 0)
-      if (m.name === 'post_impressions_unique') out.reach = v
-      if (m.name === 'post_clicks') out.linkClicks = v
+  let insightsError: string | undefined
+  const insight = async (metric: string): Promise<number | undefined> => {
+    const r = await getJson(fetchFn, `${GRAPH}/${postId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`)
+    if (!r.ok) {
+      insightsError = graphError(r.body)
+      return undefined
     }
-  } else {
-    out.insightsError = graphError(ins.body)
+    const m = (r.body.data ?? []).find((x: { name: string }) => x.name === metric)
+    return m ? Number(m.values?.[0]?.value ?? 0) : undefined
   }
+  for (const metric of FB_REACH_METRICS) {
+    const v = await insight(metric)
+    if (v !== undefined) {
+      out.reach = v
+      break
+    }
+  }
+  const clicks = await insight('post_clicks')
+  if (clicks !== undefined) out.linkClicks = clicks
+  if (insightsError && out.reach === undefined && out.linkClicks === undefined) out.insightsError = insightsError
   return out
 }
 
