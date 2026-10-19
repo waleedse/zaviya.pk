@@ -4,6 +4,7 @@ import { socialIdempotencyKey } from '../lib/idempotency.js'
 import { buildOAuthHeader } from './x-oauth.js'
 import { logger } from '../logger.js'
 import { withLink } from './link.js'
+import { blockXUntilMidnight, isXDailyLimit, xPostingBlocked } from './x-limit.js'
 import type { BridgeServer } from '../bridge/server.js'
 import type { Priority } from '@zaviya/shared'
 
@@ -64,6 +65,11 @@ export async function postX(
     }
   }
 
+  if (xPostingBlocked()) {
+    logger.info({ articleId: input.articleId }, 'X posting paused: X reported its daily post limit, resumes at 00:00 PKT')
+    return
+  }
+
   if (deps.bridge?.isConnected('x')) {
     try {
       // Long timeout: a stuck page may be looked at and healed (a few seconds each) before the job is retried
@@ -87,6 +93,9 @@ export async function postX(
       return
     } catch (e) {
       logger.warn({ err: e }, 'X bridge post failed')
+      if (isXDailyLimit(e instanceof Error ? e.message : String(e))) {
+        logger.warn({ resumesAt: new Date(blockXUntilMidnight()).toISOString() }, 'X daily post limit reached: pausing X posts until 00:00 PKT')
+      }
       // The error text says what the extension saw and did: "... | healed: ..." or "... | needs you: ..."
       await deps.payload
         .upsertSocialPost({

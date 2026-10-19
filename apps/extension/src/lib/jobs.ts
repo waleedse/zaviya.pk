@@ -1,7 +1,7 @@
 import type { BridgeJob, GeminiImageResult } from '@zaviya/shared'
 import type { GeminiSelectors, GeneratedImage } from './gemini-dom'
 import { getSettings } from './storage'
-import { ensureGeminiWindowTab, ensureOwnTab, ensureTab, findTabForPlatform, sendToTab, showBriefly, withTimeout } from './tabs'
+import { ensureGeminiWindowTab, ensureOwnTab, ensureTab, findTabForPlatform, navigateLeavingDrafts, sendToTab, showBriefly, withTimeout } from './tabs'
 
 function unwrapTabResponse<T>(res: T): T {
   if (res && typeof res === 'object' && 'error' in res && typeof (res as { error: string }).error === 'string') {
@@ -148,6 +148,14 @@ async function fetchXImage(mediaUrls: string[]): Promise<{ base64: string; type:
   }
 }
 
+/** Which one-time recovery an X post error allows. Only errors where nothing was posted qualify. */
+export function xPostRecovery(e: unknown): 'compose' | 'reload' | null {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (msg.startsWith('composer_not_found')) return 'compose'
+  if (msg.startsWith('content_script_unreachable')) return 'reload'
+  return null
+}
+
 async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<unknown> {
   // Always start from the home timeline, and bring the tab forward while posting: X does not
   // reliably mount its composer in a background tab or on a page without the Post button.
@@ -156,18 +164,32 @@ async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<un
   await chrome.tabs.update(tabId, { active: true })
   const settings = await getSettings()
   const image = await fetchXImage(job.payload.mediaUrls)
+  const message = {
+    kind: 'zaviya',
+    action: 'x.post',
+    text: job.payload.text,
+    mediaUrls: job.payload.mediaUrls,
+    image,
+    delayMinMs: settings.actionDelayMinMs,
+    delayMaxMs: settings.actionDelayMaxMs,
+  }
   try {
-    return unwrapTabResponse(
-      await sendToTab<{ externalId?: string }>(tabId, {
-        kind: 'zaviya',
-        action: 'x.post',
-        text: job.payload.text,
-        mediaUrls: job.payload.mediaUrls,
-        image,
-        delayMinMs: settings.actionDelayMinMs,
-        delayMaxMs: settings.actionDelayMaxMs,
-      }),
-    )
+    try {
+      return unwrapTabResponse(await sendToTab<{ externalId?: string }>(tabId, message))
+    } catch (e) {
+      // Nothing was sent in these two cases, so one more try is safe (ZAV-123). Anything else (e.g. post_not_sent) is never repeated.
+      const recovery = xPostRecovery(e)
+      if (!recovery) throw e
+      if (recovery === 'compose') {
+        // The home page had no composer: open X's own compose page instead
+        await navigateLeavingDrafts(tabId, 'https://x.com/compose/post')
+      } else {
+        // The content script is gone (tab crashed or never injected): reload the tab so it is injected again
+        await chrome.tabs.reload(tabId)
+        await sleep(6_000)
+      }
+      return unwrapTabResponse(await sendToTab<{ externalId?: string }>(tabId, message))
+    }
   } finally {
     if (previous?.id !== undefined && previous.id !== tabId) await chrome.tabs.update(previous.id, { active: true }).catch(() => undefined)
   }

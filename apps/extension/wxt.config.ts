@@ -8,7 +8,7 @@ export default defineConfig({
   manifest: {
     name: 'Zaviya Bridge',
     description: 'Local bridge for the Zaviya worker: Gemini images, X/Instagram discovery and posting',
-    version: '0.4.0',
+    version: '0.4.1',
     // debugger: trusted keyboard input for Gemini, which ignores script-made clicks and key presses
     permissions: ['storage', 'tabs', 'alarms', 'debugger', 'scripting', 'idle'],
     host_permissions: [
