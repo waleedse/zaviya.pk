@@ -1,8 +1,7 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { getStaticPage } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
-import { aboutPageJsonLd, buildPageMetadata } from '@/lib/seo'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { buildPageMetadata } from '@/lib/seo'
 import { PageHero } from '@/components/layout/PageHero'
 import { FileText } from 'lucide-react'
 import { localePath, t } from '@/lib/i18n'
@@ -43,6 +42,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function StaticPage({ params }: { params: Promise<{ locale: string; slug: string }> }) {
   const { locale: l, slug } = await params
   const locale = parseLocale(l)
+  // The brand page lives at /about (ZAV-131); the old CMS URL redirects there.
+  if (slug === 'about') permanentRedirect(localePath(locale, '/about'))
   const page = await getStaticPage(locale, slug)
   if (!page) notFound()
   const d = t(locale)
@@ -79,7 +80,6 @@ export default async function StaticPage({ params }: { params: Promise<{ locale:
 
   return (
     <div className="pb-10">
-      {slug === 'about' ? <JsonLd data={aboutPageJsonLd(locale)} /> : null}
       <PageHero
         title={page.title}
         crumbs={[{ label: d.nav.home, href: localePath(locale, '/') }, { label: page.title }]}

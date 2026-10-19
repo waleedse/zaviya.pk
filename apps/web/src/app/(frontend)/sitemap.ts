@@ -37,8 +37,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/baby-names`, changeFrequency: 'weekly', priority: 0.8 })
   entries.push({ url: `${siteUrl}/prize-bond-schedule`, changeFrequency: 'weekly', priority: 0.8 })
 
+  entries.push({ url: `${siteUrl}/about`, changeFrequency: 'monthly', priority: 0.7 })
+  entries.push({ url: `${siteUrl}/ur/about`, changeFrequency: 'monthly', priority: 0.5 })
+
   const pages = await payload.find({ collection: 'pages', limit: 50, depth: 0 })
-  for (const p of pages.docs) {
+  // /p/about redirects to /about, so it stays out of the sitemap
+  for (const p of pages.docs.filter((d) => d.slug !== 'about')) {
     entries.push({ url: `${siteUrl}/p/${p.slug}`, changeFrequency: 'monthly', priority: 0.5 })
     entries.push({ url: `${siteUrl}/ur/p/${p.slug}`, changeFrequency: 'monthly', priority: 0.5 })
   }

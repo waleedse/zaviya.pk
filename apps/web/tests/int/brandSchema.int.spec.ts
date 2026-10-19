@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutPageJsonLd, organizationId, organizationJsonLd, SECTION_SEO, websiteJsonLd } from '../../src/lib/seo'
+import { aboutPageJsonLd, organizationId, organizationJsonLd, SECTION_SEO, socialProfileUrls, websiteJsonLd } from '../../src/lib/seo'
 
 describe('brand entity (ZAV-100)', () => {
   it('titles the homepage "Zaviya News: ..." within 50-65 characters', () => {
@@ -23,6 +23,20 @@ describe('brand entity (ZAV-100)', () => {
     expect((websiteJsonLd('en') as Record<string, any>).publisher).toEqual({ '@id': organizationId() })
     const a = aboutPageJsonLd('en') as Record<string, any>
     expect(a['@type']).toBe('AboutPage')
-    expect(a.about).toEqual({ '@id': organizationId() })
+    expect(a.url).toMatch(/\/about$/)
+    expect(a.about['@id']).toBe(organizationId())
+    expect(a.about.name).toBe('Zaviya News')
+    expect(a.about.alternateName).toEqual(['Zaviya', 'Zaviya.pk'])
+  })
+  it('lists the official profiles from SOCIAL_PROFILE_URLS as sameAs, https only', () => {
+    const prev = process.env.SOCIAL_PROFILE_URLS
+    process.env.SOCIAL_PROFILE_URLS = 'https://x.com/zaviya, http://bad.example, https://facebook.com/zaviya ,'
+    try {
+      expect(socialProfileUrls()).toEqual(['https://x.com/zaviya', 'https://facebook.com/zaviya'])
+      expect((aboutPageJsonLd('en') as Record<string, any>).about.sameAs).toEqual(socialProfileUrls())
+    } finally {
+      if (prev === undefined) delete process.env.SOCIAL_PROFILE_URLS
+      else process.env.SOCIAL_PROFILE_URLS = prev
+    }
   })
 })
