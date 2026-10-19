@@ -1,4 +1,4 @@
-import { Queue, Worker, type ConnectionOptions } from 'bullmq'
+import { DelayedError, Queue, Worker, type ConnectionOptions } from 'bullmq'
 import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
 import { embedder, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
@@ -22,6 +22,7 @@ import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
 import { findDuplicateStory } from './social/guards.js'
+import { decideSlot, pktDayStart } from './social/caps.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
@@ -297,7 +298,7 @@ export async function createWorkerRuntime(
   workers.push(
     new Worker(
       'social',
-      async (job) => {
+      async (job, token) => {
         const d = job.data as {
           articleId: string
           platform: 'facebook' | 'instagram' | 'x'
@@ -321,6 +322,26 @@ export async function createWorkerRuntime(
           () => ({}) as import('./payload-client.js').PipelineSettings,
         )
         const cap = settings.dailyCaps?.[d.platform]
+        // ZAV-115: daily cap, peak hours and spacing. If the count cannot be read, wait and retry rather than post blind.
+        const now = Date.now()
+        const sent = await payload.getSocialCount(pktDayStart(now))
+        const slot = decideSlot({
+          platform: d.platform,
+          priority: d.priority,
+          now,
+          queuedAt: job.timestamp,
+          settingsCaps: settings.dailyCaps,
+          postedToday: sent.counts[d.platform] ?? 0,
+          lastPostedAt: sent.lastPostedAt[d.platform],
+        })
+        if (slot.action === 'skip') {
+          logger.info({ articleId: d.articleId, platform: d.platform, reason: slot.reason }, 'social post skipped')
+          return { skipped: slot.reason }
+        }
+        if (slot.action === 'delay') {
+          await job.moveToDelayed(slot.until + Math.floor(Math.random() * 60_000), token)
+          throw new DelayedError()
+        }
         if (d.platform === 'facebook') {
           await postFacebook(
             { articleId: d.articleId, copy: d.copy, mediaUrls: d.mediaUrls, url: d.url },

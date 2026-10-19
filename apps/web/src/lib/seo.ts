@@ -39,6 +39,15 @@ export function baseRobots(): Metadata['robots'] {
   }
 }
 
+/** Longest <title> that still shows whole in search results; the brand is added only when it fits */
+export const TITLE_MAX = 65
+
+/** "Headline | Zaviya News" when it fits in 65 characters; otherwise the headline alone (never shortened) */
+export function brandedTitle(headline: string, locale: Locale = 'en'): string {
+  const full = `${headline} | ${locale === 'ur' ? SITE.nameUr : SITE.brandName}`
+  return full.length <= TITLE_MAX ? full : headline
+}
+
 export function buildPageMetadata(opts: {
   locale: Locale
   title: string
@@ -58,7 +67,7 @@ export function buildPageMetadata(opts: {
   section?: string
   tags?: string[]
   noindex?: boolean
-  /** Use the title as-is, without the "| Zaviya" template */
+  /** Use the title as-is, without the " | Zaviya News" suffix */
   absoluteTitle?: boolean
 }): Metadata {
   const { locale, title, description, enPath, ogImage, type = 'website', publishedTime, modifiedTime } = opts
@@ -70,8 +79,8 @@ export function buildPageMetadata(opts: {
   const image = ogImage?.startsWith('/') ? absoluteUrl(ogImage) : ogImage ?? absoluteUrl(`/api/og?${new URLSearchParams({ title: title.slice(0, 120) }).toString()}`)
 
   return {
-    // Long headlines skip the " | Zaviya" suffix so Google shows them whole (~60 chars).
-    title: opts.absoluteTitle || title.length > 52 ? { absolute: title } : title,
+    // " | Zaviya News" is added only when the whole title stays within 65 characters (ZAV-125).
+    title: { absolute: opts.absoluteTitle ? title : brandedTitle(title, locale) },
     description,
     ...(opts.keywords?.length ? { keywords: opts.keywords } : {}),
     alternates,
@@ -80,7 +89,7 @@ export function buildPageMetadata(opts: {
       title,
       description,
       url,
-      siteName: locale === 'ur' ? SITE.nameUr : SITE.name,
+      siteName: locale === 'ur' ? SITE.nameUr : SITE.brandName,
       locale: locale === 'ur' ? 'ur_PK' : 'en_PK',
       alternateLocale: locale === 'ur' ? ['en_PK'] : ['ur_PK'],
       type,
@@ -192,9 +201,9 @@ export function organizationJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'NewsMediaOrganization',
     '@id': organizationId(),
-    name: SITE.name,
+    name: SITE.brandName,
     url: siteUrl(),
-    alternateName: ['Zaviya News', 'Zaviya.pk', 'زاویہ'],
+    alternateName: [...SITE.brandAlternateNames],
     description: 'Zaviya (zaviya.pk) is a Pakistani digital newsroom publishing the latest Pakistan news, business, cricket, jobs and daily gold, dollar and petrol rates in English and Urdu.',
     foundingDate: '2026',
     areaServed: { '@type': 'Country', name: 'Pakistan' },
@@ -214,9 +223,9 @@ export function websiteJsonLd(locale: Locale) {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: SITE.name,
+    name: SITE.brandName,
     // Google reads the site name shown in results from here
-    alternateName: ['Zaviya News', 'Zaviya.pk'],
+    alternateName: [...SITE.brandAlternateNames],
     url: absoluteUrl(prefix || '/'),
     publisher: { '@id': organizationId() },
     potentialAction: {
@@ -271,7 +280,7 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     },
     publisher: {
       '@type': 'Organization',
-      name: SITE.name,
+      name: SITE.brandName,
       logo: { '@type': 'ImageObject', url: logoUrl(), width: 512, height: 512 },
     },
     mainEntityOfPage: absoluteUrl(locale === 'ur' ? article.href : path),

@@ -290,6 +290,14 @@ export class PayloadClient {
     return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/social-posts', payload)
   }
 
+  /** Posts that went out since `sinceIso` (posted, in flight, or marked failed but live), per platform, with the last post time (ZAV-115) */
+  getSocialCount(sinceIso: string) {
+    return this.request<{ counts: Record<string, number>; lastPostedAt: Record<string, string | null> }>(
+      'GET',
+      `/api/pipeline/social-count?since=${encodeURIComponent(sinceIso)}`,
+    )
+  }
+
   /** Stories already posted (or queued) on a platform in the last `hours` (ZAV-120) */
   getRecentSocialPosts(platform: string, hours = 6) {
     return this.request<{ posts: { articleId: string; clusterId: string | null; title: string }[] }>(
