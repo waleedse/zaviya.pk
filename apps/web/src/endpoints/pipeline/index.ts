@@ -11,6 +11,7 @@ import {
 } from './helpers'
 import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
+import { pageviewsReport } from '../../lib/pageviews-report'
 import { revalidateDataTag } from '../../lib/revalidate'
 import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
 
@@ -731,6 +732,16 @@ const pipelineEndpoints: Endpoint[] = [
         return [{ articleId: String(a.id), clusterId: c == null ? null : String(typeof c === 'object' ? c.id : c), title: a.title }]
       })
       return json({ posts })
+    },
+  },
+  {
+    // ZAV-116: read-only pageviews per PKT day by traffic source, for the PM scoreboard.
+    path: '/pipeline/analytics/pageviews',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json(await pageviewsReport(req.payload, Number(req.searchParams?.get('days') ?? 14)))
     },
   },
   {
