@@ -8,6 +8,23 @@ export async function GET(req: NextRequest) {
   const title = searchParams.get('title') ?? 'Zaviya'
   const kicker = searchParams.get('kicker') ?? 'Pakistan'
 
+  // Portrait 3:4 poster for Web Stories (ZAV-127)
+  if (searchParams.get('variant') === 'story') {
+    return new ImageResponse(
+      (
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: '#0B0F17', color: '#ECEDEE', fontFamily: 'system-ui', padding: 56, borderLeft: '8px solid #2BB38A' }}>
+          <div style={{ fontSize: 22, letterSpacing: 4, textTransform: 'uppercase', color: '#2BB38A' }}>{kicker}</div>
+          <div style={{ fontSize: 60, fontWeight: 700, lineHeight: 1.1 }}>{title}</div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 32, fontWeight: 600 }}>
+            <span style={{ color: '#2BB38A' }}>z</span>
+            <span>aviya</span>
+          </div>
+        </div>
+      ),
+      { width: 720, height: 960 },
+    )
+  }
+
   return new ImageResponse(
     (
       <div
