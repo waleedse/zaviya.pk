@@ -1,4 +1,6 @@
 import { articleUrl } from '../social/link.js'
+import { numbersNotInArticle } from '../social/guards.js'
+import { socialIdempotencyKey } from '../lib/idempotency.js'
 import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 import type { PayloadClient } from '../payload-client.js'
@@ -304,7 +306,26 @@ export async function processPublishJob(
   logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId) }, 'published')
 
   const platforms = ['facebook', 'instagram', 'x'] as const
+  // Social copy may not change a figure (ZAV-120): hold a platform's post when it states a number the article does not
+  const articleText = [data.write.en.title, data.write.en.dek, ...data.write.en.keyPoints, data.write.en.bodyMarkdown, data.write.en.whatItMeans].join('\n')
   for (let i = 0; i < platforms.length; i++) {
+    const wrong = numbersNotInArticle(data.write.en.socialCopy[platforms[i]!], articleText)
+    if (wrong.length) {
+      logger.warn({ articleId: res.id, platform: platforms[i], wrong }, 'social copy held: number mismatch')
+      await deps.payload
+        .upsertSocialPost({
+          idempotencyKey: socialIdempotencyKey(String(res.id), platforms[i]!, 'text'),
+          article: String(res.id),
+          platform: platforms[i]!,
+          format: 'text',
+          copy: data.write.en.socialCopy[platforms[i]!],
+          mediaUrls: [],
+          status: 'failed',
+          error: `number mismatch: ${wrong.join(', ')}`,
+        })
+        .catch((e) => logger.warn({ err: e }, 'could not record the held social post'))
+      continue
+    }
     await deps.socialQueue.add(
       `social-${platforms[i]}`,
       {
@@ -312,6 +333,8 @@ export async function processPublishJob(
         platform: platforms[i],
         priority: data.priority,
         copy: data.write.en.socialCopy,
+        title: data.write.en.title,
+        clusterId: data.clusterId,
         mediaUrls: data.socialMediaUrls ?? [],
         url: articleUrl(category, data.write.en.slug),
       },

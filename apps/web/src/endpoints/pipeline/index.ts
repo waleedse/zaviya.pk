@@ -696,6 +696,44 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // ZAV-120: stories already posted on a platform lately, so the social worker never posts one story twice.
+    path: '/pipeline/social-recent',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const platform = req.searchParams?.get('platform') ?? ''
+      if (!['facebook', 'instagram', 'x'].includes(platform)) return badRequest('platform must be facebook, instagram or x')
+      const hours = Math.min(Math.max(Number(req.searchParams?.get('hours') ?? 6) || 6, 1), 48)
+      const rows = await req.payload.find({
+        collection: 'social-posts',
+        where: {
+          and: [
+            { platform: { equals: platform } },
+            { createdAt: { greater_than_equal: new Date(Date.now() - hours * 3_600_000).toISOString() } },
+            {
+              or: [
+                { status: { in: ['posted', 'posting', 'queued'] } },
+                { and: [{ status: { equals: 'failed' } }, { externalId: { exists: true } }] },
+              ],
+            },
+          ],
+        },
+        depth: 1,
+        locale: 'en',
+        limit: 300,
+        overrideAccess: true,
+      })
+      const posts = rows.docs.flatMap((d) => {
+        const a = d.article as { id?: number | string; title?: string; storyCluster?: number | string | { id: number | string } | null } | number | string | null
+        if (!a || typeof a !== 'object' || !a.title) return []
+        const c = a.storyCluster
+        return [{ articleId: String(a.id), clusterId: c == null ? null : String(typeof c === 'object' ? c.id : c), title: a.title }]
+      })
+      return json({ posts })
+    },
+  },
+  {
     // ZAV-108: posts that went out lately and have an external id, with the metrics already stored, so the worker knows what to fetch.
     path: '/pipeline/social-posts/recent',
     method: 'get',
