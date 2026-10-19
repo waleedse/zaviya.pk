@@ -307,7 +307,17 @@ export async function processPublishJob(
 
   const platforms = ['facebook', 'instagram', 'x'] as const
   // Social copy may not change a figure (ZAV-120): hold a platform's post when it states a number the article does not
-  const articleText = [data.write.en.title, data.write.en.dek, ...data.write.en.keyPoints, data.write.en.bodyMarkdown, data.write.en.whatItMeans].join('\n')
+  const articleText = [
+    data.write.en.title,
+    data.write.en.dek,
+    data.write.en.metaDescription ?? '',
+    ...(data.write.en.titleOptions ?? []),
+    ...data.write.en.keyPoints,
+    data.write.en.bodyMarkdown,
+    data.write.en.whatItMeans,
+    ...(data.write.en.faqs ?? []).flatMap((f) => [f.q, f.a]),
+    data.write.en.card?.figure ? `${data.write.en.card.figure.value} ${data.write.en.card.figure.label}` : '',
+  ].join('\n')
   for (let i = 0; i < platforms.length; i++) {
     const wrong = numbersNotInArticle(data.write.en.socialCopy[platforms[i]!], articleText)
     if (wrong.length) {

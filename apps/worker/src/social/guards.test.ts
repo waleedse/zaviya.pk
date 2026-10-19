@@ -15,6 +15,22 @@ describe('numbersNotInArticle', () => {
   })
 })
 
+describe('numbersNotInArticle: valid shorthand (ZAV-130)', () => {
+  it('accepts k / m / bn shorthand for the full figure and the reverse', () => {
+    const text = 'Daily hot meals drop from 250,000 to 150,000. The caseload fell from 1.6 million to 1.1 million. Wheat: 160,000 of 2.5 million tonnes.'
+    expect(numbersNotInArticle('Hot meals 250k to 150k a day; caseload 1.6m to 1.1m; 160k of 2.5m tonnes', text)).toEqual([])
+    expect(numbersNotInArticle('Reserves 21,500,000,000', 'Reserves hit $21.5bn')).toEqual([])
+  })
+  it('still catches a wrong figure behind a suffix', () => {
+    expect(numbersNotInArticle('Hot meals 350k a day', 'Daily hot meals drop from 250,000 to 150,000')).toEqual(['350'])
+    expect(numbersNotInArticle('Reserves $1.5bn', article)).toEqual(['1.5'])
+  })
+  it('accepts numbers the article spells out in words', () => {
+    expect(numbersNotInArticle('4 militants killed; night cuts now 2 hours', 'Four militants were killed. Night cuts stay at two hours.')).toEqual([])
+    expect(numbersNotInArticle('7 militants killed', 'Four militants were killed.')).toEqual(['7'])
+  })
+})
+
 describe('duplicate stories', () => {
   const a = 'SBP governor economic outlook Jameel Ahmad Bangkok'
   const b = 'SBP governor Jameel Ahmad says Pakistan economy shock absorbed'
