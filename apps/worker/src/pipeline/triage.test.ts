@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { QuotaExhaustedError } from '@zaviya/llm'
-import { processTriageJob } from './triage.js'
+import { DEFER_RELEASE_MIN, processTriageJob, releaseDeferredClusters } from './triage.js'
 
 describe('processTriageJob', () => {
   it('requeues the cluster with a delay when LLM quota is exhausted', async () => {
@@ -94,5 +94,56 @@ describe('processTriageJob', () => {
     broken.payload.recentArticles.mockRejectedValue(new Error('boom'))
     await processTriageJob({ clusterId: '9409' }, broken as never)
     expect(broken.writeQueue.add).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('releaseDeferredClusters (ZAV-144)', () => {
+  const T = Date.parse('2026-10-20T10:00:00Z')
+  it('asks for clusters idle for the release time and queues each once per 15-minute slot', async () => {
+    const deferredClusters = vi.fn().mockResolvedValue({ clusters: [{ id: '9548', updatedAt: 'x', reason: 'Minimum interval 15m not met since last publish' }, { id: '9706', updatedAt: 'x', reason: '' }] })
+    const add = vi.fn()
+    const n = await releaseDeferredClusters({ payload: { deferredClusters }, triageQueue: { add } }, T + 15 * 60_000)
+    expect(deferredClusters).toHaveBeenCalledWith(DEFER_RELEASE_MIN)
+    expect(n).toBe(2)
+    expect(add).toHaveBeenCalledTimes(2)
+    expect(add.mock.calls[0]![1]).toEqual({ clusterId: '9548' })
+    // same cluster in the same slot gets the same job id (BullMQ drops the duplicate); the next slot a new one
+    const id = (t: number) => {
+      const a = vi.fn()
+      return releaseDeferredClusters({ payload: { deferredClusters }, triageQueue: { add: a } }, t).then(() => a.mock.calls[0]![2].jobId as string)
+    }
+    expect(await id(T + 16 * 60_000)).toBe(await id(T + 20 * 60_000))
+    expect(await id(T + 16 * 60_000)).not.toBe(await id(T + 31 * 60_000))
+  })
+  it('does nothing when nothing is deferred', async () => {
+    const add = vi.fn()
+    expect(await releaseDeferredClusters({ payload: { deferredClusters: vi.fn().mockResolvedValue({ clusters: [] }) }, triageQueue: { add } })).toBe(0)
+    expect(add).not.toHaveBeenCalled()
+  })
+})
+
+describe('a deferred cluster once the interval has passed (ZAV-144)', () => {
+  const good = JSON.stringify({ pakistanRelevance: 0.9, newsworthiness: 0.9, sourceCredibility: 0.9, category: 'pakistan', sensitivityFlags: [], isUpdateOfExisting: false, suggestedPriority: 'normal', decision: 'publish', reason: 'fresh' })
+  const run = async (lastPublishedMinAgo: number) => {
+    const payload = {
+      getCluster: vi.fn().mockResolvedValue({ id: '9548', headline: 'Saudi health jobs', items: [{ title: 'x', publishedAt: new Date().toISOString(), source: { name: 'ARY', trustTier: 1 } }], maxTier: 1, distinctSources: 2 }),
+      getSettings: vi.fn().mockResolvedValue({ lastPublishedAt: new Date(Date.now() - lastPublishedMinAgo * 60_000).toISOString() }),
+      patchCluster: vi.fn(),
+      recentArticles: vi.fn().mockResolvedValue([]),
+    }
+    const triageQueue = { add: vi.fn() }
+    const writeQueue = { add: vi.fn() }
+    await processTriageJob({ clusterId: '9548' }, { router: { chat: vi.fn().mockResolvedValue({ content: good }) }, payload, writeQueue, triageQueue } as never)
+    return { payload, triageQueue, writeQueue }
+  }
+  it('is deferred inside the interval, with a retry queued', async () => {
+    const r = await run(3)
+    expect(r.payload.patchCluster.mock.calls[0]![1].triage.codeOutcome).toBe('defer')
+    expect(r.triageQueue.add).toHaveBeenCalledTimes(1)
+  })
+  it('is not deferred after 15 minutes', async () => {
+    const r = await run(16)
+    expect(r.payload.patchCluster.mock.calls[0]![1].triage.codeOutcome).not.toBe('defer')
+    expect(r.triageQueue.add).not.toHaveBeenCalled()
   })
 })

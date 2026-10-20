@@ -241,6 +241,11 @@ export class PayloadClient {
     )
   }
 
+  /** Clusters deferred by the triage rules and untouched for `minAgeMin` minutes (ZAV-144) */
+  deferredClusters(minAgeMin: number) {
+    return this.request<{ clusters: { id: string; updatedAt: string; reason: string }[] }>('GET', `/api/pipeline/deferred-clusters?minAgeMin=${minAgeMin}`)
+  }
+
   /** Articles of the last 48h (live and editor drafts) for same-story matching */
   recentArticles() {
     return this.request<import('./pipeline/same-story.js').RecentArticle[]>('GET', '/api/pipeline/recent-articles')
