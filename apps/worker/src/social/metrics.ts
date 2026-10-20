@@ -66,6 +66,45 @@ async function resolveFacebookPostId(fetchFn: FetchFn, id: string, token: string
 /** Reach: the current metric first, the one Meta retired as fallback; a bad metric name must not hide the others */
 const FB_REACH_METRICS = ['post_total_media_view_unique', 'post_impressions_unique']
 
+const NO_FIELD = /nonexisting field/i
+
+/**
+ * Reels and videos (ZAV-133): a video node has no `reactions`, `shares` or `insights` field ("Tried accessing
+ * nonexisting field"). It has `likes` and `comments` summaries and the `video_insights` edge instead.
+ */
+async function fetchFacebookVideoMetrics(fetchFn: FetchFn, videoId: string, token: string, out: MetricValues): Promise<void> {
+  const t = encodeURIComponent(token)
+  const base = await getJson(fetchFn, `${GRAPH}/${videoId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0)&access_token=${t}`)
+  if (base.ok) {
+    delete out.error
+    out.reactions = Number(base.body.likes?.summary?.total_count ?? 0)
+    out.comments = Number(base.body.comments?.summary?.total_count ?? 0)
+  } else {
+    out.error = graphError(base.body)
+  }
+  let insightsError: string | undefined
+  const insight = async (metric: string): Promise<number | undefined> => {
+    const r = await getJson(fetchFn, `${GRAPH}/${videoId}/video_insights?metric=${metric}&access_token=${t}`)
+    if (!r.ok) {
+      insightsError = graphError(r.body)
+      return undefined
+    }
+    const m = (r.body.data ?? []).find((x: { name: string }) => x.name === metric)
+    return m ? Number(m.values?.[0]?.value ?? 0) : undefined
+  }
+  for (const metric of ['post_impressions_unique', 'total_video_impressions_unique']) {
+    const v = await insight(metric)
+    if (v !== undefined) {
+      out.reach = v
+      break
+    }
+  }
+  const plays = await insight('blue_reels_play_count')
+  if (plays !== undefined) out.plays = plays
+  delete out.insightsError
+  if (insightsError && out.reach === undefined && out.plays === undefined) out.insightsError = insightsError
+}
+
 export async function fetchFacebookMetrics(rawId: string, token: string, fetchFn: FetchFn = fetch): Promise<MetricValues> {
   const out: MetricValues = {}
   const postId = await resolveFacebookPostId(fetchFn, rawId, token)
@@ -80,6 +119,11 @@ export async function fetchFacebookMetrics(rawId: string, token: string, fetchFn
   } else {
     // e.g. "(#10) requires pages_read_user_content": the Meta token needs more permissions
     out.error = graphError(base.body)
+    // A video / reel node answers "nonexisting field": read it the video way
+    if (NO_FIELD.test(out.error)) {
+      await fetchFacebookVideoMetrics(fetchFn, postId, token, out)
+      return out
+    }
   }
   let insightsError: string | undefined
   const insight = async (metric: string): Promise<number | undefined> => {

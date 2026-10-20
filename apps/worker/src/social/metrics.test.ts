@@ -71,6 +71,20 @@ describe('fetchers', () => {
     expect(m.reach).toBe(12)
     expect(m.insightsError).toBeUndefined()
   })
+  it('reads a Facebook reel through the video fields when the post fields do not exist (ZAV-133)', async () => {
+    const urls: string[] = []
+    const inner = reply({
+      'fields=page_story_id': { ok: false, body: { error: { message: '(#100) Tried accessing nonexisting field (page_story_id)' } } },
+      'fields=reactions': { ok: false, body: { error: { message: '(#100) Tried accessing nonexisting field (reactions)' } } },
+      'fields=likes': { body: { likes: { summary: { total_count: 8 } }, comments: { summary: { total_count: 2 } } } },
+      'metric=post_impressions_unique': { body: { data: [{ name: 'post_impressions_unique', values: [{ value: 300 }] }] } },
+      'metric=blue_reels_play_count': { body: { data: [{ name: 'blue_reels_play_count', values: [{ value: 410 }] }] } },
+    })
+    const f = (async (u: unknown, i?: RequestInit) => (urls.push(String(u)), inner(u as RequestInfo, i))) as unknown as typeof fetch
+    const m = await fetchFacebookMetrics('1424037265893518', 't', f)
+    expect(m).toEqual({ reactions: 8, comments: 2, reach: 300, plays: 410 })
+    expect(urls.some((u) => u.includes('/1424037265893518/video_insights'))).toBe(true)
+  })
   const creds = { consumerKey: 'a', consumerSecret: 'b', accessToken: 'c', accessTokenSecret: 'd' }
   it('reads X public_metrics and reports an auth failure', async () => {
     const ok = reply({ '/2/tweets/55': { body: { data: { public_metrics: { impression_count: 100, like_count: 4, reply_count: 1, retweet_count: 2, quote_count: 1 } } } } })

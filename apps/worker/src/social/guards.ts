@@ -17,6 +17,12 @@ const WORD_VALUES: Record<string, number> = {
   sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, dozen: 12,
 }
 
+/** "fourth-quarter growth" states the figure the copy writes as "Q4" */
+const ORDINAL_VALUES: Record<string, number> = {
+  first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12,
+  thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20,
+}
+
 function stripNoise(text: string): string {
   return text
     .replace(/https?:\/\/\S+/gi, ' ')
@@ -41,7 +47,10 @@ function statedValues(text: string): Set<number> {
     const v = Number(m[1]!.replace(/,/g, '')) * MULTIPLIER[m[2]!.toLowerCase()]!
     if (Number.isFinite(v)) values.add(Math.round(v * 1e6) / 1e6)
   }
-  for (const w of text.toLowerCase().match(/[a-z]+/g) ?? []) if (w in WORD_VALUES) values.add(WORD_VALUES[w]!)
+  for (const w of text.toLowerCase().match(/[a-z]+/g) ?? []) {
+    if (w in WORD_VALUES) values.add(WORD_VALUES[w]!)
+    else if (w in ORDINAL_VALUES) values.add(ORDINAL_VALUES[w]!)
+  }
   return values
 }
 
