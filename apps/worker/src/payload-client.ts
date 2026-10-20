@@ -241,6 +241,11 @@ export class PayloadClient {
     )
   }
 
+  /** Articles of the last 48h (live and editor drafts) for same-story matching */
+  recentArticles() {
+    return this.request<import('./pipeline/same-story.js').RecentArticle[]>('GET', '/api/pipeline/recent-articles')
+  }
+
   titleCheck(title: string, locale: 'en' | 'ur') {
     return this.request<{ maxSimilarity: number; closest?: { title: string; url: string } }>(
       'POST',
