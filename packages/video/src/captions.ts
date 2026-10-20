@@ -21,8 +21,11 @@ export interface Captions {
   firstComment?: string
 }
 
-/** Instagram allows at most 5 hashtags per post (caption and comments together). YouTube ignores all above 15. */
-export const HASHTAG_CAP: Record<Platform, number> = { instagram: 5, facebook: 3, tiktok: 5, youtube: 3, x: 2, threads: 1 }
+/**
+ * Reels follow the same growth caps as card and text posts (ZAV-132/139: Instagram 3, Facebook 2, X 2); Instagram itself
+ * allows at most 5 per post. YouTube ignores all above 15.
+ */
+export const HASHTAG_CAP: Record<Platform, number> = { instagram: 3, facebook: 2, tiktok: 5, youtube: 3, x: 2, threads: 1 }
 export const X_LIMIT = 280
 export const X_URL_WEIGHT = 23
 

@@ -102,8 +102,12 @@ describe('buildCaptions', () => {
       expect(caps[p].hashtags.length).toBeLessThanOrEqual(HASHTAG_CAP[p])
       for (const h of caps[p].hashtags) expect(caps[p].text).toContain(h)
     }
-    expect(caps.instagram.hashtags).toHaveLength(5)
-    expect(caps.facebook.hashtags).toHaveLength(3)
+    // same caps as card and text posts (ZAV-139): a reel caption with five candidate tags is cut to 3 / 2 / 2
+    expect(caps.instagram.hashtags).toHaveLength(3)
+    expect(caps.facebook.hashtags).toHaveLength(2)
+    expect(caps.x.hashtags.length).toBeLessThanOrEqual(2)
+    expect((caps.instagram.text.match(/#[\p{L}\p{N}_]+/gu) ?? []).length).toBe(3)
+    expect((caps.facebook.text.match(/#[\p{L}\p{N}_]+/gu) ?? []).length).toBe(2)
     expect(caps.threads.hashtags).toHaveLength(1)
   })
   it('instagram: numbered headlines, prompt, bio link, hashtags last, no hashtag in first comment', () => {
