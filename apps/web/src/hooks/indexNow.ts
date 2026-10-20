@@ -1,54 +1,33 @@
 import type { CollectionAfterChangeHook, Payload } from 'payload'
+import { IndexNowBatcher, indexNowEnabled, urlsForArticle } from '../lib/indexnow'
 
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
-async function buildArticleUrls(payload: Payload, doc: Record<string, unknown>): Promise<string[]> {
-  const category = doc.category
-  let categorySlug = ''
-  if (typeof category === 'object' && category !== null && 'slug' in category) {
-    categorySlug = String((category as { slug: string }).slug)
-  } else if (category) {
-    const cat = await payload.findByID({
-      collection: 'categories',
-      id: String(category),
-      depth: 0,
-      overrideAccess: true,
-    })
-    categorySlug = String(cat.slug)
-  }
-  const urls: string[] = []
-  const slug = doc.slug as Record<string, string> | string | undefined
-  if (typeof slug === 'object' && slug?.en) urls.push(`${siteUrl()}/${categorySlug}/${slug.en}`)
-  if (typeof slug === 'object' && slug?.ur) urls.push(`${siteUrl()}/ur/${categorySlug}/${slug.ur}`)
-  return urls
+/** One batcher per server process: up to 100 URLs per ping, at most one ping a minute (ZAV-146) */
+export const indexNowBatcher = new IndexNowBatcher({
+  siteUrl,
+  log: (level, msg, extra) => console[level === 'warn' ? 'warn' : 'info'](`[indexnow] ${msg}`, extra ?? ''),
+})
+
+async function categorySlugOf(payload: Payload, category: unknown): Promise<string> {
+  if (typeof category === 'object' && category !== null && 'slug' in category) return String((category as { slug: string }).slug)
+  if (!category) return ''
+  const cat = await payload.findByID({ collection: 'categories', id: String(category), depth: 0, overrideAccess: true })
+  return String(cat.slug)
 }
 
-export const pingIndexNowOnFirstPublish: CollectionAfterChangeHook = async ({
-  doc,
-  previousDoc,
-  req,
-}) => {
-  const key = process.env.INDEXNOW_KEY
-  if (!key) return doc
-  if (doc._status !== 'published') return doc
-  if (previousDoc?._status === 'published') return doc
-
-  const urlList = await buildArticleUrls(req.payload, doc as Record<string, unknown>)
-  if (urlList.length === 0) return doc
-
+/** Pings IndexNow when an article goes live and again when a live article changes. Never blocks or fails the save. */
+export const pingIndexNowOnFirstPublish: CollectionAfterChangeHook = async ({ doc, req }) => {
+  if (!indexNowEnabled() || doc._status !== 'published') return doc
   try {
-    await fetch('https://api.indexnow.org/indexnow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        host: new URL(siteUrl()).host,
-        key,
-        keyLocation: `${siteUrl()}/${key}.txt`,
-        urlList,
-      }),
+    const slug = doc.slug as Record<string, string> | string | undefined
+    const urls = urlsForArticle(siteUrl(), {
+      categorySlug: await categorySlugOf(req.payload, doc.category),
+      slug: typeof slug === 'object' ? slug : undefined,
     })
+    indexNowBatcher.add(urls)
   } catch (err) {
-    req.payload.logger.error({ err }, 'IndexNow ping failed')
+    req.payload.logger.warn({ err }, 'IndexNow queue failed')
   }
   return doc
 }

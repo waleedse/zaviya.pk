@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    // IndexNow key file (ZAV-146): /<key>.txt is answered by /api/indexnow/<key>, which checks it against INDEXNOW_KEY
+    return [{ source: '/:key([A-Za-z0-9-]{8,128}).txt', destination: '/api/indexnow/:key' }]
+  },
   async redirects() {
     return [
       { source: '/zaviya-news', destination: '/about', permanent: true },
