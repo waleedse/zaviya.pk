@@ -19,6 +19,24 @@ describe('processTriageJob', () => {
     expect(payload.patchCluster).not.toHaveBeenCalled()
   })
 
+  it('retries once with a smaller prompt when the reply is truncated JSON (ZAV-21)', async () => {
+    const good = JSON.stringify({ pakistanRelevance: 0.9, newsworthiness: 0.9, sourceCredibility: 0.9, category: 'pakistan', sensitivityFlags: [], isUpdateOfExisting: false, suggestedPriority: 'normal', decision: 'publish', reason: 'fresh' })
+    const chat = vi.fn().mockResolvedValueOnce({ content: '{"reason":"unterminated' }).mockResolvedValueOnce({ content: good })
+    const items = Array.from({ length: 6 }, (_, i) => ({ title: `t${i}`, contentText: 'x'.repeat(900), source: { name: 'Dawn', trustTier: 1 } }))
+    const payload = {
+      getCluster: vi.fn().mockResolvedValue({ id: '2', items, maxTier: 1, distinctSources: 2 }),
+      getSettings: vi.fn().mockResolvedValue({}),
+      patchCluster: vi.fn(),
+      recentArticles: vi.fn().mockResolvedValue([]),
+    }
+    await processTriageJob({ clusterId: '2' }, { router: { chat }, payload, writeQueue: { add: vi.fn() } } as never)
+    expect(chat).toHaveBeenCalledTimes(2)
+    expect(chat.mock.calls[0]![1].maxTokens).toBe(2048)
+    const second = chat.mock.calls[1]![1].messages[1].content as string
+    expect(second.match(/<source id=/g)).toHaveLength(3)
+    expect(payload.patchCluster).toHaveBeenCalled()
+  })
+
   const triageJson = {
     pakistanRelevance: 0.9,
     newsworthiness: 0.9,

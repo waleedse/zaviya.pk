@@ -17,12 +17,12 @@ export function triageUserPrompt(cluster: {
   distinctSources: number
   maxTier: number
   items: { title: string; summary?: string; contentText?: string; publishedAt?: string; source: { name: string; trustTier: number } }[]
-}): string {
+}, limits: { items: number; chars: number } = { items: 8, chars: 700 }): string {
   const lines = cluster.items
-    .slice(0, 8)
+    .slice(0, limits.items)
     .map(
       (it, i) =>
-        `<source id="${i}">\nTitle: ${it.title}\nSource: ${it.source.name} (tier ${it.source.trustTier})${it.publishedAt ? `\nPublished: ${it.publishedAt}` : ''}\n${it.summary ?? ''}\n${(it.contentText ?? '').slice(0, 700)}\n</source>`,
+        `<source id="${i}">\nTitle: ${it.title}\nSource: ${it.source.name} (tier ${it.source.trustTier})${it.publishedAt ? `\nPublished: ${it.publishedAt}` : ''}\n${it.summary ?? ''}\n${(it.contentText ?? '').slice(0, limits.chars)}\n</source>`,
     )
     .join('\n\n')
   return `Current time: ${new Date().toISOString()}

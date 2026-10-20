@@ -29,15 +29,26 @@ export async function processTriageJob(
   try {
     const format = zodToJsonSchema(TriageResultSchema, { target: 'openApi3' }) as Record<string, unknown>
     const timeoutMs = 180_000
-    const result = await deps.router.chat('triage', {
-      messages: [
-        { role: 'system', content: triageSystemPrompt() },
-        { role: 'user', content: triageUserPrompt(cluster) },
-      ],
-      format,
-      timeoutMs,
-    })
-    triage = TriageResultSchema.parse(JSON.parse(result.content))
+    const ask = async (limits: { items: number; chars: number }) => {
+      const result = await deps.router.chat('triage', {
+        messages: [
+          { role: 'system', content: triageSystemPrompt() },
+          { role: 'user', content: triageUserPrompt(cluster, limits) },
+        ],
+        format,
+        // A verdict is a few hundred tokens; a cap stops a runaway reply from being cut mid-string (ZAV-21)
+        maxTokens: 2048,
+        timeoutMs,
+      })
+      return TriageResultSchema.parse(JSON.parse(result.content))
+    }
+    try {
+      triage = await ask({ items: 8, chars: 700 })
+    } catch (e) {
+      if (!(e instanceof SyntaxError)) throw e
+      logger.info({ clusterId: data.clusterId }, 'triage reply was not valid JSON, retrying with a smaller prompt')
+      triage = await ask({ items: 3, chars: 300 })
+    }
   } catch (e) {
     if (isQuotaExhausted(e)) {
       // Out of quota is not a verdict on the story: look at it again once the first model frees up,
