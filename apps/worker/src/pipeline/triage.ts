@@ -9,6 +9,29 @@ import { logger } from '../logger.js'
 import { hasFreshSource, shouldPitch } from './pitch.js'
 import { findSameStory } from './same-story.js'
 
+/** A deferred cluster that nobody has looked at for this long lost its retry job (normal retries are 15-60 min). */
+export const DEFER_RELEASE_MIN = 20
+
+/**
+ * ZAV-144: a cluster deferred for pacing used to depend on one delayed retry job. If that job failed (LLM timeout,
+ * restart, quota) the cluster stayed 'triaged' forever. This sweep puts every such cluster back on the triage queue;
+ * the job id makes sure a cluster is queued once per 15-minute slot. Breaking news is never deferred, so it is not here.
+ */
+export async function releaseDeferredClusters(
+  deps: { payload: Pick<PayloadClient, 'deferredClusters'>; triageQueue: Pick<Queue, 'add'> },
+  now = Date.now(),
+): Promise<number> {
+  const { clusters } = await deps.payload.deferredClusters(DEFER_RELEASE_MIN)
+  const slot = Math.floor(now / (15 * 60_000))
+  let released = 0
+  for (const c of clusters) {
+    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: 4, jobId: `triage-release-${c.id}-${slot}`, removeOnComplete: true })
+    logger.info({ clusterId: c.id, reason: c.reason }, 'deferred cluster released')
+    released++
+  }
+  return released
+}
+
 export async function processTriageJob(
   data: { clusterId: string },
   deps: {
@@ -97,9 +120,15 @@ export async function processTriageJob(
   if (decision.outcome === 'defer') {
     // Pacing, not quality: look at it again later (new sources may have arrived by then).
     const ageH = (Date.now() - new Date(cluster.items[0]?.publishedAt ?? Date.now()).getTime()) / 3_600_000
-    if (ageH < 18) {
-      await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay: decision.retryInMs ?? 30 * 60_000, priority: 4 })
+    if (ageH >= 18) {
+      // too old to be today's news and it would be swept forever: close it instead of leaving it deferred
+      await deps.payload.patchCluster(data.clusterId, {
+        status: 'rejected',
+        triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: `${decision.reason}; expired after 18h` },
+      })
+      return
     }
+    await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay: decision.retryInMs ?? 30 * 60_000, priority: 4 })
     await deps.payload.patchCluster(data.clusterId, {
       status: 'triaged',
       triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: decision.outcome, deferReason: decision.reason },

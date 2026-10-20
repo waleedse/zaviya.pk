@@ -4,7 +4,7 @@ import { embedder, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
-import { processTriageJob } from './pipeline/triage.js'
+import { processTriageJob, releaseDeferredClusters } from './pipeline/triage.js'
 import { processWriteJob } from './pipeline/write.js'
 import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob } from './pipeline/media.js'
@@ -192,15 +192,17 @@ export async function createWorkerRuntime(
     new Worker(
       'triage',
       async (job) =>
-        processTriageJob(job.data, {
-          router,
-          payload,
-          writeQueue: queues.write,
-          triageQueue: queues.triage,
-          notifyReview,
-          autoApprove: env.AUTO_APPROVE,
-          pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
-        }),
+        job.name === 'release-deferred'
+          ? void (await releaseDeferredClusters({ payload, triageQueue: queues.triage }))
+          : processTriageJob(job.data, {
+              router,
+              payload,
+              writeQueue: queues.write,
+              triageQueue: queues.triage,
+              notifyReview,
+              autoApprove: env.AUTO_APPROVE,
+              pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
+            }),
       // The local model handles one job at a time; an API model can triage several clusters at once.
       { connection, concurrency: env.LOCAL_MODEL === 'off' ? 4 : 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
@@ -463,6 +465,8 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     logger.warn({ err: e }, 'Could not schedule ingest — Payload unavailable?')
   }
 
+  // ZAV-144: put deferred clusters whose retry job was lost back on the triage queue
+  await runtime.queues.triage.upsertJobScheduler('release-deferred', { every: 5 * 60 * 1000 }, { name: 'release-deferred', data: {} })
   await runtime.queues.data.upsertJobScheduler('data-rates', { every: 30 * 60 * 1000 }, { name: 'rates', data: {} })
   await runtime.queues.discover.upsertJobScheduler(
     'discover-social',

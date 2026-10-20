@@ -959,6 +959,36 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Clusters triaged as 'defer' (pacing, daily cap, publish window) that have not been looked at since `minAgeMin`
+    // minutes. The worker re-queues them so a lost retry job can never strand a story (ZAV-144).
+    path: '/pipeline/deferred-clusters',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const minAgeMin = Math.max(1, Math.min(Number(new URL(req.url ?? 'http://x').searchParams.get('minAgeMin')) || 15, 24 * 60))
+      const res = await req.payload.find({
+        collection: 'story-clusters',
+        where: {
+          and: [
+            { status: { equals: 'triaged' } },
+            { updatedAt: { less_than: new Date(Date.now() - minAgeMin * 60_000).toISOString() } },
+            { updatedAt: { greater_than: new Date(Date.now() - 7 * 24 * 3_600_000).toISOString() } },
+          ],
+        },
+        sort: 'updatedAt',
+        limit: 200,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const clusters = res.docs
+        .map((c) => ({ id: String(c.id), updatedAt: String(c.updatedAt), triage: (c.triage ?? {}) as { codeOutcome?: string; deferReason?: string } }))
+        .filter((c) => c.triage.codeOutcome === 'defer')
+        .map((c) => ({ id: c.id, updatedAt: c.updatedAt, reason: c.triage.deferReason ?? '' }))
+      return json({ clusters })
+    },
+  },
+  {
     // Articles of the last 48h (live, or drafts waiting for the editor) so triage can tell that a new
     // cluster is the same event as one we already hold (ZAV-134).
     path: '/pipeline/recent-articles',
