@@ -31,6 +31,19 @@ describe('numbersNotInArticle: valid shorthand (ZAV-130)', () => {
   })
 })
 
+describe('numbersNotInArticle: ordinals (ZAV-133)', () => {
+  it('accepts Q4 when the article says fourth-quarter, and a repeat of the 20 Oct case', () => {
+    const text = "Pakistan's GDP growth for FY26 was revised to 3.65% from 3.70%. Fourth-quarter growth slowed to 2 percent. The economy is Rs126.4tn ($450.4bn)."
+    const copy = "Pakistan's GDP growth for FY26 revised to 3.65% from 3.70%. Economy now Rs126.4tn ($450.4bn). Q4 growth slowed to 2%. #PakistanEconomy"
+    expect(numbersNotInArticle(copy, text)).toEqual([])
+    expect(numbersNotInArticle('Q3 growth slowed to 2%', text)).toEqual(['3'])
+  })
+  it('keeps the cotton and WFP cases accepted', () => {
+    expect(numbersNotInArticle('Cotton arrivals up 7.5% YoY', 'Arrivals rose 7.5 percent year on year')).toEqual([])
+    expect(numbersNotInArticle('hot meals 250k→150k/day', 'hot meals fell from 250,000 to 150,000 a day')).toEqual([])
+  })
+})
+
 describe('duplicate stories', () => {
   const a = 'SBP governor economic outlook Jameel Ahmad Bangkok'
   const b = 'SBP governor Jameel Ahmad says Pakistan economy shock absorbed'
