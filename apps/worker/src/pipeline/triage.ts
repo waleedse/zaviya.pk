@@ -1,4 +1,4 @@
-import { TriageResultSchema } from '@zaviya/shared'
+import { TriageResultSchema, type TriageResult } from '@zaviya/shared'
 import { zodToJsonSchema, isQuotaExhausted } from '@zaviya/llm'
 import type { LLMRouter } from '@zaviya/llm'
 import type { Queue } from 'bullmq'
@@ -7,6 +7,7 @@ import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../
 import { applyTriageRules } from './triage-rules.js'
 import { logger } from '../logger.js'
 import { hasFreshSource, shouldPitch } from './pitch.js'
+import { findSameStory } from './same-story.js'
 
 export async function processTriageJob(
   data: { clusterId: string },
@@ -24,7 +25,7 @@ export async function processTriageJob(
   const cluster = await deps.payload.getCluster(data.clusterId)
   const settings = await deps.payload.getSettings().catch(() => ({}) as import('../payload-client.js').PipelineSettings)
 
-  let triage
+  let triage: TriageResult
   try {
     const format = zodToJsonSchema(TriageResultSchema, { target: 'openApi3' }) as Record<string, unknown>
     const timeoutMs = 180_000
@@ -48,6 +49,30 @@ export async function processTriageJob(
     }
     logger.warn({ err: e, clusterId: data.clusterId }, 'triage LLM skipped/failed')
     return
+  }
+
+  // Same event as an article we already hold (ZAV-134): add it to that article as a live update, never a
+  // second article. Nothing already published is touched; a miss here only falls back to the old path.
+  if (!triage.isUpdateOfExisting) {
+    try {
+      const recent = await deps.payload.recentArticles()
+      const titles = [cluster.headline, ...cluster.items.map((it) => it.title)].filter((t): t is string => Boolean(t))
+      const verdict = findSameStory(titles, recent)
+      if (verdict.kind === 'skip') {
+        await deps.payload.patchCluster(data.clusterId, {
+          status: 'rejected',
+          triage: { ...triage, codeOutcome: 'reject', deferReason: verdict.reason, existingArticleId: verdict.article.id },
+        })
+        logger.info({ clusterId: data.clusterId, articleId: verdict.article.id, reason: verdict.reason }, 'triage: same story as an existing article, not written')
+        return
+      }
+      if (verdict.kind === 'update') {
+        triage = { ...triage, isUpdateOfExisting: true, existingArticleId: verdict.article.id }
+        logger.info({ clusterId: data.clusterId, articleId: verdict.article.id }, 'triage: same story as a live article, routed to an update')
+      }
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : e, clusterId: data.clusterId }, 'same-story check failed, continuing')
+    }
   }
 
   const decision = applyTriageRules(triage, {

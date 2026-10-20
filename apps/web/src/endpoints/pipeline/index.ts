@@ -959,6 +959,62 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Articles of the last 48h (live, or drafts waiting for the editor) so triage can tell that a new
+    // cluster is the same event as one we already hold (ZAV-134).
+    path: '/pipeline/recent-articles',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const since = new Date(Date.now() - 48 * 3_600_000).toISOString()
+      const [live, drafts] = await Promise.all([
+        req.payload.find({
+          collection: 'articles',
+          where: {
+            and: [
+              { _status: { equals: 'published' } },
+              { workflow: { not_equals: 'retracted' } },
+              { publishedAt: { greater_than: since } },
+            ],
+          },
+          sort: '-publishedAt',
+          limit: 300,
+          depth: 0,
+          locale: 'en',
+          overrideAccess: true,
+        }),
+        req.payload.find({
+          collection: 'articles',
+          where: {
+            and: [
+              { _status: { equals: 'draft' } },
+              { workflow: { equals: 'in_review' } },
+              { createdAt: { greater_than: since } },
+            ],
+          },
+          draft: true,
+          sort: '-createdAt',
+          limit: 100,
+          depth: 0,
+          locale: 'en',
+          overrideAccess: true,
+        }),
+      ])
+      const row = (a: (typeof live.docs)[number], published: boolean) => {
+        const updates = Array.isArray(a.updates) ? a.updates : []
+        const at = updates.map((u) => new Date(String(u.at)).getTime()).filter(Number.isFinite)
+        return {
+          id: String(a.id),
+          title: String(a.title ?? ''),
+          publishedAt: (published ? a.publishedAt : a.createdAt) ?? null,
+          published,
+          lastUpdateAt: at.length ? new Date(Math.max(...at)).toISOString() : null,
+        }
+      }
+      return json([...live.docs.map((a) => row(a, true)), ...drafts.docs.map((a) => row(a, false))].filter((r) => r.title))
+    },
+  },
+  {
     // Editor gate: written articles waiting for the editor (drafts with workflow in_review)
     path: '/pipeline/gate',
     method: 'get',
