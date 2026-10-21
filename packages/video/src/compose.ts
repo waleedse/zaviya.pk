@@ -47,6 +47,8 @@ export interface FormatConfig {
 
 export const FORMATS: Record<Format, FormatConfig> = {
   flash15: { totalFrames: 450, minStories: 1, maxStories: 1, minStoryFrames: 90, fullMax: 1, dekAlways: true, numbers: 'none', quickHits: false, hookFrames: 45, outroFrames: 75, numbersFrames: 0 },
+  // ZAV-150: the trend-reaction Reel, one story for about 25 s
+  trend25: { totalFrames: 750, minStories: 1, maxStories: 1, minStoryFrames: 90, fullMax: 1, dekAlways: true, numbers: 'none', quickHits: false, hookFrames: 45, outroFrames: 90, numbersFrames: 0 },
   headlines30: { totalFrames: 900, minStories: 3, maxStories: 6, minStoryFrames: 105, fullMax: 6, dekAlways: false, numbers: 'before-last', quickHits: false, hookFrames: 45, outroFrames: 105, numbersFrames: 105 },
   roundup60: { totalFrames: 1800, minStories: 6, maxStories: 12, minStoryFrames: 90, fullMax: 8, dekAlways: false, numbers: 'after4', quickHits: true, hookFrames: 45, outroFrames: 105, numbersFrames: 105 },
   topic60: { totalFrames: 1800, minStories: 5, maxStories: 8, minStoryFrames: 165, fullMax: 8, dekAlways: true, numbers: 'none', quickHits: false, hookFrames: 45, outroFrames: 105, numbersFrames: 0 },
@@ -159,6 +161,7 @@ function storyScene(s: StoryInput, index: number, total: number, dekAlways: bool
 
 function hookTitle(format: Format, mode: Mode, edition: Edition, topic: Topic | null, n: number, leadCategory: string): [string, string] {
   if (format === 'flash15') return ['BREAKING', leadCategory.toUpperCase()]
+  if (format === 'trend25') return ['TRENDING', 'IN PAKISTAN']
   if (topic === 'ai-tech') return ['AI & TECH', 'THIS WEEK']
   if (topic === 'money') return ['MONEY', 'IN 45 SECONDS']
   if (mode === 'breaking') return ['BREAKING', `AND ${n - 1} MORE`]
@@ -168,6 +171,7 @@ function hookTitle(format: Format, mode: Mode, edition: Edition, topic: Topic | 
 
 function coverPrefix(format: Format, edition: Edition, topic: Topic | null): string {
   if (format === 'flash15') return 'BREAKING'
+  if (format === 'trend25') return 'TRENDING'
   if (topic === 'ai-tech') return 'AI & TECH'
   if (topic === 'money') return 'MONEY'
   return edition === 'evening' ? 'TONIGHT' : 'TODAY'
@@ -294,8 +298,8 @@ export function compose(input: EditionInput, formatArg?: Format, tracks: TrackIn
   scenes.push({
     kind: 'outro',
     durationInFrames: snap(cfg.outroFrames),
-    cta: format === 'flash15' ? 'Follow for live updates' : `Which story matters most? Comment 1–${total}`,
-    count: format === 'flash15' ? 0 : total,
+    cta: format === 'flash15' ? 'Follow for live updates' : format === 'trend25' ? 'Google: Zaviya News' : `Which story matters most? Comment 1–${total}`,
+    count: format === 'flash15' || format === 'trend25' ? 0 : total,
     handles: HANDLES,
     site: SITE,
   })

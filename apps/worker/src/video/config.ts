@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseSlots, type Slot } from './schedule.js'
+import { TREND_SLOT_SPEC } from './trend.js'
 
 export type VideoPlatform = 'instagram' | 'facebook'
 
@@ -10,6 +11,8 @@ export interface VideoConfig {
   /** empty = dry run */
   platforms: VideoPlatform[]
   vetoMin: number
+  /** ZAV-150: daily trend-reaction Reel; TREND_REEL=on adds the "trend" slot, off by default */
+  trendReel: boolean
   /** 15 s breaking flashes (checked every 10 min); VIDEO_FLASH=false turns them off */
   flash: boolean
   dataDir: string
@@ -28,9 +31,11 @@ export function loadVideoConfig(env: NodeJS.ProcessEnv = process.env): VideoConf
     .split(',')
     .map((p) => p.trim())
     .filter((p): p is VideoPlatform => p === 'instagram' || p === 'facebook')
+  const trendReel = env.TREND_REEL === 'on'
   return {
     enabled: env.VIDEO_ENABLED === 'true',
-    slots: parseSlots(env.VIDEO_SLOTS),
+    trendReel,
+    slots: [...parseSlots(env.VIDEO_SLOTS), ...(trendReel ? parseSlots(TREND_SLOT_SPEC) : [])],
     platforms,
     flash: env.VIDEO_FLASH !== 'false',
     vetoMin: Math.max(0, Number(env.VIDEO_VETO_MIN ?? 20) || 0),

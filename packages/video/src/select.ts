@@ -152,8 +152,9 @@ export function selectEdition(o: SelectOptions): { input: EditionInput; picked: 
   let picked: SelectedArticle[]
   switch (o.format) {
     case 'flash15':
+    case 'trend25':
       picked = o.onlyId !== undefined
-        ? pickStories(all.filter((a) => a.id === o.onlyId), { windowHours: 6, limit: 1 })
+        ? pickStories(all.filter((a) => a.id === o.onlyId), { windowHours: o.format === 'trend25' ? 12 : 6, limit: 1 })
         : pickStories(all, { windowHours: 6, limit: 1, exclude: o.exclude })
       break
     case 'roundup60':
