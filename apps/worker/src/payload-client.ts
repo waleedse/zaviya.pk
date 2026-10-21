@@ -254,6 +254,11 @@ export class PayloadClient {
     )
   }
 
+  /** Drops breaking flags older than 24 h on live articles (ZAV-143) */
+  expireBreaking() {
+    return this.request<{ expired: number[] }>('POST', '/api/pipeline/breaking/expire', {})
+  }
+
   /** Articles of the last 48h (live and editor drafts) for same-story matching */
   recentArticles() {
     return this.request<import('./pipeline/same-story.js').RecentArticle[]>('GET', '/api/pipeline/recent-articles')

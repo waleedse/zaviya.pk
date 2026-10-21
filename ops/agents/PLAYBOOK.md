@@ -16,7 +16,7 @@ Every agent reads this first. Design and reasons: `docs/AGENTS.md`.
 
 ## Tools
 - Linear: `node ops/bin/linear.mjs list|get|create|comment|update` (team ZAV). Labels: agent group `product`, `engineer`, `editor`, `seo`, `social`, and `needs-waleed`, `pm-approved`, `risk-high`, `incident`, `Bug`, `Feature`, `Improvement`.
-- Payload: `node ops/bin/payload.mjs GET /api/articles?limit=20&sort=-publishedAt&depth=0`. Collections: articles, story-clusters, sources, review-queue, social-posts, metrics-daily, settings (global: `/api/globals/settings`).
+- Payload: `node ops/bin/payload.mjs GET /api/articles?limit=20&sort=-publishedAt&depth=0`. Changing an article's priority: `node ops/bin/payload.mjs POST /api/pipeline/articles/<id>/priority '{"priority":"high"}'` (priority-only, never PATCH it with the body; `breaking` sets isBreaking; breaking flags expire 24 h after publishing). Collections: articles, story-clusters, sources, review-queue, social-posts, metrics-daily, settings (global: `/api/globals/settings`).
 - Analytics and learning: the SQL tables behind the admin Control Room (`apps/web/src/lib/analytics.ts`, `learning.ts`, `control-room.ts`). Read them through `metrics-daily` and the pipeline collections; the `/api/control` actions need a human editor session and are not for agents.
 - git / pnpm for code (engineer only).
 

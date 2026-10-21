@@ -1,7 +1,7 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { Endpoint, PayloadRequest } from 'payload'
 import { z } from 'zod'
-import { RATE_SERIES } from '@zaviya/shared'
+import { PRIORITIES, RATE_SERIES } from '@zaviya/shared'
 import {
   articlePublicUrls,
   badRequest,
@@ -12,6 +12,7 @@ import {
 import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { pageviewsReport } from '../../lib/pageviews-report'
+import { expireBreaking, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
 import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
 
@@ -898,6 +899,29 @@ const pipelineEndpoints: Endpoint[] = [
       if ('error' in parsed) return parsed.error
       const id = String(req.routeParams?.id ?? '')
       return json(await retitleArticle(req.payload, id, parsed.data.locale, parsed.data.title, parsed.data.reason))
+    },
+  },
+  {
+    // Priority-only change on a live article (ZAV-143): send just { priority, isBreaking? }, never the body.
+    path: '/pipeline/articles/:id/priority',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ priority: z.enum(PRIORITIES), isBreaking: z.boolean().optional() }))
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      return json(await setArticlePriority(req.payload, id, parsed.data.priority, parsed.data.isBreaking))
+    },
+  },
+  {
+    // Ages out breaking flags older than 24 h (the worker calls this on its 5-minute sweep).
+    path: '/pipeline/breaking/expire',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json({ expired: await expireBreaking(req.payload) })
     },
   },
   {
