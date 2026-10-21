@@ -1016,12 +1016,17 @@ const pipelineEndpoints: Endpoint[] = [
         overrideAccess: true,
       })
       const lonelyBefore = Date.now() - lonelyAgeMin * 60_000
+      const tier3Before = Date.now() - Math.max(lonelyAgeMin, 360) * 60_000
       const clusters = res.docs
         .filter((c) => {
           const corroborated = Number(c.distinctSources ?? 0) >= minSources || Number(c.maxTier ?? 3) === 1
           if (corroborated) return true
-          return Number(c.maxTier ?? 3) <= 2 && new Date(String(c.updatedAt)).getTime() < lonelyBefore
+          if (new Date(String(c.updatedAt)).getTime() >= lonelyBefore) return false
+          // A tier 1-2 outlet alone, or a tier 3 account that posted repeatedly (two or more items) for 6 h+
+          // (X posts about AI models, ZAV-99). Single tier 3 items stay out: mostly noise.
+          return Number(c.maxTier ?? 3) <= 2 || (Number(c.itemCount ?? 1) >= 2 && new Date(String(c.updatedAt)).getTime() < tier3Before)
         })
+        .slice(0, 25)
         .map((c) => ({ id: String(c.id), updatedAt: String(c.updatedAt), distinctSources: Number(c.distinctSources ?? 0) }))
       return json({ clusters })
     },
