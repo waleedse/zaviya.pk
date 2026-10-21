@@ -111,7 +111,15 @@ export async function sendHeartbeat(runtime: WorkerRuntime): Promise<void> {
 
 export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInterval> {
   let beats = 0
+  let ticks = 0
   const beat = () => {
+    // Every ~15 minutes: breaking flags older than 24 h come off (ZAV-143)
+    if (++ticks % 45 === 1) {
+      void runtime.payload.expireBreaking().then(
+        (r) => void (r.expired.length && logger.info({ articles: r.expired }, 'breaking flags expired')),
+        (e) => logger.warn({ err: e }, 'breaking expiry failed'),
+      )
+    }
     // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one
     if (runtime.env.EDITOR_GATE && ++beats % 15 === 0) {
       void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>

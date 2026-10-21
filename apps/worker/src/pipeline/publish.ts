@@ -10,10 +10,47 @@ import { logger } from '../logger.js'
 import { editorApproved, hasFreshSource } from './pitch.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
-export function publisherName(title: string, feedName: string): string {
+const HOST_NAMES: Record<string, string> = {
+  'arabnews.pk': 'Arab News PK',
+  'arabnews.com': 'Arab News',
+  'dawn.com': 'Dawn',
+  'geo.tv': 'Geo News',
+  'thenews.com.pk': 'The News',
+  'tribune.com.pk': 'The Express Tribune',
+  'brecorder.com': 'Business Recorder',
+  'aaj.tv': 'Aaj News',
+  'samaa.tv': 'Samaa',
+  'tasnimnews.com': 'Tasnim News Agency',
+  'reuters.com': 'Reuters',
+  'bbc.com': 'BBC',
+  'aljazeera.com': 'Al Jazeera',
+}
+
+/** The outlet behind an article URL, or null for aggregators (Google News links) and unparsable URLs. */
+function outletFromUrl(url: string | undefined): string | null {
+  if (!url) return null
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^(www|m|amp)\./, '')
+  } catch {
+    return null
+  }
+  if (/(^|\.)google\./.test(host)) return null
+  const known = Object.keys(HOST_NAMES).find((h) => host === h || host.endsWith(`.${h}`))
+  if (known) return HOST_NAMES[known]!
+  const label = host.split('.').filter((p) => p.length > 3 || !['com', 'net', 'org', 'pk', 'co', 'tv'].includes(p))[0]
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : null
+}
+
+/**
+ * Google News / Trends / extension items carry the real outlet in the title ("Headline - Dawn"); without that suffix
+ * the outlet comes from the article URL, so a Trends item never credits "Google Trends" as the source (ZAV-143).
+ */
+export function publisherName(title: string, feedName: string, url?: string): string {
   if (!/google|discovery|extension/i.test(feedName)) return feedName
   const m = / [-–] ([^-–]{2,40})$/.exec(title.trim())
-  return m ? m[1]!.trim() : feedName.replace(/^Google News — .*/, 'Google News')
+  if (m) return m[1]!.trim()
+  return outletFromUrl(url) ?? feedName.replace(/^Google News — .*/, 'Google News').replace(/^Google Trends — .*/, 'Google Trends')
 }
 
 const OUTLETS = 'Dawn|Dawn News|Geo|Geo News|Geo TV|ARY|ARY News|Express Tribune|The Express Tribune|The News|Jang|Samaa|BBC|BBC Urdu|Reuters|AP|AFP|Al Jazeera|Independent Urdu|ProPakistani|Google News|Google Trends'
@@ -234,7 +271,7 @@ export async function processPublishJob(
 
   const category = triage?.category ?? 'pakistan'
   const sources = articleSources(cluster.items).map((i) => ({
-    name: publisherName(i.title, i.source.name),
+    name: publisherName(i.title, i.source.name, i.url),
     url: i.url,
     tier: i.source.trustTier,
     publishedAt: i.publishedAt,

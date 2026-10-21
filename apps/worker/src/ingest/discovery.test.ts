@@ -62,5 +62,9 @@ describe('publisherName', () => {
     expect(publisherName('Unemployment hits 21-year high - Arab News PK', 'Google News — Pakistan jobs & results')).toBe('Arab News PK')
     expect(publisherName('Some story', 'Dawn')).toBe('Dawn')
     expect(publisherName('No outlet suffix', 'Google News — Pakistan')).toBe('Google News')
+    // ZAV-143: a Trends item without a suffix is credited to the outlet in its URL
+    expect(publisherName('Munir in Tehran', 'Google Trends — Pakistan daily', 'https://www.arabnews.pk/node/123')).toBe('Arab News PK')
+    expect(publisherName('Munir in Tehran', 'Google Trends — Pakistan daily', 'https://news.google.com/rss/articles/x')).toBe('Google Trends')
+    expect(publisherName('Munir in Tehran', 'Google Trends — Pakistan daily')).toBe('Google Trends')
   })
 })
