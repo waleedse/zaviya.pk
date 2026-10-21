@@ -196,7 +196,7 @@ export async function processPublishJob(
     return null
   }
 
-  // Stale story (ZAV-89): newest source older than 48h means no publish; the cluster is rejected with the reason.
+  // Stale story (ZAV-89): newest source older than 18h means no publish; the cluster is rejected with the reason.
   if (!triage?.isUpdateOfExisting && cluster.items.length && !hasFreshSource(cluster.items)) {
     logger.warn({ clusterId: data.clusterId, articleId: data.articleId }, 'publish blocked: stale sources')
     await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...(triage ?? {}), deferReason: 'stale sources' } }).catch(() => undefined)

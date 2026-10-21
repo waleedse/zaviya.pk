@@ -198,7 +198,7 @@ export async function processTriageJob(
 
   if (!triage.isUpdateOfExisting && !hasFreshSource(cluster.items)) {
     await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: 'stale sources' } })
-    logger.info({ clusterId: data.clusterId }, 'rejected: no source from the last 48 hours')
+    logger.info({ clusterId: data.clusterId }, 'rejected: no source from the last 18 hours')
     return
   }
 
