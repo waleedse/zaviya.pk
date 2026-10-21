@@ -18,6 +18,12 @@ describe('pageviews report (ZAV-116)', () => {
     expect(report.daily[0]).toMatchObject({ pageviews: 14, bySource: { google: { pageviews: 10, visitors: 6 }, facebook: { pageviews: 4, visitors: 3 } } })
     expect(report.totalsBySource).toEqual({ google: 17, facebook: 4 })
   })
+  it('reports share clicks apart from pageviews (ZAV-157)', () => {
+    const r = shapeReport(3, days, rows, [], [{ source: 'whatsapp-share', n: 5 }])
+    expect(r.shareClicks).toEqual({ 'whatsapp-share': 5 })
+    expect(r.totalsBySource).toEqual({ google: 17, facebook: 4 })
+    expect(report.shareClicks).toEqual({})
+  })
   it('passes the top referrers through', () => {
     expect(report.topReferrers).toEqual([{ host: 'l.facebook.com', pageviews: 4 }])
   })

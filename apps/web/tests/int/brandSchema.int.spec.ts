@@ -39,4 +39,21 @@ describe('brand entity (ZAV-100)', () => {
       else process.env.SOCIAL_PROFILE_URLS = prev
     }
   })
+  it('adds the WhatsApp Channel to sameAs only when it is set (ZAV-157)', () => {
+    const prev = process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL
+    const prevSocial = process.env.SOCIAL_PROFILE_URLS
+    process.env.SOCIAL_PROFILE_URLS = 'https://x.com/zaviya'
+    try {
+      delete process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL
+      expect(socialProfileUrls()).toEqual(['https://x.com/zaviya'])
+      process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/abc'
+      expect(socialProfileUrls()).toEqual(['https://x.com/zaviya', 'https://whatsapp.com/channel/abc'])
+      expect((organizationJsonLd() as Record<string, any>).sameAs).toContain('https://whatsapp.com/channel/abc')
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL
+      else process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL = prev
+      if (prevSocial === undefined) delete process.env.SOCIAL_PROFILE_URLS
+      else process.env.SOCIAL_PROFILE_URLS = prevSocial
+    }
+  })
 })

@@ -11,10 +11,12 @@ export type PageviewsReport = {
   totalsBySource: Record<string, number>
   /** Most common referring hosts over the window (ref_host as recorded, "internal" visits excluded) */
   topReferrers: { host: string; pageviews: number }[]
+  /** Share-button clicks by source ('whatsapp-share', 'facebook-share', ...) over the window (kept apart from pageviews) */
+  shareClicks: Record<string, number>
 }
 
 /** Folds (day, source) rows into the per-day report; visitors per day are the sum of per-source uniques (a visitor seen from two sources counts twice). */
-export function shapeReport(days: number, dayList: string[], rows: PageviewRow[], referrers: { host: string; pv: number }[]): PageviewsReport {
+export function shapeReport(days: number, dayList: string[], rows: PageviewRow[], referrers: { host: string; pv: number }[], shares: { source: string; n: number }[] = []): PageviewsReport {
   const totalsBySource: Record<string, number> = {}
   const daily = dayList.map((day) => {
     const mine = rows.filter((r) => r.day === day)
@@ -30,7 +32,7 @@ export function shapeReport(days: number, dayList: string[], rows: PageviewRow[]
       bySource,
     }
   })
-  return { timezone: 'Asia/Karachi', days, daily, totalsBySource, topReferrers: referrers.map((r) => ({ host: r.host, pageviews: r.pv })) }
+  return { timezone: 'Asia/Karachi', days, daily, totalsBySource, topReferrers: referrers.map((r) => ({ host: r.host, pageviews: r.pv })), shareClicks: Object.fromEntries(shares.map((r) => [r.source, r.n])) }
 }
 
 export async function pageviewsReport(payload: Payload, days: number): Promise<PageviewsReport> {
@@ -51,10 +53,14 @@ export async function pageviewsReport(payload: Payload, days: number): Promise<P
       WHERE ts >= now() - ${n}::int * interval '1 day' AND ref_host IS NOT NULL AND source <> 'internal'
       GROUP BY 1 ORDER BY pv DESC LIMIT 25`,
   )
+  const shares = await run<{ source: string; n: string }>(
+    sql`SELECT source, count(*) AS n FROM zaviya_share_clicks WHERE ts >= now() - ${n}::int * interval '1 day' GROUP BY 1 ORDER BY n DESC`,
+  )
   return shapeReport(
     n,
     dayRows.map((r) => r.day),
     rows.map((r) => ({ day: r.day, source: r.source, pv: Number(r.pv), uv: Number(r.uv) })),
     refs.map((r) => ({ host: r.host, pv: Number(r.pv) })),
+    shares.map((r) => ({ source: r.source, n: Number(r.n) })),
   )
 }
