@@ -84,6 +84,16 @@ export async function recordPageview(row: {
   `)
 }
 
+export const SHARE_CHANNELS = ['whatsapp', 'facebook', 'x', 'copy', 'native'] as const
+
+export async function recordShareClick(row: { path: string; channel: string; locale?: string; device: string }): Promise<void> {
+  const payload = await getPayloadClient()
+  await payload.db.drizzle.execute(sql`
+    INSERT INTO zaviya_share_clicks (path, channel, source, locale, device)
+    VALUES (${row.path.slice(0, 500)}, ${row.channel}, ${row.channel + '-share'}, ${row.locale ?? null}, ${row.device})
+  `)
+}
+
 /** Raw-SQL tables owned by the app (not Payload collections): created on boot. */
 export const ANALYTICS_DDL = [
   sql`CREATE TABLE IF NOT EXISTS zaviya_pageviews (
@@ -99,6 +109,16 @@ export const ANALYTICS_DDL = [
   )`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_ts_idx ON zaviya_pageviews (ts)`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_path_ts_idx ON zaviya_pageviews (path, ts)`,
+  sql`CREATE TABLE IF NOT EXISTS zaviya_share_clicks (
+    id bigserial PRIMARY KEY,
+    ts timestamptz NOT NULL DEFAULT now(),
+    path text NOT NULL,
+    channel text NOT NULL,
+    source text NOT NULL,
+    locale text,
+    device text
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS zaviya_share_clicks_ts_idx ON zaviya_share_clicks (ts)`,
   sql`CREATE TABLE IF NOT EXISTS zaviya_commands (
     id bigserial PRIMARY KEY,
     kind text NOT NULL,

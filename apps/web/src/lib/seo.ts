@@ -198,7 +198,11 @@ export function organizationId(): string {
 
 /** Official social profiles (comma-separated https URLs in SOCIAL_PROFILE_URLS): schema sameAs and the /about links */
 export function socialProfileUrls(): string[] {
-  return (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u))
+  const urls = (process.env.SOCIAL_PROFILE_URLS ?? '').split(',').map((u) => u.trim()).filter((u) => /^https:\/\//.test(u))
+  // The WhatsApp Channel is an official profile too (NEXT_PUBLIC_WHATSAPP_CHANNEL_URL, empty until the channel exists)
+  const channel = (process.env.NEXT_PUBLIC_WHATSAPP_CHANNEL_URL ?? '').trim()
+  if (/^https:\/\//.test(channel) && !urls.includes(channel)) urls.push(channel)
+  return urls
 }
 
 export function organizationJsonLd() {
