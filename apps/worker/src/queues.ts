@@ -4,7 +4,7 @@ import { embedder, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
-import { processTriageJob, releaseDeferredClusters } from './pipeline/triage.js'
+import { processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './pipeline/triage.js'
 import { processWriteJob } from './pipeline/write.js'
 import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob } from './pipeline/media.js'
@@ -193,7 +193,10 @@ export async function createWorkerRuntime(
       'triage',
       async (job) =>
         job.name === 'release-deferred'
-          ? void (await releaseDeferredClusters({ payload, triageQueue: queues.triage }))
+          ? (async () => {
+              await releaseDeferredClusters({ payload, triageQueue: queues.triage })
+              await releaseStuckNewClusters({ payload, triageQueue: queues.triage, minSources: env.TRIAGE_MIN_SOURCES })
+            })()
           : processTriageJob(job.data, {
               router,
               payload,

@@ -989,6 +989,44 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Clusters still 'new' that nobody triaged (ZAV-147). Two kinds: corroborated clusters (enough outlets, or a tier-1
+    // wire) idle for `minAgeMin` minutes, whose triage job was lost; and lone-outlet clusters from a tier 1-2 source
+    // that never got a second outlet within `lonelyAgeMin` minutes. Triage then decides (usually a pitch or a reject).
+    path: '/pipeline/stuck-new-clusters',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const q = new URL(req.url ?? 'http://x').searchParams
+      const minAgeMin = Math.max(1, Math.min(Number(q.get('minAgeMin')) || 20, 24 * 60))
+      const lonelyAgeMin = Math.max(minAgeMin, Math.min(Number(q.get('lonelyAgeMin')) || 180, 24 * 60))
+      const minSources = Math.max(1, Number(q.get('minSources')) || 2)
+      const res = await req.payload.find({
+        collection: 'story-clusters',
+        where: {
+          and: [
+            { status: { equals: 'new' } },
+            { updatedAt: { less_than: new Date(Date.now() - minAgeMin * 60_000).toISOString() } },
+            { updatedAt: { greater_than: new Date(Date.now() - 3 * 24 * 3_600_000).toISOString() } },
+          ],
+        },
+        sort: 'updatedAt',
+        limit: 200,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const lonelyBefore = Date.now() - lonelyAgeMin * 60_000
+      const clusters = res.docs
+        .filter((c) => {
+          const corroborated = Number(c.distinctSources ?? 0) >= minSources || Number(c.maxTier ?? 3) === 1
+          if (corroborated) return true
+          return Number(c.maxTier ?? 3) <= 2 && new Date(String(c.updatedAt)).getTime() < lonelyBefore
+        })
+        .map((c) => ({ id: String(c.id), updatedAt: String(c.updatedAt), distinctSources: Number(c.distinctSources ?? 0) }))
+      return json({ clusters })
+    },
+  },
+  {
     // Articles of the last 48h (live, or drafts waiting for the editor) so triage can tell that a new
     // cluster is the same event as one we already hold (ZAV-134).
     path: '/pipeline/recent-articles',
