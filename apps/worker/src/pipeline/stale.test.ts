@@ -6,10 +6,10 @@ const now = Date.parse('2026-10-17T12:00:00Z')
 const hoursAgo = (h: number) => new Date(now - h * 3_600_000).toISOString()
 
 describe('hasFreshSource', () => {
-  it('needs one source from the last 48 hours', () => {
+  it('needs one source from the last 18 hours', () => {
     expect(hasFreshSource([{ publishedAt: hoursAgo(1) }], now)).toBe(true)
-    expect(hasFreshSource([{ publishedAt: '2026-04-03T00:00:00Z' }, { publishedAt: hoursAgo(47) }], now)).toBe(true)
-    expect(hasFreshSource([{ publishedAt: hoursAgo(49) }], now)).toBe(false)
+    expect(hasFreshSource([{ publishedAt: '2026-04-03T00:00:00Z' }, { publishedAt: hoursAgo(17) }], now)).toBe(true)
+    expect(hasFreshSource([{ publishedAt: hoursAgo(19) }], now)).toBe(false)
     expect(hasFreshSource([{}], now)).toBe(false)
   })
 })
