@@ -86,6 +86,30 @@ describe('processTriageJob', () => {
     expect(last[1].triage.deferReason).toMatch(/same story as article 1290/)
   })
 
+  it('pitches with the lede read through the extension for a headline-only Dawn item (ZAV-149)', async () => {
+    const d = setup([])
+    const cluster = { ...polioCluster, items: [{ id: '55', url: 'https://www.dawn.com/news/1', title: 'Karachi East polio case: NEOC confirms - Dawn', summary: 'Karachi East polio case: NEOC confirms - Dawn', publishedAt: new Date().toISOString(), source: { name: 'Google News', trustTier: 1 } }] }
+    const read = { ...cluster, items: [{ ...cluster.items[0]!, contentText: 'The National Emergency Operations Centre confirmed on Tuesday that a child in Karachi East tested positive for wild poliovirus. It is the first case in the city in nearly two years. Officials said a vaccination drive begins next week. More follows.' }] }
+    d.payload.getCluster.mockResolvedValueOnce(cluster).mockResolvedValue(read)
+    const patchSourceItem = vi.fn()
+    ;(d.payload as Record<string, unknown>).patchSourceItem = patchSourceItem
+    const page = { url: 'https://www.dawn.com/news/1', title: 't', text: 'x'.repeat(400) }
+    const bridge = { isOnline: () => true, send: vi.fn().mockResolvedValue(page) }
+    await processTriageJob({ clusterId: '9409' }, { ...d, pitch: true, bridge } as never)
+    expect(bridge.send).toHaveBeenCalledTimes(1)
+    expect(patchSourceItem).toHaveBeenCalledWith('55', expect.objectContaining({ contentText: expect.stringContaining('xxxx') }))
+    const last = d.payload.patchCluster.mock.calls.at(-1)![1]
+    expect(last.triage.codeOutcome).toBe('pitch')
+    expect(last.triage.pitchSummary).toMatch(/^The National Emergency Operations Centre confirmed.*two years\.$/)
+    expect(d.writeQueue.add).not.toHaveBeenCalled()
+  })
+
+  it('still pitches with an empty summary when the extension is offline (the writer then reads the page itself)', async () => {
+    const d = setup([])
+    await processTriageJob({ clusterId: '9409' }, { ...d, pitch: true, bridge: { isOnline: () => false, send: vi.fn() } } as never)
+    expect(d.payload.patchCluster.mock.calls.at(-1)![1].triage).toMatchObject({ codeOutcome: 'pitch', pitchSummary: '' })
+  })
+
   it('writes normally when no recent article matches or the lookup fails', async () => {
     const none = setup([{ ...polio1290, title: 'Rupee closes flat in interbank trading' }])
     await processTriageJob({ clusterId: '9409' }, none as never)

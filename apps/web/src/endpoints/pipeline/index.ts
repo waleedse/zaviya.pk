@@ -1150,6 +1150,7 @@ const pipelineEndpoints: Endpoint[] = [
           priority: r.triage?.suggestedPriority,
           weightedScore: r.triage?.weightedScore,
           reason: r.triage?.reason,
+          pitchSummary: r.triage?.pitchSummary ?? '',
           pitchedAt: r.triage?.pitchedAt,
           firstSeenAt: r.firstSeenAt,
           distinctSources: Number(r.distinctSources),

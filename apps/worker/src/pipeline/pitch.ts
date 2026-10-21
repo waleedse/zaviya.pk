@@ -134,3 +134,23 @@ export async function pitchFallback(
   logger.warn({ clusterId: pick.clusterId, category: pick.category, reason }, 'pitch fallback: writing a waiting pitch')
   await decidePitch(pick.clusterId, 'write', deps, reason)
 }
+
+/** First two sentences (at most 400 characters) of the best real source text; '' when every source is a headline only. */
+export function pitchSummary(items: { title: string; summary?: string; contentText?: string }[]): string {
+  let best = ''
+  for (const it of items) {
+    for (const raw of [it.contentText, it.summary]) {
+      const text = (raw ?? '').replace(/\(Read from [^)]*\)/g, '').replace(/\s+/g, ' ').trim()
+      // Google News summaries just repeat the headline and the outlet
+      if (text.length > it.title.length + 40 && text.length > best.length) best = text
+    }
+  }
+  if (!best) return ''
+  const sentences = best.split(/(?<=[.!?])\s+/)
+  let out = ''
+  for (const s of sentences.slice(0, 2)) {
+    if ((out ? `${out} ${s}` : s).length > 400) break
+    out = out ? `${out} ${s}` : s
+  }
+  return (out || best.slice(0, 400)).trim()
+}

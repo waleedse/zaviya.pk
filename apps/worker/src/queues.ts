@@ -203,6 +203,7 @@ export async function createWorkerRuntime(
               writeQueue: queues.write,
               triageQueue: queues.triage,
               notifyReview,
+              bridge,
               autoApprove: env.AUTO_APPROVE,
               pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
             }),

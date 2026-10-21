@@ -6,7 +6,9 @@ import type { PayloadClient } from '../payload-client.js'
 import { triageSystemPrompt, triageUserPrompt, TRIAGE_PROMPT_VERSION } from '../prompts/triage.js'
 import { applyTriageRules } from './triage-rules.js'
 import { logger } from '../logger.js'
-import { hasFreshSource, shouldPitch } from './pitch.js'
+import { hasFreshSource, pitchSummary, shouldPitch } from './pitch.js'
+import { enrichFromExtension } from './write.js'
+import type { BridgeServer } from '../bridge/server.js'
 import { findSameStory } from './same-story.js'
 
 /** A deferred cluster that nobody has looked at for this long lost its retry job (normal retries are 15-60 min). */
@@ -61,6 +63,8 @@ export async function processTriageJob(
     writeQueue: Queue
     triageQueue?: Queue
     autoApprove?: 'off' | 'safe' | 'all'
+    /** Chrome extension bridge: reads the lede of headline-only sources at pitch time (ZAV-149) */
+    bridge?: Pick<BridgeServer, 'isOnline' | 'send'>
     /** Pitch normal stories to the editor instead of writing them at once */
     pitch?: boolean
     notifyReview?: (args: { clusterId: string; reviewId: string; summary: string }) => Promise<void>
@@ -199,9 +203,18 @@ export async function processTriageJob(
   }
 
   if (shouldPitch({ pitch: Boolean(deps.pitch), priority: triage.suggestedPriority, isUpdate: triage.isUpdateOfExisting })) {
+    // ZAV-149: a pitch carries the lede. Headline-only sources (Dawn via Google News) are read through the extension.
+    let items = cluster.items
+    try {
+      if (!pitchSummary(items) && deps.bridge?.isOnline() && (await enrichFromExtension(items, deps.payload, deps.bridge, data.clusterId, 1))) {
+        items = (await deps.payload.getCluster(data.clusterId)).items
+      }
+    } catch (e) {
+      logger.warn({ clusterId: data.clusterId, err: e instanceof Error ? e.message : e }, 'pitch summary enrichment failed')
+    }
     await deps.payload.patchCluster(data.clusterId, {
       status: 'triaged',
-      triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString() },
+      triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString(), pitchSummary: pitchSummary(items) },
     })
     logger.info({ clusterId: data.clusterId, priority: triage.suggestedPriority }, 'pitched to the editor')
     return
