@@ -3,7 +3,7 @@ import type { Edition, Format, Topic } from './lib.js'
 /** The plan in docs/VIDEO.md: render times (posting follows 20 min later: 08:00, 13:00, 17:30, 20:00 PKT) */
 export const DEFAULT_SLOTS =
   'morning@07:40=headlines30,money@12:40/mon-sat=money45,ai@17:10/tue+thu+sat=topic60:ai-tech,evening@19:40=roundup60'
-const FORMATS: Format[] = ['flash15', 'headlines30', 'roundup60', 'topic60', 'money45']
+const FORMATS: Format[] = ['flash15', 'trend25', 'headlines30', 'roundup60', 'topic60', 'money45']
 const TOPICS: Topic[] = ['ai-tech', 'money']
 export const KARACHI_OFFSET_MS = 5 * 3600 * 1000
 

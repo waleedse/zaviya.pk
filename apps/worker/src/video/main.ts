@@ -10,6 +10,8 @@ import { loadVideoConfig } from './config.js'
 import { createJobDeps } from './deps.js'
 import { flashKeys, flashSlot, pickFlash } from './flash.js'
 import { runEdition } from './job.js'
+import { pickTrendArticle, trendNames, TREND_SLOT_NAME } from './trend.js'
+import { X_TRENDS_KEY } from '../queues-keys.js'
 import { repeatFor, schedulerId, staleSchedulers } from './schedule.js'
 
 export const VIDEO_QUEUE = 'video'
@@ -74,8 +76,24 @@ async function main() {
       const data = job.data as { slot?: string; now?: boolean }
       const slot = cfg.slots.find((s) => s.name === data.slot)
       if (!slot) throw new Error(`unknown slot ${JSON.stringify(job.data)}`)
+      // ZAV-150: the trend slot picks its own article; no match means no Reel that day (logged, not an error)
+      let articleId: number | undefined
+      if (slot.name === TREND_SLOT_NAME) {
+        const now = Date.now()
+        const usedIds = new Set((await redis.smembers('video:trend:used')).map(Number))
+        const [google, x] = await Promise.all([deps.fetchTrends().catch(() => [] as string[]), redis.get(X_TRENDS_KEY)])
+        const pick = pickTrendArticle(await deps.fetchArticles(1), [...google, ...trendNames(x)], now, usedIds)
+        if ('skip' in pick) {
+          logger.info({ reason: pick.skip }, 'trend reel skipped')
+          return { trend: 'none', reason: pick.skip }
+        }
+        articleId = pick.id
+        await redis.sadd('video:trend:used', String(pick.id))
+        await redis.expire('video:trend:used', 7 * 86400)
+        logger.info({ trend: pick.trend, articleId }, 'trend reel picked')
+      }
       // `now` (email command "video now"): post without the veto wait; the Skip button / skip key still applies
-      const outcome = await runEdition(deps, slot, data.now === true ? { now: true } : {})
+      const outcome = await runEdition(deps, slot, { ...(data.now === true ? { now: true } : {}), ...(articleId !== undefined ? { articleId } : {}) })
       logger.info({ outcome }, 'video job finished')
       return outcome
     },

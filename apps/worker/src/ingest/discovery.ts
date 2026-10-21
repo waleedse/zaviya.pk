@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { BridgeServer } from '../bridge/server.js'
 import type { SourceItemInput } from '../payload-client.js'
 import { logger } from '../logger.js'
+import { X_TRENDS_KEY } from '../queues-keys.js'
 
 /**
  * Discovery through the logged-in browser extension: what Pakistan is talking about
@@ -11,7 +12,7 @@ import { logger } from '../logger.js'
  * from multiple sources during triage and writing.
  */
 
-export const X_TRENDS_KEY = 'zaviya:trends:x'
+export { X_TRENDS_KEY }
 
 /** Official and newsroom accounts worth watching. `min_faves` keeps noise out. */
 export const DEFAULT_X_QUERIES = [

@@ -1,5 +1,5 @@
 export type Edition = 'morning' | 'evening'
-export type Format = 'flash15' | 'headlines30' | 'roundup60' | 'topic60' | 'money45'
+export type Format = 'flash15' | 'trend25' | 'headlines30' | 'roundup60' | 'topic60' | 'money45'
 export type Topic = 'ai-tech' | 'money'
 
 export interface StoryInput {

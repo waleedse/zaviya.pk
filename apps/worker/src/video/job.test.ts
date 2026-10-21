@@ -52,7 +52,7 @@ function setup(over: Partial<JobDeps> = {}, cfgOver: Partial<VideoConfig> = {}) 
   const upserts: Record<string, unknown>[] = []
   const posts: string[] = []
   const deps: JobDeps = {
-    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, ...cfgOver },
+    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, trendReel: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, ...cfgOver },
     redis,
     payload: { upsertSocialPost: vi.fn(async (b) => void upserts.push(b)) },
     fetchArticles: vi.fn(async () => Array.from({ length: 8 }, (_, i) => article(i))),
