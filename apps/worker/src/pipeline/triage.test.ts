@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { QuotaExhaustedError } from '@zaviya/llm'
-import { DEFER_RELEASE_MIN, processTriageJob, releaseDeferredClusters } from './triage.js'
+import { DEFER_RELEASE_MIN, LONELY_TRIAGE_MIN, processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './triage.js'
 
 describe('processTriageJob', () => {
   it('requeues the cluster with a delay when LLM quota is exhausted', async () => {
@@ -145,5 +145,28 @@ describe('a deferred cluster once the interval has passed (ZAV-144)', () => {
     const r = await run(16)
     expect(r.payload.patchCluster.mock.calls[0]![1].triage.codeOutcome).not.toBe('defer')
     expect(r.triageQueue.add).not.toHaveBeenCalled()
+  })
+})
+
+describe('releaseStuckNewClusters (ZAV-147)', () => {
+  const T = Date.parse('2026-10-21T10:00:00Z')
+  it('queues every stuck new cluster once per 15-minute slot', async () => {
+    const stuckNewClusters = vi.fn().mockResolvedValue({ clusters: [{ id: '9728', updatedAt: 'x', distinctSources: 1 }, { id: '10538', updatedAt: 'x', distinctSources: 3 }] })
+    const add = vi.fn()
+    const n = await releaseStuckNewClusters({ payload: { stuckNewClusters }, triageQueue: { add }, minSources: 2 }, T)
+    expect(stuckNewClusters).toHaveBeenCalledWith(DEFER_RELEASE_MIN, LONELY_TRIAGE_MIN, 2)
+    expect(n).toBe(2)
+    expect(add.mock.calls[0]![1]).toEqual({ clusterId: '9728' })
+    const id = (t: number) => {
+      const a = vi.fn()
+      return releaseStuckNewClusters({ payload: { stuckNewClusters }, triageQueue: { add: a } }, t).then(() => a.mock.calls[0]![2].jobId as string)
+    }
+    expect(await id(T + 60_000)).toBe(await id(T + 5 * 60_000))
+    expect(await id(T)).not.toBe(await id(T + 16 * 60_000))
+  })
+  it('does nothing when no cluster is stuck', async () => {
+    const add = vi.fn()
+    expect(await releaseStuckNewClusters({ payload: { stuckNewClusters: vi.fn().mockResolvedValue({ clusters: [] }) }, triageQueue: { add } })).toBe(0)
+    expect(add).not.toHaveBeenCalled()
   })
 })

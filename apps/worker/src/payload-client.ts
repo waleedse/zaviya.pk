@@ -246,6 +246,14 @@ export class PayloadClient {
     return this.request<{ clusters: { id: string; updatedAt: string; reason: string }[] }>('GET', `/api/pipeline/deferred-clusters?minAgeMin=${minAgeMin}`)
   }
 
+  /** Clusters left in 'new' without a triage job: corroborated ones idle `minAgeMin`, lone tier 1-2 ones older than `lonelyAgeMin` (ZAV-147) */
+  stuckNewClusters(minAgeMin: number, lonelyAgeMin: number, minSources: number) {
+    return this.request<{ clusters: { id: string; updatedAt: string; distinctSources: number }[] }>(
+      'GET',
+      `/api/pipeline/stuck-new-clusters?minAgeMin=${minAgeMin}&lonelyAgeMin=${lonelyAgeMin}&minSources=${minSources}`,
+    )
+  }
+
   /** Articles of the last 48h (live and editor drafts) for same-story matching */
   recentArticles() {
     return this.request<import('./pipeline/same-story.js').RecentArticle[]>('GET', '/api/pipeline/recent-articles')

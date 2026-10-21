@@ -32,6 +32,27 @@ export async function releaseDeferredClusters(
   return released
 }
 
+/** A lone tier 1-2 cluster that no second outlet joined for this long goes to triage anyway (ZAV-147). */
+export const LONELY_TRIAGE_MIN = 180
+
+/**
+ * ZAV-147: embed only queues triage when a cluster is corroborated at the moment an item arrives. A cluster that was
+ * 'new' when its triage job was lost, or that stayed with one outlet (petrol cut 9728), was never looked at again.
+ * This sweep queues them, once per 15-minute slot per cluster, and triage decides what they are.
+ */
+export async function releaseStuckNewClusters(
+  deps: { payload: Pick<PayloadClient, 'stuckNewClusters'>; triageQueue: Pick<Queue, 'add'>; minSources?: number },
+  now = Date.now(),
+): Promise<number> {
+  const { clusters } = await deps.payload.stuckNewClusters(DEFER_RELEASE_MIN, LONELY_TRIAGE_MIN, deps.minSources ?? 2)
+  const slot = Math.floor(now / (15 * 60_000))
+  for (const c of clusters) {
+    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: 4, jobId: `triage-new-${c.id}-${slot}`, removeOnComplete: true })
+    logger.info({ clusterId: c.id, sources: c.distinctSources }, 'stuck new cluster queued for triage')
+  }
+  return clusters.length
+}
+
 export async function processTriageJob(
   data: { clusterId: string },
   deps: {
