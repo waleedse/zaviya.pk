@@ -1,5 +1,6 @@
 import { sql } from '@payloadcms/db-postgres'
 import type { Payload } from 'payload'
+import { pickClusterHeadline } from '@zaviya/shared'
 import { embeddingToPgVector } from './helpers'
 
 export type ClusterMatchInput = {
@@ -26,6 +27,7 @@ export async function refreshClusterStats(payload: Payload, clusterId: string): 
   })
   const sourceIds = new Set<string>()
   let maxTier = 3
+  const candidates: { title: string; tier: number }[] = []
   for (const item of items.docs) {
     const src = item.source
     const id = typeof src === 'object' && src !== null ? String(src.id) : String(src)
@@ -35,7 +37,10 @@ export async function refreshClusterStats(payload: Payload, clusterId: string): 
         ? Number((src as { trustTier: number }).trustTier)
         : 3
     maxTier = Math.min(maxTier, tier)
+    if (item.title) candidates.push({ title: String(item.title), tier })
   }
+  const current = await payload.findByID({ collection: 'story-clusters', id: clusterId, depth: 0, overrideAccess: true })
+  const headline = pickClusterHeadline(candidates, String(current.headline ?? ''))
   const lastSeen = items.docs.reduce((max, it) => {
     const t = it.publishedAt ? new Date(it.publishedAt).getTime() : 0
     return Math.max(max, t)
@@ -47,6 +52,7 @@ export async function refreshClusterStats(payload: Payload, clusterId: string): 
       itemCount: items.docs.length,
       distinctSources: sourceIds.size,
       maxTier,
+      ...(headline && headline !== current.headline ? { headline } : {}),
       lastSeenAt: lastSeen ? new Date(lastSeen).toISOString() : new Date().toISOString(),
     },
     overrideAccess: true,
