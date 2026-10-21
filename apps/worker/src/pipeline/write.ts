@@ -133,14 +133,15 @@ async function runLocaleWrite(
 }
 
 /** Read up to three thin source items through the extension; true when any text was saved. */
-async function enrichFromExtension(
+export async function enrichFromExtension(
   items: { id?: string; title: string; summary?: string; contentText?: string; url: string }[],
   payload: PayloadClient,
   bridge: Pick<BridgeServer, 'isOnline' | 'send'>,
   clusterId: string,
+  max = 3,
 ): Promise<boolean> {
   let saved = false
-  const thin = items.filter((it) => it.id && sourceTextChars([it]) === 0).slice(0, 3)
+  const thin = items.filter((it) => it.id && sourceTextChars([it]) === 0).slice(0, max)
   for (const it of thin) {
     try {
       const raw = await bridge.send({ id: `read_${clusterId}_${it.id}_${Date.now()}`, type: 'page.read', payload: { url: it.url } }, 60_000)

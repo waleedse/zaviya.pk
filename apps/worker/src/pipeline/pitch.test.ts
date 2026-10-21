@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { bestPitch, decidePitch, editorApproved, floorPitch, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
+import { bestPitch, decidePitch, pitchSummary, editorApproved, floorPitch, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
 import { deferImage } from './media.js'
 
 function fakeRedis(init: Record<string, string> = {}) {
@@ -142,5 +142,21 @@ describe('hourly floor', () => {
   it('on a slow hour prefers AI, big tech and business stories', () => {
     expect(floorPitch(pitches)?.clusterId).toBe('2')
     expect(floorPitch([{ clusterId: '3', headline: 'c', category: 'pakistan', weightedScore: 0.8 }, ...pitches])?.clusterId).toBe('3')
+  })
+})
+
+describe('pitchSummary (ZAV-149)', () => {
+  it('takes the first two sentences of real source text', () => {
+    const items = [{ title: 'Rupee falls', contentText: 'The rupee fell 0.3pc against the dollar on Tuesday. Dealers blamed import payments. A third sentence follows here.\n\n(Read from www.dawn.com)' }]
+    expect(pitchSummary(items)).toBe('The rupee fell 0.3pc against the dollar on Tuesday. Dealers blamed import payments.')
+  })
+  it('is empty when every source only repeats the headline', () => {
+    expect(pitchSummary([{ title: 'Rupee falls - Dawn', summary: 'Rupee falls - Dawn' }])).toBe('')
+  })
+  it('prefers the longest real text and caps the length', () => {
+    const long = 'Word '.repeat(300)
+    const out = pitchSummary([{ title: 'A headline', summary: 'Short but real summary line that is long enough to count here.' }, { title: 'B', contentText: long }])
+    expect(out.length).toBeLessThanOrEqual(400)
+    expect(out.startsWith('Word')).toBe(true)
   })
 })
