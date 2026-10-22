@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { CATEGORY_SLUGS, PRIORITIES } from '@zaviya/shared'
 import type { Article } from '../../payload-types'
 import { articlePublicUrls, badRequest, json } from './helpers'
+import { findDuplicate, withKeyLock } from '../../lib/publish-guard'
 
 const localeContentSchema = z.object({
   title: z.string(),
@@ -109,6 +110,35 @@ export async function handlePipelineArticles(req: PayloadRequest): Promise<Respo
     return badRequest('Validation failed', parsed.error.flatten())
   }
   const body = parsed.data
+  // ZAV-158: creating is "check for an existing article, then create", done one request at a time per cluster, so a
+  // retried or concurrent publish of the same cluster returns the first article instead of making a twin.
+  if (!body.articleId && body.clusterId) {
+    return withKeyLock(`cluster:${body.clusterId}`, async () => {
+      const recent = await req.payload.find({
+        collection: 'articles',
+        where: { storyCluster: { equals: Number(body.clusterId) } },
+        draft: true,
+        sort: '-createdAt',
+        limit: 5,
+        depth: 0,
+        locale: 'en',
+        overrideAccess: true,
+      })
+      const dup = findDuplicate(recent.docs.map((a) => ({ id: a.id, createdAt: a.createdAt, workflow: a.workflow })))
+      if (dup) {
+        req.payload.logger.warn(`pipeline/articles: cluster ${body.clusterId} already has article ${dup.id}, not creating another`)
+        const wanted = body.status === 'published' ? 'published' : body.status === 'in_review' ? 'in_review' : 'draft'
+        // Same stage requested (a retry after a timeout or a failed later step): finish that article, idempotently
+        if (dup.workflow === wanted) return createOrUpdateArticle(req, { ...body, articleId: String(dup.id) })
+        return json({ id: String(dup.id), status: dup.workflow, urls: await articlePublicUrls(req.payload, String(dup.id)), deduped: true })
+      }
+      return createOrUpdateArticle(req, body)
+    })
+  }
+  return createOrUpdateArticle(req, body)
+}
+
+async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof pipelineArticleSchema>): Promise<Response> {
   const category = await req.payload.find({
     collection: 'categories',
     where: { slug: { equals: body.category } },
