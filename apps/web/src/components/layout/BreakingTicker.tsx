@@ -20,7 +20,7 @@ export function BreakingTicker({ items, locale, label }: { items: ArticleCard[];
           {label === 'latest' ? d.latest : d.breaking}
         </span>
         <div className="relative min-w-0 flex-1 overflow-hidden">
-          <div className="ticker-scroll flex w-max gap-10 whitespace-nowrap" style={{ animationDuration: `${Math.max(90, items.length * 22)}s` }}>
+          <div className="ticker-scroll flex w-max gap-10 whitespace-nowrap" style={{ animationDuration: `${Math.max(90, items.length * 7)}s` }}>
             {doubled.map((item, i) => (
               <Link
                 key={`${item.id}-${i}`}
