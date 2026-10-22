@@ -2,6 +2,7 @@ import type { CollectionBeforeValidateHook, CollectionBeforeChangeHook, Collecti
 import { computeReadingTimeMinutes } from './readingTime'
 import { revalidateArticleHook } from './revalidate'
 import { pingIndexNowOnFirstPublish } from './indexNow'
+import { savedSlug } from '../lib/publish-guard'
 
 export const articleSlugUnique: CollectionBeforeValidateHook = async ({ data, req, originalDoc }) => {
   const id = originalDoc?.id
@@ -10,6 +11,18 @@ export const articleSlugUnique: CollectionBeforeValidateHook = async ({ data, re
   for (const locale of locales) {
     const slugVal = typeof data.slug === 'object' ? data.slug[locale] : data.slug
     if (!slugVal || typeof slugVal !== 'string') continue
+    // ZAV-158: an article that already holds this slug may be edited (status, headline, text). Only a slug change
+    // can collide; otherwise a duplicate pair (1476/1477) could never be unpublished, every PATCH returned 500.
+    if (id) {
+      let held = savedSlug(originalDoc, locale, req.locale ?? undefined)
+      if (held === undefined) {
+        const saved = await req.payload
+          .findByID({ collection: 'articles', id, locale, depth: 0, overrideAccess: true })
+          .catch(() => undefined)
+        held = saved && typeof saved.slug === 'string' ? saved.slug : undefined
+      }
+      if (held === slugVal) continue
+    }
     const existing = await req.payload.find({
       collection: 'articles',
       locale,
