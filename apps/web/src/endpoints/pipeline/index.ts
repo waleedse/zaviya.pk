@@ -89,6 +89,32 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Built-in sources the worker needs but that have no feed (ZAV-86: the PPSC jobs page). Idempotent by key:
+    // an existing source, enabled or not, is left exactly as it is.
+    path: '/pipeline/sources',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const schema = z.object({
+        key: z.string().min(2).max(60),
+        name: z.string().min(2).max(120),
+        url: z.string().url(),
+        type: z.enum(['rss', 'gnews']),
+        trustTier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        language: z.enum(['en', 'ur', 'mixed']).optional(),
+        categoryHint: z.string().max(40).optional(),
+        pollIntervalSec: z.number().int().min(300).max(86_400).optional(),
+      })
+      const parsed = await parseJson(req, schema)
+      if ('error' in parsed) return parsed.error
+      const found = await req.payload.find({ collection: 'sources', where: { key: { equals: parsed.data.key } }, limit: 1, depth: 0, overrideAccess: true })
+      if (found.docs[0]) return json({ id: String(found.docs[0].id), created: false })
+      const doc = await req.payload.create({ collection: 'sources', data: { ...parsed.data, enabled: true }, overrideAccess: true, req })
+      return json({ id: String(doc.id), created: true })
+    },
+  },
+  {
     path: '/pipeline/sources/:id',
     method: 'patch',
     handler: async (req) => {

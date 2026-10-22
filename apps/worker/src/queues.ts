@@ -10,7 +10,8 @@ import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob } from './pipeline/media.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './pipeline/hero-backfill.js'
 import { processPublishJob } from './pipeline/publish.js'
-import { fetchRssFeed, toSourceItemInputs } from './ingest/rss.js'
+import { fetchRssFeed, jobLikeDropped, toSourceItemInputs } from './ingest/rss.js'
+import { BUILTIN_SOURCES, fetchPpscSourceItems, isPpscUrl } from './ingest/ppsc.js'
 import { isAllowedByRobots } from './ingest/robots.js'
 import { fetchArticleText } from './ingest/extract.js'
 import { fetchCuratedTweets } from './ingest/x.js'
@@ -160,14 +161,22 @@ export async function createWorkerRuntime(
         }
         let inputs: SourceItemInput[] = []
         let nextEtag: string | undefined
-        if (isTrendsUrl(url)) {
+        if (isPpscUrl(url)) {
+          // No feed: the official jobs page is read directly and every open advertisement becomes one item (ZAV-86)
+          inputs = await fetchPpscSourceItems(sourceId, url)
+        } else if (isTrendsUrl(url)) {
           const trends = await fetchTrends(url)
           await redis.set(TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends }))
           inputs = trendsToSourceItems(sourceId, trends)
         } else {
           const feed = await fetchRssFeed(url, { etag })
           nextEtag = feed.etag
-          if (!feed.notModified) inputs = toSourceItemInputs(sourceId, feed.items, lang)
+          if (!feed.notModified) {
+            inputs = toSourceItemInputs(sourceId, feed.items, lang)
+            // Say so when job or vacancy items are left out for age, instead of dropping them silently (ZAV-86)
+            const dropped = jobLikeDropped(feed.items, inputs)
+            if (dropped.length) logger.info({ sourceId, count: dropped.length, titles: dropped.slice(0, 5) }, 'ingest: job items skipped, older than 48 h')
+          }
         }
         if (inputs.length) await storeItems(inputs)
         await payload.patchSource(sourceId, {
@@ -449,6 +458,13 @@ export async function createWorkerRuntime(
 
 export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<void> {
   try {
+    // Sources the code itself depends on (no feed to subscribe to) are created once if they are missing
+    for (const b of BUILTIN_SOURCES) {
+      await runtime.payload.ensureSource(b).then(
+        (r) => r.created && logger.info({ key: b.key }, 'built-in source created'),
+        (e) => logger.warn({ err: e instanceof Error ? e.message : e, key: b.key }, 'could not ensure built-in source'),
+      )
+    }
     const { sources } = await runtime.payload.getSources()
     const wanted = new Set(sources.map((s) => `ingest-${s.id}`))
     // Drop schedulers for sources that were disabled or deleted since the last start.
