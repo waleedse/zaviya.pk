@@ -14,6 +14,10 @@ export const TriageResultSchema = z.object({
   suggestedPriority: z.enum(PRIORITIES),
   decision: z.enum(['publish', 'review', 'reject']),
   reason: z.string().max(400),
+  /** What kind of piece the sources are: a report, opinion/editorial/column, or a long feature/analysis (ZAV-155) */
+  storyKind: z.enum(['news', 'opinion', 'feature']).optional(),
+  /** Where the event happens: in Pakistan (or to Pakistanis there), or abroad (ZAV-155) */
+  eventRegion: z.enum(['pakistan', 'abroad']).optional(),
 })
 export type TriageResult = z.infer<typeof TriageResultSchema>
 

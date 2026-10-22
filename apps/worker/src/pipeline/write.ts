@@ -10,6 +10,7 @@ import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
+import { opinionCue, pageFromWrongOutlet } from './story-kind.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
@@ -147,6 +148,11 @@ export async function enrichFromExtension(
       const raw = await bridge.send({ id: `read_${clusterId}_${it.id}_${Date.now()}`, type: 'page.read', payload: { url: it.url } }, 60_000)
       const page = PageReadResultSchema.parse(raw)
       if (page.text.length < 300) continue
+      // The extension must have read the outlet the headline names (a stale tab once returned a Dawn editorial for a Nikkei item)
+      if (pageFromWrongOutlet(it.title, page.url)) {
+        logger.warn({ clusterId, itemId: it.id, host: new URL(page.url).hostname, title: it.title }, 'extension page is from a different outlet than the headline, ignored')
+        continue
+      }
       await payload.patchSourceItem(it.id!, { contentText: `${page.text}\n\n(Read from ${new URL(page.url).hostname})` })
       saved = true
       logger.info({ clusterId, itemId: it.id, host: new URL(page.url).hostname, chars: page.text.length }, 'source text read by extension')
@@ -177,6 +183,13 @@ export async function processWriteJob(
     if (await enrichFromExtension(cluster.items, deps.payload, deps.bridge, data.clusterId)) {
       cluster = await deps.payload.getCluster(data.clusterId)
     }
+  }
+  // An editorial or column is not a news report (ZAV-155); the text read just now may reveal one
+  const opinion = opinionCue(cluster.items)
+  if (opinion) {
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...((cluster.triage ?? {}) as Record<string, unknown>), codeOutcome: 'reject', deferReason: opinion } })
+    logger.info({ clusterId: data.clusterId, reason: opinion }, 'write skipped: the source is opinion')
+    return null
   }
   // Headline-only items (Google News links, blocked outlets) give the writer nothing to report.
   // Without real source text it writes "about the headline" instead of the news: skip until an
