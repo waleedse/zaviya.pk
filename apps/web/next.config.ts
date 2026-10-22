@@ -8,6 +8,8 @@ const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@zaviya/shared'],
+  // Pre-rendering reads the live DB; on a loaded server a page can take over the 60 s default (the 22 Oct deploys failed on it)
+  staticPageGenerationTimeout: 240,
   images: {
     remotePatterns: [
       // Cloudflare R2 public bucket for media in production

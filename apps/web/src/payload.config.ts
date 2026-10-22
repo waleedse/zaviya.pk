@@ -111,7 +111,8 @@ export default buildConfig({
       connectionString: process.env.DATABASE_URL || '',
       // ZAV-169: fail fast instead of queueing forever. A request waits at most 15 s for a free connection,
       // and no single statement may run longer than 2 minutes (it would hold a pool slot while the API hangs).
-      connectionTimeoutMillis: 15_000,
+      // `next build` pre-renders pages against the live DB while the worker and video service are busy: it may wait longer.
+      connectionTimeoutMillis: process.env.NEXT_PHASE === 'phase-production-build' ? 120_000 : 15_000,
       idleTimeoutMillis: 30_000,
       statement_timeout: 120_000,
     },
