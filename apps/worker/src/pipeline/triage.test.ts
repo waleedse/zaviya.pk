@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { QuotaExhaustedError } from '@zaviya/llm'
-import { DEFER_RELEASE_MIN, LONELY_TRIAGE_MIN, processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './triage.js'
+import { DEFER_RELEASE_MIN, HEADLINE_ONLY_REJECT, HEADLINE_ONLY_RETRY_MIN, HEADLINE_ONLY_WAITING, LONELY_TRIAGE_MIN, processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './triage.js'
 
 describe('processTriageJob', () => {
   it('requeues the cluster with a delay when LLM quota is exhausted', async () => {
@@ -104,10 +104,52 @@ describe('processTriageJob', () => {
     expect(d.writeQueue.add).not.toHaveBeenCalled()
   })
 
-  it('still pitches with an empty summary when the extension is offline (the writer then reads the page itself)', async () => {
+  it('waits, instead of binning the story, when the extension is offline and the source is fresh (ZAV-163)', async () => {
     const d = setup([])
+    const triageQueue = { add: vi.fn() }
+    await processTriageJob({ clusterId: '9409' }, { ...d, triageQueue, pitch: true, bridge: { isOnline: () => false, send: vi.fn() } } as never)
+    const last = d.payload.patchCluster.mock.calls.at(-1)![1]
+    expect(last.status).toBe('triaged')
+    expect(last.triage).toMatchObject({ codeOutcome: 'defer', deferReason: HEADLINE_ONLY_WAITING })
+    expect(triageQueue.add).toHaveBeenCalledTimes(1)
+    expect(triageQueue.add.mock.calls[0]![2].delay).toBe(HEADLINE_ONLY_RETRY_MIN * 60_000)
+  })
+
+  // The four pitches of 22 Oct 01:24 PKT: empty pitchSummary, a Google News link as the only source
+  const headlineOnly: [string, string, string, string][] = [
+    ['11140', 'Rice exporters seek relief on rail freight - Arab News PK', 'Arab News PK', 'https://news.google.com/rss/articles/CBMi11140?oc=5'],
+    ['11150', 'Cotton arrivals rise 12pc to 4.4m bales - Mettis Global', 'Mettis Global', 'https://news.google.com/rss/articles/CBMi11150?oc=5'],
+    ['11161', 'SECP issues PRL rules for listed companies - Investify', 'Investify', 'https://news.google.com/rss/articles/CBMi11161?oc=5'],
+    ['11173', 'Sheikhupura maid case: suspects arrested - ARY News', 'ARY News', 'https://news.google.com/rss/articles/CBMi11173?oc=5'],
+  ]
+  it.each(headlineOnly)('rejects headline-only pitch %s when the article body cannot be read (ZAV-163)', async (id, title, outlet, url) => {
+    const d = setup([])
+    const item = { id: '1', url, title, summary: title.replace(' - ', '  '), publishedAt: new Date().toISOString(), source: { name: `Google News — ${outlet}`, trustTier: 2 } }
+    d.payload.getCluster.mockResolvedValue({ ...polioCluster, id, headline: title, items: [item] })
+    // extension online but the page read fails
+    const bridge = { isOnline: () => true, send: vi.fn().mockRejectedValue(new Error('tab closed')) }
+    await processTriageJob({ clusterId: id }, { ...d, pitch: true, bridge, triageQueue: { add: vi.fn() } } as never)
+    const last = d.payload.patchCluster.mock.calls.at(-1)![1]
+    expect(last.status).toBe('rejected')
+    expect(last.triage).toMatchObject({ codeOutcome: 'reject', deferReason: HEADLINE_ONLY_REJECT })
+    expect(d.writeQueue.add).not.toHaveBeenCalled()
+    expect(d.payload.patchCluster.mock.calls.some((c) => c[1].triage?.codeOutcome === 'pitch')).toBe(false)
+  })
+
+  it('rejects a headline-only pitch outright once the sources are old, even with the extension offline', async () => {
+    const d = setup([])
+    const old = { ...polioCluster, items: [{ ...polioCluster.items[0]!, publishedAt: new Date(Date.now() - 5 * 3_600_000).toISOString(), summary: '' }] }
+    d.payload.getCluster.mockResolvedValue(old)
+    await processTriageJob({ clusterId: '9409' }, { ...d, pitch: true, bridge: { isOnline: () => false, send: vi.fn() }, triageQueue: { add: vi.fn() } } as never)
+    expect(d.payload.patchCluster.mock.calls.at(-1)![1].status).toBe('rejected')
+  })
+
+  it('still pitches a story that has a body', async () => {
+    const d = setup([])
+    const body = 'The National Emergency Operations Centre confirmed on Tuesday that a child in Karachi East tested positive for wild poliovirus. It is the first case in the city.'
+    d.payload.getCluster.mockResolvedValue({ ...polioCluster, items: [{ ...polioCluster.items[0]!, contentText: body }] })
     await processTriageJob({ clusterId: '9409' }, { ...d, pitch: true, bridge: { isOnline: () => false, send: vi.fn() } } as never)
-    expect(d.payload.patchCluster.mock.calls.at(-1)![1].triage).toMatchObject({ codeOutcome: 'pitch', pitchSummary: '' })
+    expect(d.payload.patchCluster.mock.calls.at(-1)![1].triage).toMatchObject({ codeOutcome: 'pitch' })
   })
 
   it('writes normally when no recent article matches or the lookup fails', async () => {
