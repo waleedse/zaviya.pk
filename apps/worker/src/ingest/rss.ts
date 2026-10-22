@@ -91,3 +91,11 @@ export function toSourceItemInputs(sourceId: string, items: NormalizedRssItem[],
     hash: i.hash,
   }))
 }
+
+const JOB_TITLE = /\b(ppsc|fpsc|nts|jobs?|vacanc\w*|recruitment|hiring|posts?|apply|last date|advertisement)\b/i
+
+/** Titles of job-like feed items that toSourceItemInputs left out (too old), so the drop is logged and not silent (ZAV-86). */
+export function jobLikeDropped(all: NormalizedRssItem[], kept: SourceItemInput[]): string[] {
+  const keptIds = new Set(kept.map((k) => k.externalId))
+  return all.filter((i) => !keptIds.has(i.externalId) && JOB_TITLE.test(i.title)).map((i) => i.title)
+}

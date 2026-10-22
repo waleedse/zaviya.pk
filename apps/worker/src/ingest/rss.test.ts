@@ -25,3 +25,15 @@ describe('rss normalization', () => {
     expect(out.map((i) => i.title)).toEqual(['fresh', 'edge'])
   })
 })
+
+import { jobLikeDropped, toSourceItemInputs as toInputs, type NormalizedRssItem } from './rss.js'
+describe('jobLikeDropped (ZAV-86)', () => {
+  it('names the job items that the 48 h age filter left out', () => {
+    const now = Date.parse('2026-10-22T08:00:00Z')
+    const item = (title: string, publishedAt: string): NormalizedRssItem => ({ externalId: title, url: `https://x/${title}`, title, publishedAt, lang: 'en', hash: title })
+    const all = [item('PPSC Advertisement No. 11 2026 Announced', '2026-10-09T08:00:00.000Z'), item('Rupee closes flat', '2026-10-01T08:00:00.000Z'), item('Cabinet meets today', '2026-10-22T07:00:00.000Z')]
+    const kept = toInputs('1', all, undefined, now)
+    expect(kept.map((k) => k.externalId)).toEqual(['Cabinet meets today'])
+    expect(jobLikeDropped(all, kept)).toEqual(['PPSC Advertisement No. 11 2026 Announced'])
+  })
+})
