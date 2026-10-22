@@ -328,7 +328,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <div className="pb-6">
-      <h1 className="sr-only">{isUr ? 'زاویہ: پاکستان کی تازہ ترین خبریں' : 'Zaviya News: Latest Pakistan news'}</h1>
+      <h1 className="sr-only">{isUr ? 'زاویہ: پاکستان کی تازہ ترین خبریں' : 'Zaviya News: Pakistan news in English and Urdu'}</h1>
       <LiveRefresh locale={locale} />
 
       {/* ── Front page: the editor's lead, the next stories, the wire and the top stories ── */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutPageJsonLd, organizationId, organizationJsonLd, SECTION_SEO, socialProfileUrls, websiteJsonLd } from '../../src/lib/seo'
+import { openSearchXml, aboutPageJsonLd, organizationId, organizationJsonLd, SECTION_SEO, socialProfileUrls, websiteJsonLd } from '../../src/lib/seo'
 
 describe('brand entity (ZAV-100)', () => {
   it('titles the homepage "Zaviya News: ..." within 50-65 characters', () => {
@@ -7,6 +7,21 @@ describe('brand entity (ZAV-100)', () => {
     expect(t.startsWith('Zaviya News: ')).toBe(true)
     expect(t.length).toBeGreaterThanOrEqual(50)
     expect(t.length).toBeLessThanOrEqual(65)
+  })
+  it('names the brand and the domain once each in the homepage title (ZAV-181)', () => {
+    const t = SECTION_SEO.home!.en.title
+    expect(t.match(/Zaviya News/g)).toHaveLength(1)
+    expect(t.match(/zaviya\.pk/g)).toHaveLength(1)
+  })
+  it('serves an OpenSearch description pointing at the real search page and the WebSite SearchAction matches it (ZAV-181)', () => {
+    const xml = openSearchXml()
+    expect(xml).toMatch(/<ShortName>Zaviya News<\/ShortName>/)
+    const template = xml.match(/template="([^"]+)"/)![1]!
+    expect(template).toMatch(/^https?:\/\/[^/]+\/search\?q=\{searchTerms\}$/)
+    const action = (websiteJsonLd('en') as Record<string, any>).potentialAction
+    expect(action['@type']).toBe('SearchAction')
+    expect(action.target.replace('{search_term_string}', '{searchTerms}')).toBe(template)
+    expect(xml.startsWith('<?xml')).toBe(true)
   })
   it('gives the organization a stable id and the fields Google reads', () => {
     const o = organizationJsonLd() as Record<string, any>
