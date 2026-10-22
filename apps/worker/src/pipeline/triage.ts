@@ -11,6 +11,17 @@ import { enrichFromExtension } from './write.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { findSameStory } from './same-story.js'
 
+export const HEADLINE_ONLY_REJECT = 'headline only: the article body could not be read, so it is not pitched'
+export const HEADLINE_ONLY_WAITING = 'headline only: waiting for the extension to read the article'
+/** With the extension offline a headline-only cluster is retried hourly while the newest source is under 4 h old (ZAV-163). */
+export const HEADLINE_ONLY_RETRY_MIN = 60
+export const HEADLINE_ONLY_WAIT_H = 4
+
+function newestSourceMs(items: { publishedAt?: string }[]): number {
+  const times = items.map((i) => (i.publishedAt ? Date.parse(i.publishedAt) : NaN)).filter(Number.isFinite)
+  return times.length ? Math.max(...times) : 0
+}
+
 /** A deferred cluster that nobody has looked at for this long lost its retry job (normal retries are 15-60 min). */
 export const DEFER_RELEASE_MIN = 20
 
@@ -212,9 +223,31 @@ export async function processTriageJob(
     } catch (e) {
       logger.warn({ clusterId: data.clusterId, err: e instanceof Error ? e.message : e }, 'pitch summary enrichment failed')
     }
+    const lede = pitchSummary(items)
+    // ZAV-163: a pitch with no body (a Google News link whose article text could not be read) would be written, or
+    // approved and then withdrawn, from a headline alone. The worker closes it itself with a note.
+    if (!lede) {
+      const ageH = (Date.now() - newestSourceMs(items)) / 3_600_000
+      if (!deps.bridge?.isOnline() && ageH < HEADLINE_ONLY_WAIT_H && deps.triageQueue) {
+        // The extension is offline, so the page could not even be tried: look again later instead of binning it
+        await deps.triageQueue.add('triage', { clusterId: data.clusterId }, { delay: HEADLINE_ONLY_RETRY_MIN * 60_000, priority: 4, jobId: `triage-body-${data.clusterId}-${Math.floor(Date.now() / (HEADLINE_ONLY_RETRY_MIN * 60_000))}`, removeOnComplete: true })
+        await deps.payload.patchCluster(data.clusterId, {
+          status: 'triaged',
+          triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'defer', deferReason: HEADLINE_ONLY_WAITING },
+        })
+        logger.info({ clusterId: data.clusterId }, 'headline-only: waiting for the extension to read the article')
+        return
+      }
+      await deps.payload.patchCluster(data.clusterId, {
+        status: 'rejected',
+        triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: HEADLINE_ONLY_REJECT },
+      })
+      logger.info({ clusterId: data.clusterId }, 'rejected: headline-only, no article body could be read')
+      return
+    }
     await deps.payload.patchCluster(data.clusterId, {
       status: 'triaged',
-      triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString(), pitchSummary: pitchSummary(items) },
+      triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString(), pitchSummary: lede },
     })
     logger.info({ clusterId: data.clusterId, priority: triage.suggestedPriority }, 'pitched to the editor')
     return
