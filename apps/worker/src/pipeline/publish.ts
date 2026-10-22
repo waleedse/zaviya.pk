@@ -141,6 +141,24 @@ export async function releaseRejectedDraft(clusterId: string, payload: Pick<Payl
   return 'triaged'
 }
 
+/**
+ * A draft still marked in_review whose Redis entry is gone (an earlier approve consumed it and the publish
+ * was blocked, or Redis was flushed) can never be finished, yet stays on the editor's list and swallows every
+ * later command (ZAV-177). Move it out of review so the editor stops seeing it; the text stays as a draft.
+ */
+export async function dropOrphanedGateDraft(articleId: string, payload: Pick<PayloadClient, 'request'>): Promise<boolean> {
+  try {
+    const a = await payload.request<{ _status?: string; workflow?: string }>('GET', `/api/articles/${articleId}?draft=true&depth=0`)
+    if (a._status !== 'draft' || a.workflow !== 'in_review') return false
+    await payload.request('PATCH', `/api/articles/${articleId}?draft=true&locale=en`, { workflow: 'draft' })
+    logger.warn({ articleId }, 'gate draft had no waiting entry: moved out of review')
+    return true
+  } catch (e) {
+    logger.warn({ err: e, articleId }, 'could not clear an orphaned gate draft')
+    return false
+  }
+}
+
 /** Publish (or drop) a story the editor decided on. Publishing reuses the normal path with its article id. */
 export async function finishGated(
   articleId: string,
@@ -148,7 +166,10 @@ export async function finishGated(
   deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
 ): Promise<boolean> {
   const raw = await deps.redis.hget(GATE_KEY, articleId)
-  if (!raw) return false
+  if (!raw) {
+    await dropOrphanedGateDraft(articleId, deps.payload)
+    return false
+  }
   await deps.redis.hdel(GATE_KEY, articleId)
   const data = JSON.parse(raw) as Parameters<typeof processPublishJob>[0]
   if (action === 'reject') {

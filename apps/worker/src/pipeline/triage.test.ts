@@ -190,9 +190,9 @@ describe('releaseDeferredClusters (ZAV-144)', () => {
 
 describe('a deferred cluster once the interval has passed (ZAV-144)', () => {
   const good = JSON.stringify({ pakistanRelevance: 0.9, newsworthiness: 0.9, sourceCredibility: 0.9, category: 'pakistan', sensitivityFlags: [], isUpdateOfExisting: false, suggestedPriority: 'normal', decision: 'publish', reason: 'fresh' })
-  const run = async (lastPublishedMinAgo: number) => {
+  const run = async (lastPublishedMinAgo: number, items: unknown[] = [{ title: 'x', publishedAt: new Date().toISOString(), source: { name: 'ARY', trustTier: 1 } }]) => {
     const payload = {
-      getCluster: vi.fn().mockResolvedValue({ id: '9548', headline: 'Saudi health jobs', items: [{ title: 'x', publishedAt: new Date().toISOString(), source: { name: 'ARY', trustTier: 1 } }], maxTier: 1, distinctSources: 2 }),
+      getCluster: vi.fn().mockResolvedValue({ id: '9548', headline: 'Saudi health jobs', items, maxTier: 1, distinctSources: 2 }),
       getSettings: vi.fn().mockResolvedValue({ lastPublishedAt: new Date(Date.now() - lastPublishedMinAgo * 60_000).toISOString() }),
       patchCluster: vi.fn(),
       recentArticles: vi.fn().mockResolvedValue([]),
@@ -206,6 +206,20 @@ describe('a deferred cluster once the interval has passed (ZAV-144)', () => {
     const r = await run(3)
     expect(r.payload.patchCluster.mock.calls[0]![1].triage.codeOutcome).toBe('defer')
     expect(r.triageQueue.add).toHaveBeenCalledTimes(1)
+  })
+  it('keeps deferring when the cluster holds an old first item but a fresh source (ZAV-179)', async () => {
+    const old = new Date(Date.now() - 30 * 3_600_000).toISOString()
+    const r = await run(3, [{ title: 'old', publishedAt: old, source: { name: 'X', trustTier: 2 } }, { title: 'APP', publishedAt: new Date().toISOString(), source: { name: 'APP', trustTier: 1 } }])
+    expect(r.payload.patchCluster.mock.calls[0]![1].status).toBe('triaged')
+    expect(r.payload.patchCluster.mock.calls[0]![1].triage.codeOutcome).toBe('defer')
+    expect(r.triageQueue.add).toHaveBeenCalledTimes(1)
+  })
+  it('closes a deferred cluster only when every source is stale, and says so', async () => {
+    const old = new Date(Date.now() - 30 * 3_600_000).toISOString()
+    const r = await run(3, [{ title: 'old', publishedAt: old, source: { name: 'X', trustTier: 1 } }])
+    const patch = r.payload.patchCluster.mock.calls[0]![1]
+    expect(patch.status).toBe('rejected')
+    expect(patch.triage.deferReason).toMatch(/^stale sources/)
   })
   it('is not deferred after 15 minutes', async () => {
     const r = await run(16)
