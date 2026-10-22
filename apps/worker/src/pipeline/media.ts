@@ -6,6 +6,7 @@ import { logger } from '../logger.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor, photoDataUrl } from './social-card.js'
 import { renderPostCard } from './post-card.js'
+import { findRealPhoto } from './real-photo.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
@@ -210,7 +211,9 @@ export async function processMediaJob(
 
   try {
     // Cards carry the hero photo and the headline: what people stop scrolling for
-    const photo = await photoDataUrl(blob).catch(() => null)
+    // A real photo of the person/thing named in the headline when one exists; otherwise the AI hero
+    const real = await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null)
+    const photo = real?.dataUrl ?? (await photoDataUrl(blob).catch(() => null))
     const breaking = data.priority === 'breaking'
     const cardsEn = await renderSocialCardSet({
       title: data.write.en.title,
@@ -231,6 +234,7 @@ export async function processMediaJob(
         title: data.write.en.title,
         category,
         photo,
+        photoCredit: real?.credit,
         breaking,
         headlineUr: card?.headlineUr ?? data.write.ur?.title ?? null,
         highlight: card?.highlight,

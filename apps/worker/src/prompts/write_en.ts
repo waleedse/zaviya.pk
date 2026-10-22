@@ -17,7 +17,7 @@ Write an ORIGINAL article from the sources (do not paraphrase any single source 
 - tags: 3-8 specific entities/topics (people, institutions, places), not generic words.
 - imageBrief: a description of a realistic news-photo scene that represents the story (place, objects, situation), without real people's faces, flags, logos or any text.
 - altText: a plain description of that scene.
-- socialCopy: facebook (2-3 short lines, ending with one short question to readers; no link, no more than 2 hashtags), instagram (caption with 1-3 relevant hashtags, never more than 3), x (under 240 chars, no more than 2 hashtags).
+- socialCopy (no hashtags and no links in any of them; code adds the hashtags and the link): facebook (2-3 lines + question to readers); instagram (a caption of 3 short parts separated by blank lines: a one-line hook that is the news itself, then 2-3 sentences describing what happened with the key facts from the sources, then one line on what it means for readers or a question); x (under 240 chars).
 - card (text printed on the social media image): headlineUr: the headline in natural, simple Urdu script (اردو), under 60 characters, same facts; highlight: 1-3 words copied exactly from your FIRST headline option that carry the news (e.g. "tax net", "Rs5.40", "petrol"); highlightUr: the same words exactly as they appear in headlineUr; figure: only when the story turns on one number from the sources, as value (e.g. "Rs5.40", "22%", "1.2m") and label (what the number is, under 60 characters); leave figure out otherwise.
 
 Originality: paraphrase in your own sentences; never copy a source's sentences. Quote people only briefly, inside quotation marks.

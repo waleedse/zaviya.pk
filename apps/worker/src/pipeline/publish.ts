@@ -1,3 +1,4 @@
+import { finalizeCopy } from '../social/hashtags.js'
 import { articleUrl } from '../social/link.js'
 import { numbersNotInArticle } from '../social/guards.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
@@ -400,7 +401,7 @@ export async function processPublishJob(
         articleId: res.id,
         platform: platforms[i],
         priority: data.priority,
-        copy: data.write.en.socialCopy,
+        copy: finalizeCopy(data.write.en.socialCopy, { tags: cleanTags(data.write.en.tags), category, title: data.write.en.title }),
         title: data.write.en.title,
         clusterId: data.clusterId,
         mediaUrls: data.socialMediaUrls ?? [],

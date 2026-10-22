@@ -15,6 +15,8 @@ export interface PostCardInput {
   title: string
   category: string
   photo: string | null
+  /** Shown small on the card when the photo needs attribution */
+  photoCredit?: string
   breaking?: boolean
   headlineUr?: string | null
   highlight?: string | null
@@ -50,7 +52,7 @@ export function markHighlight(text: string, highlight: string | null | undefined
 /** Large and elegant, but never overflowing: longer headlines step down. */
 export function headlineSize(title: string, template: PostCardTemplate): number {
   const n = title.length
-  const steps = template === 'ticker' ? [104, 92, 80, 70] : template === 'figure' ? [84, 76, 68, 60] : [112, 98, 86, 76]
+  const steps = template === 'ticker' ? [104, 92, 80, 70] : template === 'figure' ? [84, 76, 68, 60] : [92, 84, 74, 64]
   return n <= 45 ? steps[0]! : n <= 65 ? steps[1]! : n <= 85 ? steps[2]! : steps[3]!
 }
 
@@ -122,22 +124,23 @@ ${input.headlineUr ? `<div class="ur" style="position:absolute;left:56px;right:5
     )
   }
 
-  // bilingual
+  // bilingual: the feed look that works for news pages: photo, logo top-left, centred bold headline, key words boxed
   const y = BRAND_YELLOW
   return page(
     `${photo}
-<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,20,16,.86) 0%,rgba(8,20,16,.5) 30%,rgba(8,20,16,.08) 46%,rgba(8,20,16,.6) 62%,rgba(8,20,16,.94) 100%)"></div>
-<div style="position:absolute;top:56px;left:64px;right:64px;display:flex;justify-content:space-between;align-items:center">
-  <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:40px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
-  <div class="mono" style="font-size:20px">${cat}${time ? ` · ${time}` : ''}</div>
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 20%,rgba(0,0,0,0) 38%,rgba(6,8,12,.78) 62%,rgba(6,8,12,.97) 100%)"></div>
+<div style="position:absolute;top:52px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center">
+  <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
+  <div class="mono" style="font-size:20px;background:rgba(0,0,0,.45);padding:8px 16px;border-radius:6px">${cat}${time ? ` · ${time}` : ''}</div>
 </div>
-${input.headlineUr ? `<div class="ur" style="position:absolute;top:150px;left:64px;right:64px;font-size:62px;line-height:1.85">${markHighlight(input.headlineUr, input.highlightUr)}</div>` : ''}
-<div style="position:absolute;left:64px;right:64px;bottom:60px;display:flex;flex-direction:column;gap:34px">
-  <div style="display:flex;align-items:center;gap:18px"><div style="width:64px;height:3px;background:${y}"></div><div class="mono" style="font-size:20px;color:${y}">${cat}</div></div>
-  <div class="en" style="font-size:${size}px">${markHighlight(input.title, input.highlight)}</div>
-  <div class="mono" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,.4);padding-top:22px;font-size:20px;color:rgba(255,255,255,.9)"><div>URDU + ENGLISH</div><div>POORI KHABAR → ZAVIYA.PK</div></div>
-</div>`,
-    `.hl{font-style:italic;color:${y}}`,
+<div style="position:absolute;left:56px;right:56px;bottom:64px;display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center">
+  <div class="en" style="font-size:${size}px;font-weight:800;line-height:1.14;letter-spacing:-0.025em;text-shadow:0 2px 24px rgba(0,0,0,.55)">${markHighlight(input.title, input.highlight)}</div>
+  <div style="width:150px;height:6px;background:${y}"></div>
+  ${input.headlineUr ? `<div class="ur" style="font-size:50px;line-height:1.8;text-align:center;color:rgba(255,255,255,.95)">${markHighlight(input.headlineUr, input.highlightUr, 'hl-ur')}</div>` : ''}
+  <div class="mono" style="font-size:20px;color:rgba(255,255,255,.75)">POORI KHABAR → ZAVIYA.PK</div>
+</div>
+${input.photoCredit ? `<div style="position:absolute;right:24px;top:620px;writing-mode:vertical-rl;font-size:15px;color:rgba(255,255,255,.7)">${escapeHtml(input.photoCredit)}</div>` : ''}`,
+    `.hl{background:${y};color:#111;padding:0 .18em;margin:0 -.04em;border-radius:6px;font-style:normal;-webkit-box-decoration-break:clone;box-decoration-break:clone}.hl-ur{color:${y}}`,
   )
 }
 
