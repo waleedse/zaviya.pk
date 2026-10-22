@@ -44,26 +44,25 @@ export function LeadStory({ article, locale, priority }: { article: Card; locale
           article={article}
           locale={locale}
           priority={priority}
-          aspect="aspect-[4/5] sm:aspect-[16/10] lg:aspect-[16/9]"
+          aspect="aspect-[4/5] sm:aspect-[16/10]"
           sizes="(max-width:1024px) 100vw, 860px"
           showLabel={false}
           className="rounded-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" aria-hidden />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 from-0% via-black/35 via-30% to-transparent to-55%" aria-hidden />
         {article.isLive && (
           <span className="absolute end-4 top-4">
             <LiveBadge locale={locale} />
           </span>
         )}
-        <div className="absolute inset-x-0 bottom-0 space-y-2.5 p-5 text-white md:p-7">
+        <div className="absolute inset-x-0 bottom-0 space-y-2 p-4 text-white md:p-6">
           <span className="angle-tag" style={{ background: article.category.color }}>
             {article.category.name}
             {article.isBreaking ? (isUr ? ' · بریکنگ' : ' · Breaking') : ''}
           </span>
-          <h2 className={cn('max-w-[24ch] font-display text-[clamp(1.6rem,1.1rem+1.6vw,2.7rem)] font-extrabold', lh(locale, 'leading-[1.06]', 'leading-[1.6]'))}>
+          <h2 className={cn('max-w-[28ch] font-display text-[clamp(1.4rem,1.05rem+1.2vw,2.15rem)] font-extrabold [text-shadow:0_2px_16px_rgba(0,0,0,.5)]', lh(locale, 'leading-[1.1]', 'leading-[1.6]'))}>
             <span className="headline-hover">{article.title}</span>
           </h2>
-          {article.dek && <p className="line-clamp-2 max-w-[70ch] text-[1rem] leading-relaxed text-white/85">{article.dek}</p>}
           <p className="text-sm text-white/75">
             {article.author && <b className="font-semibold text-white">{article.author.name} · </b>}
             <TimeAgo iso={article.publishedAt} locale={locale} />

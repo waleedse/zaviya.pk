@@ -105,6 +105,13 @@ export const keepHeroImage: CollectionBeforeChangeHook = ({ data, originalDoc })
   return data
 }
 
+/** A published article always has a publish date: without one it sorts above every newer story (NULLs come first in a descending sort). */
+export const ensurePublishedAt: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
+  if (!data || data._status !== 'published') return data
+  if (!data.publishedAt && !originalDoc?.publishedAt) data.publishedAt = new Date().toISOString()
+  return data
+}
+
 const KEEP_TEXT_FIELDS = ['dek', 'keyPoints', 'body', 'whatItMeans', 'faqs'] as const
 
 const hasContent = (v: unknown): boolean => {
