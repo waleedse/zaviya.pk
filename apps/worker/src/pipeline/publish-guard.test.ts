@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { processPublishJob, publishBlocker } from './publish.js'
+import { processPublishJob, publishBlocker, finishGated } from './publish.js'
 
 const body = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ')
 
@@ -29,5 +29,22 @@ describe('processPublishJob', () => {
     expect(res).toBeNull()
     expect(payload.postArticle).not.toHaveBeenCalled()
     expect(payload.patchCluster).toHaveBeenCalledWith('1', { status: 'triaged' })
+  })
+})
+
+describe('finishGated without a waiting entry', () => {
+  const redis = { hget: vi.fn(async () => null), hdel: vi.fn() }
+  const run = (article: object) => {
+    const payload = { request: vi.fn(async (m: string) => (m === 'GET' ? article : {})) }
+    return finishGated('9', 'publish', { payload: payload as never, socialQueue: {} as never, redis: redis as never }).then((done) => ({ done, payload }))
+  }
+  it('moves a stranded in_review draft out of review', async () => {
+    const { done, payload } = await run({ _status: 'draft', workflow: 'in_review' })
+    expect(done).toBe(false)
+    expect(payload.request).toHaveBeenCalledWith('PATCH', expect.stringContaining('/api/articles/9'), { workflow: 'draft' })
+  })
+  it('leaves a live article alone', async () => {
+    const { payload } = await run({ _status: 'published', workflow: 'published' })
+    expect(payload.request).toHaveBeenCalledTimes(1)
   })
 })
