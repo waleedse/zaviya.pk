@@ -112,7 +112,7 @@ export function buildPageMetadata(opts: {
 export const SECTION_SEO: Record<string, { en: { title: string; description: string }; ur: { title: string; description: string } }> = {
   home: {
     en: {
-      title: 'Zaviya News: Latest Pakistan News Today in English & Urdu',
+      title: 'Zaviya News: Latest Pakistan News on zaviya.pk, English & Urdu',
       description:
         'Latest Pakistan news today: breaking stories, politics, business, cricket, petrol, gold and dollar rates, explained clearly in English and Urdu by Zaviya.',
     },
@@ -243,6 +243,22 @@ export function websiteJsonLd(locale: Locale) {
       'query-input': 'required name=search_term_string',
     },
   }
+}
+
+/** OpenSearch description (/opensearch.xml): lets browsers offer "search Zaviya News" and ties the brand name to the site (ZAV-181). */
+export function openSearchXml(): string {
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>${esc(SITE.brandName)}</ShortName>
+  <Description>Search Pakistan news on Zaviya News (zaviya.pk), in English and Urdu.</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Url type="text/html" method="get" template="${esc(absoluteUrl('/search?q={searchTerms}'))}"/>
+  <Developer>${esc(SITE.brandName)}</Developer>
+  <Language>en</Language>
+  <Language>ur</Language>
+</OpenSearchDescription>
+`
 }
 
 export function aboutPageJsonLd(locale: Locale) {

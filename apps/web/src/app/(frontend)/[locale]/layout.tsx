@@ -46,6 +46,10 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={`${bricolage.variable} ${hanken.variable} ${newsreader.variable} ${nastaliq.variable} ${locale === 'ur' ? gulzar.variable : ''}`}>
+      <head>
+        {/* Browser site search and a brand signal (ZAV-181) */}
+        <link rel="search" type="application/opensearchdescription+xml" title={SITE.brandName} href="/opensearch.xml" />
+      </head>
       <body className="min-h-screen pb-16 md:pb-0">
         <AnalyticsScripts />
         {process.env.NEXT_PUBLIC_ADSENSE_CLIENT ? (
