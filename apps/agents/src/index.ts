@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { Engines, type EngineName } from './engines.js'
 import { SCHEDULE, TIMEOUT_MIN, isDue, slotKey, type AgentName } from './schedule.js'
 import { fetchCommentsSince, inboxPrompt, newHumanComments } from './inbox.js'
-import { CONFIRM_CHECKS, DEFAULT_CONFIRM_CHECKS, findProblems, type Observation, type Problem } from './watchdog.js'
+import { findProblems, planWatchdog, type Observation, type WatchdogState } from './watchdog.js'
 
 /**
  * Server-side agents runner: the watchdog every minute (plain code) and the Editor-in-Chief on its
@@ -44,10 +44,10 @@ function writeState(name: string, value: unknown) {
   fs.writeFileSync(path.join(DATA, 'state', name), JSON.stringify(value, null, 1))
 }
 
-async function linear(...args: string[]): Promise<{ id?: string } | null> {
+async function linear(...args: string[]): Promise<{ id?: string; state?: string } | null> {
   try {
     const { stdout } = await run('node', [path.join(WORKSPACE, 'ops/bin/linear.mjs'), ...args], { env: process.env })
-    return JSON.parse(stdout) as { id?: string }
+    return JSON.parse(stdout) as { id?: string; state?: string }
   } catch (e) {
     log('watchdog', `linear ${args[0]} failed: ${(e as Error).message.slice(0, 300)}`)
     return null
@@ -62,9 +62,18 @@ async function observe(): Promise<Observation> {
     .then((r) => r.status)
     .catch(() => 0)
   const headers = { Authorization: `users API-Key ${API_KEY}` }
-  const settings = (await fetch(`${PAYLOAD_URL}/api/globals/settings?depth=0`, { headers, signal: AbortSignal.timeout(15_000) })
-    .then((r) => r.json())
-    .catch(() => ({}))) as { lastHeartbeat?: string; lastHeartbeatMeta?: { queues?: Observation['heartbeat']['queues']; integrations?: { extension?: boolean } } }
+  // This authenticated call doubles as the API probe: a hang or error means apiOk = false, not "worker silent"
+  type SettingsDoc = { lastHeartbeat?: string; lastHeartbeatMeta?: { queues?: Observation['heartbeat']['queues']; integrations?: { extension?: boolean } } }
+  let apiOk = true
+  const settings = await fetch(`${PAYLOAD_URL}/api/globals/settings?depth=0`, { headers, signal: AbortSignal.timeout(15_000) })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json() as Promise<SettingsDoc>
+    })
+    .catch(() => {
+      apiOk = false
+      return {} as SettingsDoc
+    })
   const latest = (await fetch(`${PAYLOAD_URL}/api/articles?limit=1&sort=-publishedAt&depth=0&where[_status][equals]=published`, {
     headers,
     signal: AbortSignal.timeout(15_000),
@@ -78,6 +87,7 @@ async function observe(): Promise<Observation> {
     now,
     diskUsedPct: disk ? (1 - disk.bavail / disk.blocks) * 100 : null,
     siteStatus,
+    apiOk,
     heartbeat: {
       at: settings.lastHeartbeat ? Date.parse(settings.lastHeartbeat) : null,
       queues: settings.lastHeartbeatMeta?.queues ?? {},
@@ -87,58 +97,65 @@ async function observe(): Promise<Observation> {
   }
 }
 
-interface Tracked {
-  count: number
-  issue?: string
-  lastNote?: number
-  problem: Problem
-}
-
 let previous: Observation | undefined
+
+/** An open (not Done/Canceled) incident with exactly this title, so a lost state file never makes a second issue. */
+async function findOpenIssue(title: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await run('node', [path.join(WORKSPACE, 'ops/bin/linear.mjs'), 'list', '--label', 'incident', '--limit', '100'], { env: process.env })
+    return (JSON.parse(stdout) as { id: string; title: string }[]).find((i) => i.title === title)?.id
+  } catch {
+    return undefined
+  }
+}
 
 async function watchdog() {
   const obs = await observe()
   const problems = findProblems(obs, previous)
   previous = obs
-  const tracked = readState<Record<string, Tracked>>('watchdog.json', {})
-  const seen = new Set(problems.map((p) => p.key))
+  const prev: WatchdogState = readState<WatchdogState>('watchdog2.json', { tracked: readState('watchdog.json', {}), resolved: {} })
+  const { actions, state } = planWatchdog(prev, problems, obs.now)
 
-  for (const p of problems) {
-    const t: Tracked = tracked[p.key] ?? { count: 0, problem: p }
-    t.count++
-    t.problem = p
-    const confirmAfter = CONFIRM_CHECKS[p.key] ?? DEFAULT_CONFIRM_CHECKS
-    if (t.count >= confirmAfter && !t.issue) {
+  for (const a of actions) {
+    const t = state.tracked[a.key]
+    const title = `[watchdog] ${a.problem.title}`
+    if (a.type === 'open') {
       const body = [
-        p.detail,
+        a.problem.detail,
         '',
-        p.label === 'needs-waleed'
+        a.problem.label === 'needs-waleed'
           ? '@Waleed need your input: this one needs you (see above). Everything else keeps running.'
           : 'Opened by the watchdog. Engineer: diagnose with `ssh zaviya` (docker logs, releases/history.log), fix, and comment here.',
-        `First seen: ${new Date(obs.now - (t.count - 1) * 60_000).toISOString()}`,
+        'One issue per outage: if it comes back within 12 h the watchdog comments here instead of opening another.',
+        `First seen: ${new Date(a.firstSeen).toISOString()}`,
       ].join('\n')
-      const issue = await linear('create', '--title', `[watchdog] ${p.title}`, '--body', body, '--label', p.label, '--priority', p.key === 'site-down' ? '1' : '2')
-      if (issue?.id) {
-        t.issue = issue.id
-        t.lastNote = obs.now
-        log('watchdog', `opened ${issue.id}: ${p.title}`)
+      const existing = await findOpenIssue(title)
+      if (existing) {
+        if (t) t.issue = existing
+        await linear('comment', existing, '--body', `Seen again at ${new Date(obs.now).toISOString()}: ${a.problem.detail}`)
+        log('watchdog', `reused ${existing}: ${a.problem.title}`)
+        continue
       }
-    } else if (t.issue && obs.now - (t.lastNote ?? 0) > 60 * 60_000) {
-      await linear('comment', t.issue, '--body', `Still happening (${t.count} checks): ${p.detail}`)
-      t.lastNote = obs.now
+      const issue = await linear('create', '--title', title, '--body', body, '--label', a.problem.label, '--priority', a.key === 'site-down' || a.key === 'api-hung' ? '1' : '2')
+      if (issue?.id) {
+        if (t) t.issue = issue.id
+        log('watchdog', `opened ${issue.id}: ${a.problem.title}`)
+      } else if (t) {
+        t.count = 0 // creation failed: count again so the next confirmed check retries
+      }
+    } else if (a.type === 'reopen') {
+      const cur = await linear('get', a.issue)
+      if (!cur?.state || /^(done|canceled|cancelled|duplicate)$/i.test(cur.state)) await linear('update', a.issue, '--state', 'Todo')
+      await linear('comment', a.issue, '--body', `Back at ${new Date(obs.now).toISOString()}: ${a.problem.detail}`)
+      log('watchdog', `reopened ${a.issue}: ${a.problem.title}`)
+    } else if (a.type === 'note') {
+      await linear('comment', a.issue, '--body', `Still happening (${a.count} checks): ${a.problem.detail}`)
+    } else {
+      await linear('comment', a.issue, '--body', `Recovered at ${new Date(obs.now).toISOString()} (watchdog no longer sees it).`)
+      log('watchdog', `recovered ${a.issue}: ${a.problem.title}`)
     }
-    tracked[p.key] = t
   }
-
-  for (const [key, t] of Object.entries(tracked)) {
-    if (seen.has(key)) continue
-    if (t.issue) {
-      await linear('comment', t.issue, '--body', `Recovered at ${new Date(obs.now).toISOString()} (watchdog no longer sees it).`)
-      log('watchdog', `recovered ${t.issue}: ${t.problem.title}`)
-    }
-    delete tracked[key]
-  }
-  writeState('watchdog.json', tracked)
+  writeState('watchdog2.json', state)
 }
 
 // ---------- editor ----------

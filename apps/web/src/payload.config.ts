@@ -109,6 +109,11 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
+      // ZAV-169: fail fast instead of queueing forever. A request waits at most 15 s for a free connection,
+      // and no single statement may run longer than 2 minutes (it would hold a pool slot while the API hangs).
+      connectionTimeoutMillis: 15_000,
+      idleTimeoutMillis: 30_000,
+      statement_timeout: 120_000,
     },
     // Keep false: onInit owns the pgvector `embedding` column; Drizzle push
     // would otherwise prompt to drop it and hang the non-interactive server.
