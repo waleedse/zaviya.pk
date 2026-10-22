@@ -10,6 +10,7 @@ import { hasFreshSource, pitchSummary, shouldPitch } from './pitch.js'
 import { enrichFromExtension } from './write.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { findSameStory } from './same-story.js'
+import { opinionCue, routeByStoryKind } from './story-kind.js'
 
 export const HEADLINE_ONLY_REJECT = 'headline only: the article body could not be read, so it is not pitched'
 export const HEADLINE_ONLY_WAITING = 'headline only: waiting for the extension to read the article'
@@ -121,6 +122,18 @@ export async function processTriageJob(
     return
   }
 
+  // Opinion is not news and a feature about an event abroad is not Pakistan news (ZAV-155)
+  const kind = routeByStoryKind(triage, cluster.items)
+  if (kind.action === 'reject') {
+    await deps.payload.patchCluster(data.clusterId, {
+      status: 'rejected',
+      triage: { ...triage, codeOutcome: 'reject', deferReason: kind.reason },
+    })
+    logger.info({ clusterId: data.clusterId, storyKind: triage.storyKind, reason: kind.reason }, 'triage: not a news report, rejected')
+    return
+  }
+  triage = kind.triage
+
   // Same event as an article we already hold (ZAV-134): add it to that article as a live update, never a
   // second article. Nothing already published is touched; a miss here only falls back to the old path.
   if (!triage.isUpdateOfExisting) {
@@ -222,6 +235,16 @@ export async function processTriageJob(
       }
     } catch (e) {
       logger.warn({ clusterId: data.clusterId, err: e instanceof Error ? e.message : e }, 'pitch summary enrichment failed')
+    }
+    // The text read through the extension may show an editorial that the headline did not (ZAV-155)
+    const cue = opinionCue(items)
+    if (cue) {
+      await deps.payload.patchCluster(data.clusterId, {
+        status: 'rejected',
+        triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: cue },
+      })
+      logger.info({ clusterId: data.clusterId, reason: cue }, 'rejected: the article text is opinion')
+      return
     }
     const lede = pitchSummary(items)
     // ZAV-163: a pitch with no body (a Google News link whose article text could not be read) would be written, or
