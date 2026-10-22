@@ -23,8 +23,12 @@ const ORDINAL_VALUES: Record<string, number> = {
   thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20,
 }
 
+/** Decades are dates, not figures: "the 2000s", "the 1990s", "'90s", "80s" (ZAV-171) */
+const DECADE = /(?:['\u2019]\s?\d0s|\b(?:1[0-9]|20)\d0s|\b[1-9]0s)\b/g
+
 function stripNoise(text: string): string {
   return text
+    .replace(DECADE, ' ')
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/#[\p{L}\p{N}_]+/gu, ' ')
     .replace(/@[\w]+/g, ' ')
