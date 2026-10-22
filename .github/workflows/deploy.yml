@@ -21,7 +21,8 @@ jobs:
   deploy:
     # Zaviya's own VPS (Contabo EU, 194.163.184.12) since 16 Oct 2026; the old shared server ran zaviya-server
     runs-on: [self-hosted, zaviya-eu]
-    timeout-minutes: 45
+    # The web build takes 35-45 min while the worker, video and Postgres share the 4 CPUs; at 45 the run was cut off on 22 Oct
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
         with:
