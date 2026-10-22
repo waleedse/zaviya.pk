@@ -15,6 +15,17 @@ describe('numbersNotInArticle', () => {
   })
 })
 
+describe('numbersNotInArticle: decades (ZAV-171)', () => {
+  it('does not treat "the 2000s", "the 1990s" or "\'90s" as a figure', () => {
+    expect(numbersNotInArticle('The worst heat since the 2000s, last seen in the 1990s and the \u201990s #Heat', article)).toEqual([])
+    expect(numbersNotInArticle("Rates not this high since the 90s and 2010s", article)).toEqual([])
+  })
+  it('still catches a wrong figure next to a decade, and a plain year', () => {
+    expect(numbersNotInArticle('Highest since the 2000s: reserves $1.5bn', article)).toEqual(['1.5'])
+    expect(numbersNotInArticle('Reserves in 2000 were low', article)).toEqual(['2000'])
+  })
+})
+
 describe('numbersNotInArticle: valid shorthand (ZAV-130)', () => {
   it('accepts k / m / bn shorthand for the full figure and the reverse', () => {
     const text = 'Daily hot meals drop from 250,000 to 150,000. The caseload fell from 1.6 million to 1.1 million. Wheat: 160,000 of 2.5 million tonnes.'
