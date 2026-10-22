@@ -167,13 +167,15 @@ export async function processTriageJob(
   })
 
   if (decision.outcome === 'defer') {
-    // Pacing, not quality: look at it again later (new sources may have arrived by then).
-    const ageH = (Date.now() - new Date(cluster.items[0]?.publishedAt ?? Date.now()).getTime()) / 3_600_000
-    if (ageH >= 18) {
-      // too old to be today's news and it would be swept forever: close it instead of leaving it deferred
+    // Pacing, not quality: look at it again later (new sources may have arrived by then). ZAV-179: pacing alone never
+    // rejects a story. It used to close the cluster once the FIRST item was 18 h old, which lost fresh tier-1 stories
+    // (a cluster keeps its oldest item first). Only a cluster whose newest dated source is past the freshness limit is
+    // closed, and then for being stale (the publish step would refuse it anyway), not for the pacing.
+    const newest = newestSourceMs(cluster.items)
+    if (newest > 0 && !hasFreshSource(cluster.items)) {
       await deps.payload.patchCluster(data.clusterId, {
         status: 'rejected',
-        triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: `${decision.reason}; expired after 18h` },
+        triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'reject', deferReason: `stale sources: no source from the last 18 hours (was deferred: ${decision.reason})` },
       })
       return
     }
