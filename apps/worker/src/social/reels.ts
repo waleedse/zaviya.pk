@@ -17,7 +17,11 @@ interface GraphError {
   error?: { message?: string; code?: number; error_subcode?: number }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+let sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** tests replace the wait between status polls */
+export function setReelSleep(fn: (ms: number) => Promise<unknown>) {
+  sleep = fn as typeof sleep
+}
 
 async function graph<T>(method: 'GET' | 'POST', path: string, params: Record<string, string>, token: string): Promise<T & GraphError> {
   const qs = new URLSearchParams({ ...params, access_token: token })
@@ -35,7 +39,8 @@ async function upload(uri: string, file: Buffer, token: string): Promise<string 
     headers: { Authorization: `OAuth ${token}`, offset: '0', file_size: String(file.length), 'Content-Type': 'application/octet-stream' },
     body: new Uint8Array(file),
     signal: AbortSignal.timeout(300_000),
-  })
+  }).catch((e: unknown) => e as Error)
+  if (res instanceof Error) return `upload failed: ${res.message}`
   if (res.ok) return null
   return `upload HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`
 }
@@ -62,16 +67,22 @@ export async function postInstagramReel(
   )
   if (!created.id || !created.uri) return { ok: false, error: errText(created.error, 'create container') }
 
+  // ZAV-180: Meta's upload endpoint answers 400 "ProcessingFailedError" (retriable:false) after about 33 s for longer
+  // videos although it has the whole file: the container then goes on to FINISHED (reproduced with the failing 60 s
+  // digest and a re-encoded copy). So an upload error is not final; the container status is the verdict. If the
+  // container ends in ERROR the upload error and Meta's status text are both reported.
   const upErr = await upload(created.uri, file, cfg.token)
-  if (upErr) return { ok: false, error: upErr }
+  if (upErr) logger.warn({ containerId: created.id, upErr }, 'Instagram reel upload reported an error, checking the container status')
 
-  // Processing usually takes 10-60 s; give it up to 5 minutes
-  for (let i = 0; i < 60; i++) {
+  // Processing usually takes 10-60 s (a late upload answer or a 60 s video can take minutes): wait up to 8 minutes
+  for (let i = 0; i < 96; i++) {
     await sleep(5_000)
     const st = await graph<{ status_code?: string; status?: string }>('GET', created.id, { fields: 'status_code,status' }, cfg.token)
     if (st.status_code === 'FINISHED') break
-    if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') return { ok: false, error: `processing: ${st.status ?? st.status_code}` }
-    if (i === 59) return { ok: false, error: 'processing: timed out after 5 min' }
+    if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') {
+      return { ok: false, error: `processing: ${st.status ?? st.status_code}${upErr ? ` (${upErr})` : ''}`.slice(0, 600) }
+    }
+    if (i === 95) return { ok: false, error: `processing: timed out after 8 min${upErr ? ` (${upErr})` : ''}`.slice(0, 600) }
   }
 
   const pub = await graph<{ id?: string }>('POST', `${cfg.igUserId}/media_publish`, { creation_id: created.id }, cfg.token)
