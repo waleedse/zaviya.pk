@@ -6,6 +6,12 @@ describe('real photo', () => {
     expect(subjectsFor('Imran Khan meets IMF team in Lahore', ['IMF', 'Imran Khan', 'Karachi', 'Lahore'])).toEqual(['Imran Khan', 'Lahore', 'IMF'])
   })
 
+  it('matches a person by given name in the headline, but not by a generic first word', () => {
+    expect(subjectsFor('PM Shehbaz announces petrol cut', ['Shehbaz Sharif'])).toEqual(['Shehbaz Sharif'])
+    expect(subjectsFor('Nawaz returns to Lahore', ['Shehbaz Sharif'])).toEqual([])
+    expect(subjectsFor('State of the economy', ['State Bank of Pakistan'])).toEqual([])
+  })
+
   it('accepts a big free Commons image of the right page and rejects the rest', async () => {
     const pages = (title: string, source: string, width = 2000) => ({ query: { pages: { 1: { title, index: 1, original: { source, width, height: 1000 } } } } })
     const mk = (json: unknown) =>

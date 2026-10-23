@@ -76,8 +76,10 @@ const envSchema = z.object({
   /** Never publish with only the branded text card: wait for a real Gemini illustration (default on) */
   REQUIRE_HERO_IMAGE: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** How often to retry the image before giving up (retries are 15 min apart) */
-  /** Hero images: `flux` = Cloudflare Workers AI first, Gemini (extension) as backup; `extension` = Gemini first */
-  IMAGE_SOURCE: z.enum(['flux', 'extension']).catch('flux').default('flux'),
+  /** Hero images: `flux` = Cloudflare Workers AI first, Gemini (extension) as backup; `extension` = Gemini first; `zimage` = Z-Image Turbo (fal.ai) first, then FLUX, then Gemini */
+  IMAGE_SOURCE: z.enum(['flux', 'extension', 'zimage']).catch('flux').default('flux'),
+  /** fal.ai key for Z-Image Turbo (IMAGE_SOURCE=zimage): fast, about half a cent a picture */
+  FAL_KEY: optionalStr,
   /** Cloudflare Workers AI (FLUX) for hero images: account id (same as R2) + API token */
   CLOUDFLARE_ACCOUNT_ID: optionalStr,
   CLOUDFLARE_AI_TOKEN: optionalStr,
