@@ -10,7 +10,7 @@ import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob } from './pipeline/media.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './pipeline/hero-backfill.js'
 import { processPublishJob } from './pipeline/publish.js'
-import { EXPLAINER_QUEUE, processExplainerScript } from './video/explainer/script-job.js'
+import { EXPLAINER_QUEUE, processExplainerScript, processHeadlineJob } from './video/explainer/script-job.js'
 import { fetchRssFeed, jobLikeDropped, toSourceItemInputs } from './ingest/rss.js'
 import { BUILTIN_SOURCES, fetchPpscSourceItems, isPpscUrl } from './ingest/ppsc.js'
 import { isAllowedByRobots } from './ingest/robots.js'
@@ -318,7 +318,7 @@ export async function createWorkerRuntime(
 
   // Explainer videos: the video service has no LLM, so the script is written here and left in Redis
   workers.push(
-    new Worker(EXPLAINER_QUEUE, async (job) => processExplainerScript(job.data, { router, redis }), {
+    new Worker(EXPLAINER_QUEUE, async (job) => (job.name === 'headlines' ? processHeadlineJob(job.data, { router, redis }) : processExplainerScript(job.data, { router, redis })), {
       connection,
       concurrency: 1,
       lockDuration: LONG_LOCK_MS,

@@ -71,3 +71,45 @@ describe('writeExplainerScript', () => {
     await expect(writeExplainerScript({ router: {} as never, fetchText: async () => null }, { ...idea, sources: ['https://x.test/a'] })).rejects.toThrow(/sources/)
   })
 })
+
+import { processHeadlineJob, requestHeadlines, storyUrKey } from './script-job.js'
+
+describe('Urdu headlines on demand', () => {
+  const kv = () => {
+    const m = new Map<string, string>()
+    return { m, get: async (k: string) => m.get(k) ?? null, set: async (k: string, v: string) => (m.set(k, v), 'OK') }
+  }
+  const router = (items: { id: string; headlineUr: string }[]) => ({ chat: async () => ({ content: JSON.stringify({ items }), provider: 't', model: 'm' }) }) as never
+
+  it('keeps headlines that can be read aloud and keep their figures, drops the rest', async () => {
+    const redis = kv()
+    const r = await processHeadlineJob(
+      { stories: [{ id: '1', title: 'Petrol cut by Rs5' }, { id: '2', title: 'SBP holds rate' }, { id: '3', title: 'Gold hits record' }] },
+      {
+        router: router([
+          { id: '1', headlineUr: 'پیٹرول 5 روپے سستا' },
+          { id: '2', headlineUr: 'Blorptastic شرح برقرار' },
+          { id: '3', headlineUr: 'سونا 900 روپے مہنگا' },
+        ]),
+        redis,
+      },
+    )
+    expect(r.written).toEqual(['1'])
+    expect(JSON.parse(redis.m.get(storyUrKey('1'))!)).toEqual({ headlineUr: 'پیٹرول 5 روپے سستا' })
+    expect(redis.m.has(storyUrKey('2'))).toBe(false)
+    expect(redis.m.has(storyUrKey('3'))).toBe(false)
+  })
+
+  it('asks once and returns as soon as every headline is in Redis', async () => {
+    const redis = kv()
+    const added: unknown[] = []
+    let now = 0
+    const sleep = async (ms: number) => {
+      now += ms
+      if (now >= 8000) for (const id of ['1', '2']) redis.m.set(storyUrKey(id), '{}')
+    }
+    await requestHeadlines({ redis, queue: { add: async (_n, d) => void added.push(d) }, sleep, now: () => now }, [{ id: '1', title: 'a' }, { id: '2', title: 'b' }], 60_000)
+    expect(added).toHaveLength(1)
+    expect(now).toBeLessThan(60_000)
+  })
+})

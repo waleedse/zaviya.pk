@@ -14,7 +14,7 @@ import { SCRIPT_WAIT_MS } from './explainer/run.js'
 import { narrateEdition } from './narrate-news.js'
 import { createVideoTelegram } from './telegram.js'
 import { IdeaStore, type IdeaRedis } from './explainer/ideas.js'
-import { requestScript } from './explainer/script-job.js'
+import { requestHeadlines, requestScript } from './explainer/script-job.js'
 import type { ExplainerDeps } from './explainer/run.js'
 import { generateViaZImage } from '../pipeline/zimage.js'
 import type { Queue } from 'bullmq'
@@ -34,7 +34,7 @@ async function getJson<T>(url: string, tries = 3): Promise<T> {
   throw last instanceof Error ? last : new Error(String(last))
 }
 
-export function createJobDeps(env: WorkerEnv, cfg: VideoConfig, redis: Redis, hub?: MediaHub): JobDeps {
+export function createJobDeps(env: WorkerEnv, cfg: VideoConfig, redis: Redis, hub?: MediaHub, scriptQueue?: Queue): JobDeps {
   const base = env.PAYLOAD_URL.replace(/\/+$/, '')
   const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
   return {
@@ -84,7 +84,21 @@ export function createJobDeps(env: WorkerEnv, cfg: VideoConfig, redis: Redis, hu
     async render({ timeline, outDir, imagesDir }) {
       return renderEdition({ timeline, outDir, imagesDir, bundleDir: cfg.bundleDir, concurrency: cfg.concurrency, browserExecutable: cfg.browserExecutable })
     },
-    narrate: hub && cfg.voiced ? (a) => narrateEdition({ hub, redis, now: () => Date.now() }, a) : undefined,
+    narrate:
+      hub && cfg.voiced
+        ? (a) =>
+            narrateEdition(
+              {
+                hub,
+                redis,
+                now: () => Date.now(),
+                requestHeadlines: scriptQueue
+                  ? (stories) => requestHeadlines({ redis: redis as never, queue: scriptQueue as never, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now() }, stories, 4 * 60_000)
+                  : undefined,
+              },
+              a,
+            )
+        : undefined,
     async renderNarrated({ timeline, outDir, assetsDir }) {
       return renderNarrated({ timeline, outDir, assetsDir, bundleDir: cfg.bundleDir, concurrency: cfg.concurrency, browserExecutable: cfg.browserExecutable })
     },

@@ -55,14 +55,15 @@ async function main() {
 
   // The Mac agent's media hub (voice and pictures made locally); off without MEDIA_AGENT_TOKEN
   const hub = new MediaHub(redisHubStore(redis as never), cfg.dataDir)
-  const deps = createJobDeps(env, cfg, redis, hub)
+  // the queue the main worker reads for explainer scripts and Urdu headlines
+  const scriptQueue = new Queue(EXPLAINER_QUEUE, { connection: redis })
+  const deps = createJobDeps(env, cfg, redis, hub, scriptQueue)
 
-  // Explainer videos: their own queue and worker, the script queue read by the main worker, and the editor's ideas routes
+  // Explainer videos: their own queue and worker, and the editor's ideas routes
   const roundsQueue = new Queue(EXPLAINER_ROUNDS_QUEUE, {
     connection: redis,
     defaultJobOptions: { attempts: 1, removeOnComplete: { count: 30 }, removeOnFail: { count: 30 } },
   })
-  const scriptQueue = new Queue(EXPLAINER_QUEUE, { connection: redis })
   const explainer = createExplainerDeps(env, cfg, redis, hub, scriptQueue, deps)
   for (const h of EXPLAINER_HOURS) {
     if (cfg.explainer) await roundsQueue.upsertJobScheduler(`explainer-${h}`, { pattern: `0 ${h} * * *`, tz: 'Asia/Karachi' }, { name: 'explainer-round', data: {} })

@@ -232,7 +232,7 @@ export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Pr
 }
 
 /** Redis key of a story's Urdu headline, read by the video service */
-export const storyUrKey = (articleId: string) => `story:ur:${articleId}`
+export const storyUrKey = (articleId: string) => `story:ur:${articleId}`  // same key as video/explainer/script-job.ts
 
 export async function processPublishJob(
   data: {
