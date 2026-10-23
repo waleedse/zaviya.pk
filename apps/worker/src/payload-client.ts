@@ -259,6 +259,14 @@ export class PayloadClient {
     )
   }
 
+  /** Editor-approved (or publish-decided) clusters with no article that nothing is working on (ZAV-107) */
+  stuckApprovedClusters(minAgeMin: number, writingAgeMin: number, publishAgeMin: number) {
+    return this.request<{ clusters: { id: string; status: string; updatedAt: string; triage: Record<string, unknown> }[] }>(
+      'GET',
+      `/api/pipeline/stuck-approved-clusters?minAgeMin=${minAgeMin}&writingAgeMin=${writingAgeMin}&publishAgeMin=${publishAgeMin}`,
+    )
+  }
+
   /** Drops breaking flags older than 24 h on live articles (ZAV-143) */
   expireBreaking() {
     return this.request<{ expired: number[] }>('POST', '/api/pipeline/breaking/expire', {})
