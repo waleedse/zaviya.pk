@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MediaHub, memoryHubStore } from '../media-hub.js'
 import { parseSlots } from '../schedule.js'
 import { IdeaStore, memoryIdeaRedis, type Idea } from './ideas.js'
-import { explainerCaptions, roundKey, runExplainerRound, scriptSentences, shiftAwayFromSlots, type ExplainerDeps } from './run.js'
+import { explainerCaptions, imagePlan, roundKey, runExplainerRound, scriptSentences, shiftAwayFromSlots, type ExplainerDeps } from './run.js'
 import type { ExplainerScript } from './script.js'
 
 const NOW = Date.UTC(2026, 9, 24, 4, 0) // 09:00 PKT
@@ -148,6 +148,19 @@ describe('runExplainerRound', () => {
     await runExplainerRound(deps, { ideaId: 'scam1' })
     expect(deps.sleep).toHaveBeenCalled()
     expect(vi.mocked(deps.sleep).mock.calls[0]![0]).toBeGreaterThanOrEqual(20 * 60_000)
+  })
+})
+
+describe('imagePlan', () => {
+  it('makes fewer pictures than beats and gives every beat one', () => {
+    expect(imagePlan(6).count).toBe(4)
+    expect(imagePlan(5).count).toBe(4)
+    expect(imagePlan(7).count).toBe(5)
+    expect(imagePlan(3).count).toBe(3)
+    const p = imagePlan(6)
+    const used = Array.from({ length: 6 }, (_, i) => p.groupOf(i))
+    expect(used).toEqual([0, 0, 1, 2, 2, 3])
+    expect(new Set(used).size).toBe(p.count)
   })
 })
 
