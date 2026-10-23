@@ -170,6 +170,8 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   })
   if (!written) return fail('script-failed', 'the script could not be written')
   const script = written.script
+  // Nobody previews these videos unless Telegram is set up: only a script its own writer rates low risk goes out
+  if (script.risk !== 'low') return fail('script-failed', `the writer rated the script ${script.risk} risk`)
 
   // 3. voice and pictures (Mac agent)
   const dir = path.join(cfg.dataDir, key)

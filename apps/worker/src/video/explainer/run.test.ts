@@ -99,6 +99,15 @@ describe('runExplainerRound', () => {
     expect(posts).toHaveLength(2)
   })
 
+  it('does not make a video from a script rated medium or high risk', async () => {
+    const { deps, store } = setup({ requestScript: vi.fn(async () => ({ script: { ...script, risk: 'medium' as const }, model: 'test', sourceUrls: [] })) })
+    await store.put(evergreen)
+    const out = await runExplainerRound(deps, { now: true, ideaId: 'scam1' })
+    expect(out.status).toBe('script-failed')
+    expect(out.error).toMatch(/medium/)
+    expect(deps.renderNarrated).not.toHaveBeenCalled()
+  })
+
   it('does nothing when the Mac agent is offline', async () => {
     const { deps, store } = setup({}, { agentOnline: false })
     await store.put(evergreen)
