@@ -8,6 +8,15 @@ describe('post card', () => {
     expect(chooseTemplate({})).toBe('bilingual')
   })
 
+  it('uses the one new look for number and breaking stories too', () => {
+    const fig = postCardHtml({ title: 'IESCO sale: 10 bidders prequalified', category: 'business', photo: null, figure: { value: '10', label: 'bidders' } })
+    expect(fig).not.toContain('NUMBERS')
+    expect(fig).toContain('class="hl"')
+    const brk = postCardHtml({ title: 'Blast in Quetta', category: 'pakistan', photo: null, breaking: true })
+    expect(brk).toContain('BREAKING')
+    expect(brk).not.toContain('ZAVIYA / ')
+  })
+
   it('highlights the first match and escapes everything', () => {
     expect(markHighlight('Widen the tax net', 'TAX NET')).toBe('Widen the <span class="hl">tax net</span>')
     expect(markHighlight('A <b> & co', 'nothing')).toBe('A &lt;b&gt; &amp; co')
