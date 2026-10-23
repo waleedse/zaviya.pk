@@ -1,5 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import {
   CATEGORIES,
   DATA_PAGES,
@@ -26,6 +27,34 @@ import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
 
 const PAGE_SIZE = 12
+
+/**
+ * Fields a card needs. Listing queries select only these: without it Payload also loads and joins the body,
+ * FAQs, sources and key points of every article, which made each page regeneration cost ~300 heavy queries (ZAV-187).
+ */
+const CARD_SELECT = {
+  slug: true,
+  title: true,
+  dek: true,
+  createdAt: true,
+  updatedAt: true,
+  category: true,
+  heroImage: true,
+  author: true,
+  publishedAt: true,
+  readingTime: true,
+  isLive: true,
+  isBreaking: true,
+  priority: true,
+} as const
+
+/**
+ * React cache() only dedupes inside one request, so every ISR regeneration of every page (hundreds of tag, category and
+ * article pages) repeated the layout queries. This keeps one copy per `revalidate` seconds across requests too (ZAV-187).
+ */
+function sharedCache<A extends unknown[], R>(name: string, revalidate: number, fn: (...args: A) => Promise<R>) {
+  return cache(unstable_cache(fn, ['zaviya-shared', name], { revalidate, tags: ['shared-data'] }))
+}
 
 const publishedClauses: Where[] = [
   { _status: { equals: 'published' } },
@@ -159,6 +188,34 @@ async function mapArticleCardAsync(doc: Article, locale: Locale): Promise<Articl
   return card
 }
 
+/** Cards for a list of articles; the other-language links come from ONE query instead of one findByID per card. */
+async function mapArticleCards(docs: Article[], locale: Locale): Promise<ArticleCard[]> {
+  const cards = docs.map((d) => mapArticleCard(d, locale, mapCategory(d.category as Category, locale)))
+  if (!docs.length) return cards
+  const other: Locale = locale === 'en' ? 'ur' : 'en'
+  try {
+    const payload = await getPayloadClient()
+    const res = await payload.find({
+      collection: 'articles',
+      locale: other,
+      where: { id: { in: docs.map((d) => d.id) } },
+      select: { slug: true },
+      depth: 0,
+      limit: docs.length,
+      pagination: false,
+      overrideAccess: true,
+    })
+    const slugs = new Map(res.docs.map((d) => [String(d.id), d.slug ? String(d.slug) : '']))
+    for (const c of cards) {
+      const slug = slugs.get(c.id)
+      if (slug) c.alternateHref = articleHref(other, c.category.slug, slug)
+    }
+  } catch {
+    // no language link on these cards; the page still renders
+  }
+  return cards
+}
+
 async function loadPublishedCards(locale: Locale, limit = 100): Promise<ArticleCard[]> {
   const payload = await getPayloadClient()
   const result = await payload.find({
@@ -168,12 +225,13 @@ async function loadPublishedCards(locale: Locale, limit = 100): Promise<ArticleC
     sort: '-publishedAt',
     limit,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  return mapArticleCards(result.docs as unknown as Article[], locale)
 }
 
-export const getCategories = cache(async (locale: Locale): Promise<CategoryRef[]> => {
+export const getCategories = sharedCache('getCategories', 300, async (locale: Locale): Promise<CategoryRef[]> => {
   const payload = await getPayloadClient()
   const cats = await payload.find({
     collection: 'categories',
@@ -205,7 +263,7 @@ function homeFeedFrom(all: ArticleCard[], locale: Locale): HomeFeed {
   }
 }
 
-export const getHomeFeed = cache(async (locale: Locale): Promise<HomeFeed> => {
+export const getHomeFeed = sharedCache('getHomeFeed', 60, async (locale: Locale): Promise<HomeFeed> => {
   if (demoData() && !(await hasPublishedArticles())) {
     return homeFeedFrom(mockCards(locale), locale)
   }
@@ -351,9 +409,10 @@ export const getCategoryFeed = cache(
       page,
       limit: PAGE_SIZE,
       depth: 2,
+      select: CARD_SELECT,
       overrideAccess: true,
     })
-    const docs = await Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+    const docs = await mapArticleCards(result.docs as unknown as Article[], locale)
     return {
       docs,
       page: result.page ?? page,
@@ -396,9 +455,10 @@ export const getTagFeed = cache(
       page,
       limit: PAGE_SIZE,
       depth: 2,
+      select: CARD_SELECT,
       overrideAccess: true,
     })
-    const docs = await Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+    const docs = await mapArticleCards(result.docs as unknown as Article[], locale)
     return {
       tag: { slug, name: tagName },
       feed: {
@@ -459,9 +519,10 @@ export const getAuthor = cache(async (locale: Locale, slug: string, page = 1): P
     page,
     limit: PAGE_SIZE,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  const docs = await Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  const docs = await mapArticleCards(result.docs as unknown as Article[], locale)
   return {
     slug: author.slug,
     name: author.name,
@@ -514,12 +575,13 @@ export const getRelated = cache(async (locale: Locale, articleId: string, limit 
     sort: '-publishedAt',
     limit,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  return mapArticleCards(result.docs as unknown as Article[], locale)
 })
 
-export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> => {
+export const getBreaking = sharedCache('getBreaking', 60, async (locale: Locale): Promise<ArticleCard[]> => {
   if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).filter((a) => a.isBreaking || a.isLive)
   }
@@ -535,9 +597,10 @@ export const getBreaking = cache(async (locale: Locale): Promise<ArticleCard[]> 
     sort: '-publishedAt',
     limit: 20,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  return mapArticleCards(result.docs as unknown as Article[], locale)
 })
 
 export interface UpcomingEvent {
@@ -579,7 +642,7 @@ const PRIORITY_RANK: Record<string, number> = { breaking: 3, high: 2, normal: 1 
  * Top stories of the last `hours`: the editor marks the day's 5-8 most important stories as
  * priority high (breaking stays breaking), then newest first.
  */
-export const getTopStories = cache(async (locale: Locale, hours: number, limit = 8): Promise<ArticleCard[]> => {
+export const getTopStories = sharedCache('getTopStories', 60, async (locale: Locale, hours: number, limit: number = 8): Promise<ArticleCard[]> => {
   if (demoData() && !(await hasPublishedArticles())) return mockCards(locale).slice(0, limit)
   const payload = await getPayloadClient()
   const since = new Date(Date.now() - hours * 3_600_000).toISOString()
@@ -590,6 +653,7 @@ export const getTopStories = cache(async (locale: Locale, hours: number, limit =
     sort: '-publishedAt',
     limit: 150,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
   const ranked = [...result.docs].sort(
@@ -598,10 +662,10 @@ export const getTopStories = cache(async (locale: Locale, hours: number, limit =
       Number(Boolean(b.heroImage)) - Number(Boolean(a.heroImage)) ||
       String(b.publishedAt).localeCompare(String(a.publishedAt)),
   )
-  return Promise.all(ranked.slice(0, limit).map((d) => mapArticleCardAsync(d, locale)))
+  return mapArticleCards(ranked.slice(0, limit) as unknown as Article[], locale)
 })
 
-export const getLive = cache(async (locale: Locale): Promise<ArticleCard[]> => {
+export const getLive = sharedCache('getLive', 60, async (locale: Locale): Promise<ArticleCard[]> => {
   if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).filter((a) => a.isLive)
   }
@@ -615,13 +679,14 @@ export const getLive = cache(async (locale: Locale): Promise<ArticleCard[]> => {
     sort: '-publishedAt',
     limit: 30,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  return Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  return mapArticleCards(result.docs as unknown as Article[], locale)
 })
 
 /** Tags used most across the latest stories: the site's own "trending now" list. */
-export const getTrendingTags = cache(async (locale: Locale, limit = 10): Promise<{ slug: string; name: string; count: number }[]> => {
+export const getTrendingTags = sharedCache('getTrendingTags', 300, async (locale: Locale, limit: number = 10): Promise<{ slug: string; name: string; count: number }[]> => {
   if (demoData() && !(await hasPublishedArticles())) return []
   const payload = await getPayloadClient()
   const since = new Date(Date.now() - 3 * 86_400_000).toISOString()
@@ -648,7 +713,7 @@ export const getTrendingTags = cache(async (locale: Locale, limit = 10): Promise
   return [...counts.values()].filter((t) => t.count > 1).sort((a, b) => b.count - a.count).slice(0, limit)
 })
 
-export const getMostRead = cache(async (locale: Locale, limit = 10): Promise<ArticleCard[]> => {
+export const getMostRead = sharedCache('getMostRead', 60, async (locale: Locale, limit: number = 10): Promise<ArticleCard[]> => {
   if (demoData() && !(await hasPublishedArticles())) {
     return mockCards(locale).slice(2, 2 + limit)
   }
@@ -690,7 +755,7 @@ function rateHref(series: RateSeries): string {
   return '/petrol-price-today-pakistan'
 }
 
-export const getRatesTicker = cache(async (locale: Locale = 'en'): Promise<RateTick[]> => {
+export const getRatesTicker = sharedCache('getRatesTicker', 300, async (locale: Locale = 'en'): Promise<RateTick[]> => {
   const payload = await getPayloadClient()
   const count = await payload.find({ collection: 'data-points', limit: 1, depth: 0 })
   if (count.totalDocs === 0) return demoData() ? mockRates() : []
@@ -811,9 +876,10 @@ export const search = cache(async (locale: Locale, q: string, page = 1): Promise
     page,
     limit: PAGE_SIZE,
     depth: 2,
+    select: CARD_SELECT,
     overrideAccess: true,
   })
-  const docs = await Promise.all(result.docs.map((d) => mapArticleCardAsync(d, locale)))
+  const docs = await mapArticleCards(result.docs as unknown as Article[], locale)
   return {
     docs,
     page: result.page ?? page,
@@ -893,9 +959,10 @@ export const getFrontPagePlan = cache(async (locale: Locale): Promise<ResolvedFr
       where: publishedAnd({ id: { in: ids } }),
       limit: ids.length,
       depth: 2,
+      select: CARD_SELECT,
       overrideAccess: true,
     })
-    await Promise.all(result.docs.map(async (d) => cards.set(Number(d.id), await mapArticleCardAsync(d, locale))))
+    for (const c of await mapArticleCards(result.docs as unknown as Article[], locale)) cards.set(Number(c.id), c)
   }
   const pick = (list: number[]) => list.map((id) => cards.get(id)).filter((c): c is ArticleCard => Boolean(c))
   return {

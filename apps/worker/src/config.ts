@@ -89,6 +89,8 @@ const envSchema = z.object({
   BRIDGE_HOST: z.string().default('127.0.0.1'),
   /** Base URL the browser can open for uploaded media (differs from PAYLOAD_URL inside Docker) */
   PUBLIC_MEDIA_URL: optionalUrl,
+  /** Public R2 domain for generated social cards: Instagram fetches these, so they must not go through the busy web app (ZAV-184) */
+  MEDIA_CDN_URL: z.preprocess(emptyToUndef, z.string().url().default('https://media.zaviya.pk')),
   /** Headless Chromium for the social post cards (Urdu needs a real browser engine) */
   CHROMIUM_PATH: optionalStr,
   BRIDGE_TOKEN: optionalStr,

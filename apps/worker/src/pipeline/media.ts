@@ -92,9 +92,16 @@ export function deferImage(o: { gate: boolean; articleId?: string; priority: Pri
   return o.gate && !o.articleId && o.priority !== 'breaking' && !o.isUpdate && !o.approved
 }
 
-function absoluteMediaUrl(baseUrl: string, url?: string | null): string | undefined {
+const MEDIA_FILE_PREFIX = '/api/media/file/'
+
+/**
+ * Public URL of an uploaded file. Payload serves /api/media/file/<name> from R2 through the web app (4-16 s when it is
+ * busy, so Instagram gave up with "media could not be fetched"); the same object is on the R2 domain directly (ZAV-184).
+ */
+export function absoluteMediaUrl(baseUrl: string, url?: string | null, cdnBase?: string): string | undefined {
   if (!url) return undefined
   if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (cdnBase && url.startsWith(MEDIA_FILE_PREFIX)) return `${cdnBase.replace(/\/$/, '')}/${url.slice(MEDIA_FILE_PREFIX.length)}`
   const base = baseUrl.replace(/\/$/, '')
   return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`
 }
@@ -105,6 +112,7 @@ async function uploadGeneratedPng(
   png: Buffer,
   alt: string,
   filename?: string,
+  cdnBase?: string,
 ): Promise<{ id: string; url?: string } | null> {
   try {
     const uploaded = await payload.uploadMedia(new Blob([png], { type: 'image/png' }), {
@@ -117,7 +125,7 @@ async function uploadGeneratedPng(
     })
     return {
       id: uploaded.id,
-      url: absoluteMediaUrl(baseUrl, uploaded.url),
+      url: absoluteMediaUrl(baseUrl, uploaded.url, cdnBase),
     }
   } catch (e) {
     logger.warn({ err: e }, 'generated PNG upload skipped')
@@ -245,7 +253,7 @@ export async function processMediaJob(
       deps.env.CHROMIUM_PATH,
     ).catch(() => null)
     const post = postPng
-      ? await uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, postPng, `${data.write.en.title} — social post`, `${data.write.en.slug}-post`).catch(() => null)
+      ? await uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, postPng, `${data.write.en.title} — social post`, `${data.write.en.slug}-post`, deps.env.MEDIA_CDN_URL).catch(() => null)
       : null
     if (post?.url) socialMediaUrls.push(post.url)
 
@@ -256,6 +264,7 @@ export async function processMediaJob(
         cardsEn.og,
         data.write.en.title,
         `${data.write.en.slug}-card`,
+        deps.env.MEDIA_CDN_URL,
       ),
       uploadGeneratedPng(
         deps.payload,
@@ -263,9 +272,10 @@ export async function processMediaJob(
         cardsEn.portrait,
         `${data.write.en.title} — Instagram card (EN)`,
         `${data.write.en.slug}-portrait`,
+        deps.env.MEDIA_CDN_URL,
       ),
       cardsUr && data.write.ur
-        ? uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, cardsUr.portrait, `${data.write.ur.title} — Instagram card (UR)`, `${data.write.ur.slug}-portrait-ur`)
+        ? uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, cardsUr.portrait, `${data.write.ur.title} — Instagram card (UR)`, `${data.write.ur.slug}-portrait-ur`, deps.env.MEDIA_CDN_URL)
         : Promise.resolve(null),
     ])
 

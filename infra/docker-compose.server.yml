@@ -41,6 +41,8 @@ services:
       context: ..
       dockerfile: infra/worker.Dockerfile
     restart: unless-stopped
+    # PID 1 that reaps children: chromium/esbuild/tsc exits left ~100 zombie processes on the host (ZAV-187)
+    init: true
     env_file: ${ENV_DIR:-../../env}/worker.env
     environment:
       PAYLOAD_URL: http://web:3000
@@ -61,6 +63,7 @@ services:
       context: ..
       dockerfile: infra/agents.Dockerfile
     restart: unless-stopped
+    init: true
     env_file: ${ENV_DIR:-../../env}/agents.env
     environment:
       PAYLOAD_URL: http://web:3000
@@ -79,6 +82,7 @@ services:
       context: ..
       dockerfile: infra/video.Dockerfile
     restart: unless-stopped
+    init: true
     env_file: ${ENV_DIR:-../../env}/worker.env
     environment:
       PAYLOAD_URL: http://web:3000
