@@ -14,12 +14,24 @@ const API = 'https://en.wikipedia.org/w/api.php'
 const MIN_WIDTH = 900
 const UA = { 'user-agent': 'ZaviyaBot/1.0 (https://zaviya.pk; ops@zaviya.pk)' }
 
-/** Tags that appear in the headline, longest (most specific) first. */
-export function subjectsFor(title: string, tags: string[], max = 3): string[] {
+const GENERIC_FIRST = new Set(['state', 'prime', 'supreme', 'federal', 'national', 'pakistan', 'islamabad', 'punjab', 'sindh', 'chief', 'finance', 'foreign', 'central', 'general', 'united', 'world', 'north', 'south', 'east', 'west', 'high', 'court'])
+
+/** Does the headline name this entity? The full tag, or for a person-style tag ("Shehbaz Sharif") its given name as a word ("PM Shehbaz ..."). */
+export function namedIn(title: string, tag: string): boolean {
   const t = title.toLowerCase()
+  const full = tag.trim().toLowerCase()
+  if (full.length >= 3 && t.includes(full)) return true
+  const words = full.split(/\s+/)
+  const first = words[0] ?? ''
+  if (words.length < 2 || words.length > 3 || first.length < 5 || GENERIC_FIRST.has(first)) return false
+  return new RegExp(`(^|[^a-z])${first.replace(/[^a-z]/g, '')}([^a-z]|$)`).test(t)
+}
+
+/** Tags the headline names, longest (most specific) first. */
+export function subjectsFor(title: string, tags: string[], max = 3): string[] {
   return tags
     .map((x) => x.trim())
-    .filter((x) => x.length >= 3 && t.includes(x.toLowerCase()))
+    .filter((x) => x.length >= 3 && namedIn(title, x))
     .sort((a, b) => b.length - a.length)
     .slice(0, max)
 }

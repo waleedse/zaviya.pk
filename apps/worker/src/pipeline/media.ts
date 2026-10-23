@@ -7,6 +7,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor, photoDataUrl } from './social-card.js'
 import { renderPostCard } from './post-card.js'
 import { findRealPhoto } from './real-photo.js'
+import { generateViaZImage } from './zimage.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
@@ -187,8 +188,14 @@ export async function processMediaJob(
     }
     return null
   }
+  const zimage = async () => generateViaZImage(fluxPrompt(brief, await scene()), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
   const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
-  const blob: Blob | null = fluxFirst ? ((await flux()) ?? (await gemini())) : ((await gemini()) ?? (await flux()))
+  const blob: Blob | null =
+    deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
+      ? ((await zimage()) ?? (await flux()) ?? (await gemini()))
+      : fluxFirst
+        ? ((await flux()) ?? (await gemini()))
+        : ((await gemini()) ?? (await flux()))
   // No real illustration yet: hold the story and try again later instead of publishing a text card.
   if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
     const tries = (data.imageTries ?? 0) + 1
