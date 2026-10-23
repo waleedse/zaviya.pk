@@ -6,7 +6,7 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { CATEGORIES } from '@zaviya/shared'
-import { storyUrKey } from '../pipeline/publish.js'
+import { storyUrKey } from './explainer/script-job.js'
 import { logger } from '../logger.js'
 import { composeNarrated, type NarratedInput, type NarratedTimeline, type StoryInput, type Timeline } from './lib.js'
 import type { MediaHub } from './media-hub.js'
@@ -32,6 +32,8 @@ export interface NarrateDeps {
   hub: MediaHub
   redis: { get(key: string): Promise<string | null> }
   now(): number
+  /** have the main worker write the Urdu headline of stories that have none (waits for them); optional */
+  requestHeadlines?(stories: { id: string; title: string; dek?: string }[]): Promise<void>
 }
 
 const INTRO: Record<'morning' | 'evening', string> = { morning: 'آج صبح کی اہم خبریں۔', evening: 'آج شام کی اہم خبریں۔' }
@@ -47,7 +49,14 @@ export async function narrateEdition(deps: NarrateDeps, a: NarrateArgs): Promise
     return null
   }
 
-  // each story's Urdu headline (saved when it was published) and what the voice will say
+  // stories published before Urdu headlines were saved get theirs written now (a short job in the main worker)
+  if (deps.requestHeadlines) {
+    const missing: { id: string; title: string; dek?: string }[] = []
+    for (const s of a.stories) if (!(await deps.redis.get(storyUrKey(String(s.id))))) missing.push({ id: String(s.id), title: s.title, ...(s.dek ? { dek: s.dek } : {}) })
+    if (missing.length) await deps.requestHeadlines(missing).catch((e: unknown) => log.warn({ err: String(e) }, 'could not get Urdu headlines'))
+  }
+
+  // each story's Urdu headline and what the voice will say
   const voiced: { story: StoryInput; text: string; speech: string }[] = []
   for (const story of a.stories) {
     const raw = await deps.redis.get(storyUrKey(String(story.id)))
