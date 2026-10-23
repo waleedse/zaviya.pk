@@ -35,7 +35,7 @@ export const HOUR = 3_600_000
 export const DAY = 24 * HOUR
 
 const SENSITIVE =
-  /\b(terror\w*|blast|bomb\w*|killed|kills?|dead|death|martyr\w*|murder\w*|rape\w*|harass\w*|abduct\w*|kidnap\w*|massacre|shooting|attack\w*|militan\w*|court|verdict|convict\w*|acquit\w*|arrest\w*|accused|bail|blasphem\w*|sectarian|election\w*|rigging|ISPR|army|military|PTI|PMLN|PML-N|PPP|Imran|Nawaz|Sharif|Zardari|Bilawal|protest\w*|riot\w*|war|ceasefire|strike on|missile|drone)\b/i
+  /\b(terror\w*|blast|bomb\w*|killed|kills?|dead|death|martyr\w*|murder\w*|rape\w*|harass\w*|abduct\w*|kidnap\w*|massacre|shooting|attack\w*|militan\w*|court|verdict|convict\w*|acquit\w*|arrest\w*|accused|bail|blasphem\w*|sectarian|election\w*|rigging|ISPR|army|military|PTI|PMLN|PML-N|PPP|Imran|Nawaz|Sharif|Zardari|Bilawal|protest\w*|riot\w*|war|ceasefire|strike on|missile|drone|minister\w*|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|diplomat\w*|summit|delegation|envoy|opposition|coalition|ruling|treaty|sanction\w*)\b/i
 
 export function isSensitive(text: string): boolean {
   return SENSITIVE.test(text)
@@ -108,8 +108,8 @@ export interface DiscoverArticle {
   tags?: string[]
 }
 
-/** Categories where an explainer makes sense: news in these can be explained, hard politics and crime cannot. */
-export const EXPLAINABLE = new Set(['business', 'tech-telecom', 'ai', 'education-jobs', 'world'])
+/** Categories where an explainer makes sense: money, technology, AI and jobs news can be explained; politics, world affairs and crime cannot. */
+export const EXPLAINABLE = new Set(['business', 'tech-telecom', 'ai', 'education-jobs'])
 
 export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: string[]; now: number }): Idea[] {
   const { articles, trends, now } = input
