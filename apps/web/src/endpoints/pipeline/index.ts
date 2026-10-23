@@ -1082,6 +1082,48 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // Clusters the editor approved (or triage decided to publish) that never got an article (ZAV-107): the writer
+    // skipped them for thin source text, QA sent them to review, or the write job was lost. Release rules: editor
+    // approved and idle `minAgeMin` (triaged/in_review) or `writingAgeMin` (writing); a plain publish decision in
+    // 'triaged' only after `publishAgeMin`. The worker skips any cluster that still has a job queued.
+    path: '/pipeline/stuck-approved-clusters',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const q = new URL(req.url ?? 'http://x').searchParams
+      const minAgeMin = Math.max(1, Math.min(Number(q.get('minAgeMin')) || 5, 24 * 60))
+      const writingAgeMin = Math.max(minAgeMin, Math.min(Number(q.get('writingAgeMin')) || 45, 24 * 60))
+      const publishAgeMin = Math.max(minAgeMin, Math.min(Number(q.get('publishAgeMin')) || 30, 24 * 60))
+      const res = await req.payload.find({
+        collection: 'story-clusters',
+        where: {
+          and: [
+            { status: { in: ['triaged', 'in_review', 'writing'] } },
+            { article: { exists: false } },
+            { updatedAt: { less_than: new Date(Date.now() - minAgeMin * 60_000).toISOString() } },
+            { updatedAt: { greater_than: new Date(Date.now() - 7 * 24 * 3_600_000).toISOString() } },
+          ],
+        },
+        sort: 'updatedAt',
+        limit: 300,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const ageMin = (c: { updatedAt?: unknown }) => (Date.now() - new Date(String(c.updatedAt)).getTime()) / 60_000
+      const clusters = res.docs
+        .filter((c) => {
+          const triage = (c.triage ?? {}) as { editorApproved?: boolean; codeOutcome?: string }
+          if (c.status === 'writing') return triage.editorApproved === true && ageMin(c) >= writingAgeMin
+          if (triage.editorApproved === true) return true
+          return c.status === 'triaged' && triage.codeOutcome === 'publish' && ageMin(c) >= publishAgeMin
+        })
+        .slice(0, 25)
+        .map((c) => ({ id: String(c.id), status: String(c.status), updatedAt: String(c.updatedAt), triage: (c.triage ?? {}) as Record<string, unknown> }))
+      return json({ clusters })
+    },
+  },
+  {
     // Articles of the last 48h (live, or drafts waiting for the editor) so triage can tell that a new
     // cluster is the same event as one we already hold (ZAV-134).
     path: '/pipeline/recent-articles',

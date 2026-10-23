@@ -34,6 +34,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import type { WriteResult } from './pipeline/write.js'
 
 import { TRENDS_KEY } from './queues-keys.js'
+import { releaseStuckApproved } from './pipeline/release-approved.js'
 export { TRENDS_KEY }
 
 export const QUEUE_NAMES = [
@@ -205,6 +206,8 @@ export async function createWorkerRuntime(
           ? (async () => {
               await releaseDeferredClusters({ payload, triageQueue: queues.triage })
               await releaseStuckNewClusters({ payload, triageQueue: queues.triage, minSources: env.TRIAGE_MIN_SOURCES })
+              // ZAV-107: approved clusters that never reached the writer
+              await releaseStuckApproved({ payload, writeQueue: queues.write, chain: [queues.write, queues.qa, queues.media, queues.publish] })
             })()
           : processTriageJob(job.data, {
               router,
