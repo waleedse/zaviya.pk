@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { GeminiProvider, cleanSchema, toInteractionInput } from './gemini.js'
+import { GeminiProvider, cleanSchema, isInputBlocked, isQuotaExhausted, toInteractionInput } from './gemini.js'
 
 const interaction = (steps: unknown[], id = 'int_1') =>
   new Response(JSON.stringify({ id, status: 'completed', steps }), { status: 200 })
@@ -124,6 +124,27 @@ describe('model rotation', () => {
     await expect(p.chat({ model: 'gemini-rot-a,gemini-rot-b', messages: [{ role: 'user', content: 'x' }] })).rejects.toMatchObject({
       name: 'QuotaExhaustedError',
     })
+  })
+
+  const blockedBody = () =>
+    new Response(JSON.stringify({ error: { message: 'Input blocked: The prompt could not be submitted. The prompt contains sensitive words that violate policy.' } }), { status: 400 })
+
+  it('tries the next model when one blocks the input (ZAV-182)', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(blockedBody())
+      .mockResolvedValueOnce(interaction([{ type: 'model_output', content: [{ type: 'text', text: 'ok-b' }] }]))
+    const res = await new GeminiProvider('key').chat({ model: 'gemini-blk-a,gemini-blk-b', messages: [{ role: 'user', content: 'x' }] })
+    expect(res.content).toBe('ok-b')
+    expect(res.model).toBe('gemini-blk-b')
+  })
+
+  it('throws InputBlockedError when every model blocks it, so callers stop retrying', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(blockedBody()).mockResolvedValueOnce(blockedBody())
+    const err = await new GeminiProvider('key')
+      .chat({ model: 'gemini-blk-c,gemini-blk-d', messages: [{ role: 'user', content: 'x' }] })
+      .catch((e) => e)
+    expect(isInputBlocked(err)).toBe(true)
+    expect(isQuotaExhausted(err)).toBe(false)
   })
 })
 
