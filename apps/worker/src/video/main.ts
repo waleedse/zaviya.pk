@@ -7,14 +7,21 @@ import { Redis } from 'ioredis'
 import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
 import { loadVideoConfig } from './config.js'
-import { createJobDeps } from './deps.js'
+import { createExplainerDeps, createJobDeps } from './deps.js'
+import { EXPLAINER_QUEUE } from './explainer/script-job.js'
+import { explainerRoutes } from './explainer/routes.js'
+import { runExplainerRound } from './explainer/run.js'
 import { flashKeys, flashSlot, pickFlash } from './flash.js'
 import { runEdition } from './job.js'
+import { MediaHub, redisHubStore, startMediaHubServer } from './media-hub.js'
 import { pickTrendArticle, trendNames, TREND_SLOT_NAME } from './trend.js'
 import { X_TRENDS_KEY } from '../queues-keys.js'
 import { repeatFor, schedulerId, staleSchedulers } from './schedule.js'
 
 export const VIDEO_QUEUE = 'video'
+/** explainer rounds wait for the Mac for up to two hours: they get their own queue so a round never holds up the daily videos */
+export const EXPLAINER_ROUNDS_QUEUE = 'video-explainer'
+const EXPLAINER_HOURS = [9, 12, 15, 18, 21]
 
 async function main() {
   const env = loadConfig()
@@ -46,7 +53,39 @@ async function main() {
   }
   logger.info({ slots: cfg.slots.map((s) => `${s.name}@${s.hour}:${s.minute}=${s.format}`), platforms: cfg.platforms, vetoMin: cfg.vetoMin }, cfg.platforms.length ? 'video service started' : 'video service started (dry run: VIDEO_PLATFORMS is empty)')
 
-  const deps = createJobDeps(env, cfg, redis)
+  // The Mac agent's media hub (voice and pictures made locally); off without MEDIA_AGENT_TOKEN
+  const hub = new MediaHub(redisHubStore(redis as never), cfg.dataDir)
+  const deps = createJobDeps(env, cfg, redis, hub)
+
+  // Explainer videos: their own queue and worker, the script queue read by the main worker, and the editor's ideas routes
+  const roundsQueue = new Queue(EXPLAINER_ROUNDS_QUEUE, {
+    connection: redis,
+    defaultJobOptions: { attempts: 1, removeOnComplete: { count: 30 }, removeOnFail: { count: 30 } },
+  })
+  const scriptQueue = new Queue(EXPLAINER_QUEUE, { connection: redis })
+  const explainer = createExplainerDeps(env, cfg, redis, hub, scriptQueue, deps)
+  for (const h of EXPLAINER_HOURS) {
+    if (cfg.explainer) await roundsQueue.upsertJobScheduler(`explainer-${h}`, { pattern: `0 ${h} * * *`, tz: 'Asia/Karachi' }, { name: 'explainer-round', data: {} })
+    else await roundsQueue.removeJobScheduler(`explainer-${h}`).catch(() => {})
+  }
+  if (cfg.mediaAgentToken) {
+    startMediaHubServer(hub, {
+      port: cfg.mediaHubPort,
+      token: cfg.mediaAgentToken,
+      extra: explainerRoutes(explainer.store, Date.now, async (o) => void (await roundsQueue.add('explainer-round', o, { jobId: `manual-${Date.now()}` }))),
+    })
+  } else logger.info('media hub off: MEDIA_AGENT_TOKEN is not set')
+  const explainerWorker = new Worker(
+    EXPLAINER_ROUNDS_QUEUE,
+    async (job) => {
+      if (!cfg.explainer && !(job.data as { dry?: boolean }).dry && job.id?.startsWith('manual-') !== true) return { skipped: 'VIDEO_EXPLAINER is off' }
+      const outcome = await runExplainerRound(explainer.deps, job.data as { ideaId?: string; dry?: boolean; now?: boolean })
+      logger.info({ outcome }, 'explainer round finished')
+      return outcome
+    },
+    { connection: redis.duplicate({ maxRetriesPerRequest: null }), concurrency: 1, lockDuration: 15 * 60_000, stalledInterval: 15 * 60_000 },
+  )
+  explainerWorker.on('failed', (job, err) => logger.error({ id: job?.id, err: err.message }, 'explainer round failed'))
   const worker = new Worker(
     VIDEO_QUEUE,
     async (job) => {
@@ -104,6 +143,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'video service shutting down')
     await worker.close().catch(() => {})
+    await explainerWorker.close().catch(() => {})
     await queue.close().catch(() => {})
     redis.disconnect()
     process.exit(0)

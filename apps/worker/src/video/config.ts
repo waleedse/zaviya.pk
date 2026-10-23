@@ -20,6 +20,13 @@ export interface VideoConfig {
   concurrency: number
   siteUrl: string
   keepDays: number
+  /** VIDEO_VOICED=true: the headline videos get an Urdu voice (made on the Mac) when the agent is online */
+  voiced: boolean
+  /** VIDEO_EXPLAINER=true: an Urdu explainer video every 3 hours (09:00 to 21:00 PKT) while the Mac agent is online */
+  explainer: boolean
+  /** media hub for the Mac agent: port and shared token (no token = hub off) */
+  mediaHubPort: number
+  mediaAgentToken?: string
   /** chrome-headless-shell installed in the image; undefined = Remotion's default lookup */
   browserExecutable?: string
 }
@@ -44,6 +51,10 @@ export function loadVideoConfig(env: NodeJS.ProcessEnv = process.env): VideoConf
     concurrency: Math.max(1, Number(env.VIDEO_CONCURRENCY ?? 2) || 2),
     siteUrl: (env.VIDEO_SITE_URL ?? 'https://zaviya.pk').replace(/\/+$/, ''),
     keepDays: 14,
+    voiced: env.VIDEO_VOICED === 'true',
+    explainer: env.VIDEO_EXPLAINER === 'true',
+    mediaHubPort: Number(env.MEDIA_HUB_PORT ?? 8790) || 8790,
+    mediaAgentToken: env.MEDIA_AGENT_TOKEN || undefined,
     browserExecutable: env.VIDEO_BROWSER_EXECUTABLE || undefined,
   }
 }
