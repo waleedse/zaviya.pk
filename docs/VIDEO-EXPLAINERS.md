@@ -53,8 +53,12 @@ Posting happens 60–90 min after the round starts, never within 45 min of a sch
    Turbo or lower/faster): Z-Image Turbo (Tongyi-MAI, 6B, Apache-2.0) on fal.ai first, about $0.005 per megapixel, 8 steps,
    a few seconds (`pipeline/zimage.ts`, `IMAGE_SOURCE=zimage` + `FAL_KEY`); then FLUX on Workers AI (already wired); Gemini
    through the Mac extension as the free option for key frames when the laptop is free (slow, needs the screen unlocked).
-   A local model is not an option on the server (4 CPUs, no GPU), and there is no CPU benchmark for Z-Image Turbo on an
-   Intel Mac; a smaller local model (SD-Turbo class) would be worse than any of the three above. About 8 pictures a video
+   Local models, measured on Waleed's Mac (Intel i9, CPU only, 24 Oct): **SDXS-512** (1 step) makes a 512 px picture in 2-5 s
+and is fine for a photo-like scene but weak for diagrams (garbled pseudo-text); **Z-Image Turbo Q4_K via stable-diffusion.cpp**
+(Apache-2.0, 3.9 GB model + 2.5 GB text encoder) gives a realistic, clearly better picture but takes about 5.5 minutes for a
+512 px image (33 s per step; the Mac's Metal GPU path crashed with a GPU timeout, so CPU only). On the 4-CPU server that is
+8-12 min a picture, so 48 pictures a day would eat most of its CPU: local Z-Image is only viable as an overnight batch that
+builds a stock library of generic illustrations, not as the per-video generator. SDXS is a possible local fallback for simple scenes. About 8 pictures a video
    at half a cent is under 5 cents per video. A **licence ledger** (source URL, licence, author, or "AI-generated:
    model + prompt") is stored on the video and printed in the Telegram preview and the caption credit.
 9. **Render**: new Remotion composition `Explainer` in `packages/video`: Ken Burns on stills, crossfades on beats,
