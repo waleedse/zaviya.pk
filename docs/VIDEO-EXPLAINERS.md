@@ -128,3 +128,32 @@ Nothing posts until step 5 passes a full dry-run day. Rollback is `VIDEO_EXPLAIN
 4. Remotion licence: free for companies of up to 3 people; confirm before the volume grows.
 5. fal.ai account: Waleed creates it and puts `FAL_KEY` in the server env file (never in chat); until then FLUX/Gemini carry on as today.
 6. Voice fatigue: one voice and one style across six videos a day. Plan B when we have a GPU box: OmniVoice or an Urdu fine-tune with more styles.
+
+---
+
+## As built (24 Oct 2026) and runbook
+
+What shipped in v2026.10.24-1, and where it lives:
+
+| Piece | Where |
+| --- | --- |
+| Mac agent (voice, pictures) | `tools/media-agent/` (`install.sh`, `agent.py`, launchd plist); installed in `~/zaviya-media-agent` on Waleed's Mac |
+| Media hub (job queue + HTTPS long poll) | `apps/worker/src/video/media-hub.ts`, served by the video container on 8790, nginx `/media/` on `zaviya.194-163-184-12.sslip.io` |
+| Urdu speech normaliser | `apps/worker/src/video/urdu-speech.ts` |
+| Narrated video | `packages/video/src/narrated.ts` (timing from the audio), `remotion/Narrated.tsx`, `renderNarrated` in `render.ts` (PNG frames so the file is yuv420p) |
+| Voiced news | `apps/worker/src/video/narrate-news.ts`; the Urdu headline of each story is saved in Redis (`story:ur:<id>`, 7 days) when it is published |
+| Explainer rounds | `apps/worker/src/video/explainer/` (`ideas`, `evergreen`, `script`, `script-job`, `run`, `routes`); queue `video-explainer`; script writing runs in the main worker (queue `explainer`) |
+| Editor control | `ops/bin/video.mjs`, section "Video ideas" in `.claude/agents/editor.md` |
+
+Switches (in `/var/www/aurm-test/env/compose.env` on the server; both default to off):
+- `VIDEO_VOICED=true`: the headline videos get the Urdu voice when the agent is online, else the silent video as before.
+- `VIDEO_EXPLAINER=true`: rounds at 09:00, 12:00, 15:00, 18:00 and 21:00 PKT. A round does nothing when the Mac agent is offline.
+- `FAL_KEY` in `worker.env` (optional): a picture from Z-Image Turbo on fal.ai when the Mac did not deliver in time.
+
+Operating it:
+- Backlog from a shell on the server: `docker exec zaviya-agents-1 node ops/bin/video.mjs ideas` (and `add`, `decide`, `run --dry`).
+- Make one now without posting: `video.mjs run --dry --now`; with posting: `video.mjs run --now` (the Telegram Skip button still works for 20 minutes unless `--now`).
+- Pause the Mac agent while using the Mac: `touch ~/zaviya-media-agent/PAUSE`. Log: `~/zaviya-media-agent/agent.log`.
+- Rollback: set the flag to `false` (and `docker compose ... up -d video`), or `docker stop zaviya-video-1`; the news worker and the site are not involved.
+
+Known limits: the Mac must be on (sleep stops the agent; headless Chrome renders on the Mac need `chrome-wrapper.sh`: this Mac's headless Chrome never fires `requestAnimationFrame` without `--in-process-gpu --disable-gpu-compositing`); the voice is one speaker and one style; there is no automatic voice check (ASR round trip) yet; a script with a figure that is not in its sources is rejected, so topics with news need readable sources.
