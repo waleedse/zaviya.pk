@@ -45,6 +45,7 @@ describe('discovery', () => {
         article({ id: 3, title: 'Court verdict on tax case', category: 'business' }),
         article({ id: 4, title: 'Old story about chips', publishedAt: new Date(NOW - 50 * HOUR).toISOString() }),
         article({ id: 5, title: 'Big AI model launched', category: 'ai', isBreaking: true }),
+        article({ id: 6, title: 'Foreign affairs update from abroad', category: 'world' }),
       ],
       trends: ['Starlink'],
       now: NOW,
@@ -56,10 +57,12 @@ describe('discovery', () => {
     expect(byArticle(3)?.risk).toBe('needs-veto')
     expect(byArticle(4)).toBeUndefined()
     expect(byArticle(5)).toBeUndefined()
+    expect(byArticle(6)).toBeUndefined()
     expect(found.filter((i) => i.origin === 'evergreen').length).toBeGreaterThan(20)
   })
 
   it('detects sensitive words', () => {
+    expect(isSensitive('Ishaq Dar departs for Istanbul to attend R4 ministers talks')).toBe(true)
     expect(isSensitive('Imran Khan court hearing')).toBe(true)
     expect(isSensitive('How solar panels work')).toBe(false)
     expect(similar('How rockets reach orbit', 'How a rocket reaches orbit')).toBeGreaterThan(0.5)
