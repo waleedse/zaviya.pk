@@ -138,8 +138,13 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   const seen = await hub.agentSeenAt()
   if (!seen || startedAt - seen > AGENT_ONLINE_MS) {
     log.info('explainer round skipped: the Mac agent is offline')
+    if (await redis.set(`explainer:offline-notified:${karachiDate(startedAt)}`, '1', 'EX', 86400, 'NX')) {
+      await telegram.notify('Explainer round skipped: the Mac media agent is offline (is the Mac awake?). Rounds resume by themselves when it is back.').catch(() => {})
+    }
     return { status: 'agent-offline', key }
   }
+
+  hub.pruneAssets(7 * 86400_000)
 
   // 1. discover, rank, pick
   const articles = await deps.fetchArticles(1).catch(() => [] as ApiArticle[])
@@ -172,10 +177,12 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   mkdirSync(assets, { recursive: true })
   const sentences = scriptSentences(script)
   if (!sentences.length) return fail('script-failed', 'the script has nothing to say')
-  const tts = await hub.enqueue('tts', { sentences: sentences.map((s) => s.spoken), lengthScale: 0.9 }, `exp-${idea.id}-tts`)
+  // a retry after a failed round gets fresh job ids: a failed job must not answer for it
+  const attempt = `exp-${idea.id}-f${idea.failures ?? 0}`
+  const tts = await hub.enqueue('tts', { sentences: sentences.map((s) => s.spoken), lengthScale: 0.9 }, `${attempt}-tts`)
   const images = await Promise.all(
     script.beats.map((b, i) =>
-      hub.enqueue('image', { prompt: `${b.imagePrompt}, ${IMAGE_STYLE}`, width: 512, height: 512, quality: 'good', seed: 11 + i }, `exp-${idea.id}-img${i}`),
+      hub.enqueue('image', { prompt: `${b.imagePrompt}, ${IMAGE_STYLE}`, width: 512, height: 512, quality: 'good', seed: 11 + i }, `${attempt}-img${i}`),
     ),
   )
   const voice = await hub.waitFor(tts, ASSET_WAIT_MS)

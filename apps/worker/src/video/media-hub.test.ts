@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -51,6 +51,25 @@ describe('MediaHub', () => {
     const again = await hub.claim(['tts'], 'mac')
     expect(again?.id).toBe(id)
     expect(again?.attempts).toBe(1)
+  })
+})
+
+describe('pruneAssets', () => {
+  it('deletes old asset files and keeps new ones', async () => {
+    const d = dir()
+    const hub = new MediaHub(memoryHubStore(), d)
+    const ids: string[] = []
+    for (const body of ['old', 'new']) {
+      const id = await hub.enqueue('tts', { sentences: [body] })
+      await hub.claim(['tts'], 'mac')
+      await hub.complete(id, Buffer.from(body), 'audio/wav')
+      ids.push(id)
+    }
+    const old = new Date(Date.now() - 10 * 86400_000)
+    utimesSync(path.join(d, 'assets', `${ids[0]}.wav`), old, old)
+    expect(hub.pruneAssets(7 * 86400_000)).toBe(1)
+    expect(existsSync(path.join(d, 'assets', `${ids[0]}.wav`))).toBe(false)
+    expect(existsSync(path.join(d, 'assets', `${ids[1]}.wav`))).toBe(true)
   })
 })
 

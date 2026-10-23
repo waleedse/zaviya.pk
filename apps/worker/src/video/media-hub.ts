@@ -9,7 +9,7 @@
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { logger } from '../logger.js'
 
@@ -154,6 +154,24 @@ export class MediaHub {
     if (!job || job.status !== 'leased') return
     await this.store.remove(`media:leased:${job.kind}`, id)
     await this.retryOrFail(job, error.slice(0, 300))
+  }
+
+  /** Deletes asset files older than `maxAgeMs` (a video's voice and pictures are only needed while it is made). */
+  pruneAssets(maxAgeMs: number): number {
+    const dir = path.join(this.dataDir, 'assets')
+    let n = 0
+    try {
+      for (const f of readdirSync(dir)) {
+        const p = path.join(dir, f)
+        if (this.now() - statSync(p).mtimeMs > maxAgeMs) {
+          rmSync(p, { force: true })
+          n++
+        }
+      }
+    } catch {
+      /* no assets yet */
+    }
+    return n
   }
 
   readFile(job: MediaJob): Buffer | null {

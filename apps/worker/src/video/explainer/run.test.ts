@@ -106,6 +106,14 @@ describe('runExplainerRound', () => {
     expect(deps.requestScript).not.toHaveBeenCalled()
   })
 
+  it('tells Waleed once a day when the Mac agent is offline', async () => {
+    const { deps, store } = setup({}, { agentOnline: false })
+    await store.put(evergreen)
+    await runExplainerRound(deps, { now: true, round: 'a' })
+    await runExplainerRound(deps, { now: true, round: 'b' })
+    expect(deps.telegram.notify).toHaveBeenCalledTimes(1)
+  })
+
   it('retires an idea after two failed scripts', async () => {
     const { deps, store } = setup({ requestScript: vi.fn(async () => null) })
     await store.put(evergreen)

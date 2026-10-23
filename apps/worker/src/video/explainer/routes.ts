@@ -1,7 +1,7 @@
 /** The explainer backlog over HTTP for the editor agent (and for Waleed): list, add, decide, and make one now. */
 import { z } from 'zod'
 import type { ExtraRoutes } from '../media-hub.js'
-import { HOUR, ideaId, isSensitive, rank, type Idea, IdeaStore } from './ideas.js'
+import { HOUR, ideaId, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
 
 const AddSchema = z.object({
   title: z.string().min(8).max(160),
@@ -17,7 +17,12 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
   return async (method, pathname, body) => {
     if (method === 'GET' && pathname === '/ideas') {
       const t = now()
-      const ranked = rank(await store.all(), t).slice(0, 30)
+      // needs-veto ideas are listed too (flagged): approving them is the editor's job; vetoed, made and expired ones are not
+      const ranked = (await store.all())
+        .map((idea) => ({ idea, score: scoreIdea({ ...idea, risk: 'low' }, t) }))
+        .filter((r) => Number.isFinite(r.score))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 30)
       return {
         status: 200,
         body: ranked.map(({ idea, score }) => ({
