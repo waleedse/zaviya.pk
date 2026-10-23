@@ -34,6 +34,21 @@ export function hasFreshSource(items: { publishedAt?: string }[], now = Date.now
   })
 }
 
+/**
+ * ZAV-186: the 18 h rule is judged when the editor approves. A story approved with a fresh source then waits for the
+ * writer and for the publish pacing slots (hours on a busy day) and used to be rejected as stale at the very end. Such a
+ * story keeps its freshness for this long after approval.
+ */
+export const APPROVAL_GRACE_MS = 8 * 60 * 60_000
+
+/** Fresh now, or (editor-approved) fresh at approval time and published within APPROVAL_GRACE_MS of it. */
+export function freshForApproved(items: { publishedAt?: string }[], triage: unknown, now = Date.now()): boolean {
+  if (hasFreshSource(items, now)) return true
+  if (!editorApproved(triage)) return false
+  const at = Date.parse(String((triage as { editorApprovedAt?: unknown }).editorApprovedAt ?? ''))
+  return Number.isFinite(at) && now - at <= APPROVAL_GRACE_MS && hasFreshSource(items, at)
+}
+
 export interface Pitch {
   clusterId: string
   headline: string
@@ -71,7 +86,7 @@ export async function decidePitch(
   }
   await deps.payload.patchCluster(clusterId, {
     status: 'writing',
-    triage: { ...triage, codeOutcome: 'publish', editorApproved: true, editorNote: note },
+    triage: { ...triage, codeOutcome: 'publish', editorApproved: true, editorApprovedAt: new Date().toISOString(), editorNote: note },
   })
   await deps.writeQueue.add('write', { clusterId }, { priority: triage.suggestedPriority === 'high' ? 2 : 3 })
   await deps.redis.set(PITCH_APPROVED_KEY, String(Date.now()))

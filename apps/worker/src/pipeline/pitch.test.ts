@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { bestPitch, decidePitch, pitchSummary, editorApproved, floorPitch, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
+import { bestPitch, decidePitch, freshForApproved, pitchSummary, editorApproved, floorPitch, pitchFallback, shouldPitch, PITCH_APPROVED_KEY } from './pitch.js'
 import { deferImage } from './media.js'
 
 function fakeRedis(init: Record<string, string> = {}) {
@@ -158,5 +158,30 @@ describe('pitchSummary (ZAV-149)', () => {
     const out = pitchSummary([{ title: 'A headline', summary: 'Short but real summary line that is long enough to count here.' }, { title: 'B', contentText: long }])
     expect(out.length).toBeLessThanOrEqual(400)
     expect(out.startsWith('Word')).toBe(true)
+  })
+})
+
+describe('freshForApproved (ZAV-186)', () => {
+  const H = 3_600_000
+  const now = Date.parse('2026-10-23T12:00:00Z')
+  const src = (hoursAgo: number) => [{ publishedAt: new Date(now - hoursAgo * H).toISOString() }]
+  const approved = (hoursAgo: number) => ({ editorApproved: true, editorApprovedAt: new Date(now - hoursAgo * H).toISOString() })
+
+  it('a fresh source is fresh for everyone', () => {
+    expect(freshForApproved(src(2), {}, now)).toBe(true)
+  })
+
+  it('an approved story keeps its freshness through the queue: source 20 h old, approved 3 h ago with a 17 h source', () => {
+    expect(freshForApproved(src(20), approved(3), now)).toBe(true)
+  })
+
+  it('does not stretch forever: approved 10 h ago, or a source that was already stale at approval', () => {
+    expect(freshForApproved(src(27), approved(10), now)).toBe(false)
+    expect(freshForApproved(src(40), approved(3), now)).toBe(false)
+  })
+
+  it('needs the approval stamp and the editor flag', () => {
+    expect(freshForApproved(src(20), { editorApproved: true }, now)).toBe(false)
+    expect(freshForApproved(src(20), { editorApprovedAt: new Date(now - H).toISOString() }, now)).toBe(false)
   })
 })

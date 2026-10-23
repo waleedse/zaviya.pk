@@ -1,7 +1,7 @@
 import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
 import { logger } from '../logger.js'
-import { hasFreshSource } from './pitch.js'
+import { freshForApproved } from './pitch.js'
 
 /** An approved cluster idle in triaged/in_review this long went back there after a skipped or failed write (ZAV-107). */
 export const APPROVED_IDLE_MIN = 5
@@ -52,7 +52,7 @@ export async function releaseStuckApproved(
         await deps.payload.patchCluster(c.id, { status: 'rejected', triage: { ...triage, codeOutcome, deferReason } })
         logger.warn({ clusterId: c.id, status: c.status, releases, reason: deferReason }, 'stuck approved cluster closed')
       }
-      if (cluster.items.length && !hasFreshSource(cluster.items)) {
+      if (cluster.items.length && !freshForApproved(cluster.items, triage, now)) {
         await close('reject', 'stale sources: no source from the last 18 hours')
         continue
       }
