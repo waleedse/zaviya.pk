@@ -43,6 +43,20 @@ export function isQuotaExhausted(e: unknown): e is QuotaExhaustedError {
   return e instanceof Error && e.name === 'QuotaExhaustedError'
 }
 
+/** Every model that was tried refused the prompt itself (400 "Input blocked ... sensitive words"): retrying cannot help. */
+export class InputBlockedError extends Error {
+  constructor(readonly model: string, detail: string) {
+    super(`Gemini input blocked (${model}): ${detail}`)
+    this.name = 'InputBlockedError'
+  }
+}
+
+export function isInputBlocked(e: unknown): e is InputBlockedError {
+  return e instanceof Error && e.name === 'InputBlockedError'
+}
+
+const BLOCKED_RE = /input blocked|sensitive words|prompt could not be submitted/i
+
 class RateLimited extends Error {
   constructor(readonly retryInMs: number) {
     super('rate limited')
@@ -224,6 +238,7 @@ export class GeminiProvider implements LLMProvider {
     // A stateful continuation must stay on the model that started it.
     const candidates = previousInteractionId ? chain.slice(0, 1) : chain
     let earliestReset = Infinity
+    let blocked: InputBlockedError | null = null
     let res: Response | null = null
     let data: InteractionResponse = {}
     let model = candidates[0]!
@@ -251,8 +266,15 @@ export class GeminiProvider implements LLMProvider {
         throw e
       }
       data = (await res.json().catch(() => ({}))) as InteractionResponse
+      // This model refuses the prompt (Gemma does it on news about violence); the next one in the chain may not
+      if (res.status === 400 && BLOCKED_RE.test(data.error?.message ?? '') && !previousInteractionId) {
+        blocked = new InputBlockedError(m, data.error?.message ?? '')
+        res = null
+        continue
+      }
       break
     }
+    if (!res && blocked && !Number.isFinite(earliestReset)) throw blocked
     if (!res) throw new QuotaExhaustedError(Number.isFinite(earliestReset) ? earliestReset : Date.now() + 3_600_000)
     if (!res.ok || data.error) {
       throw new Error(`Gemini chat failed (${model}, ${res.status}): ${data.error?.message ?? 'unknown error'}`)

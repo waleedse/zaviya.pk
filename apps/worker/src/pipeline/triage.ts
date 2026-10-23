@@ -1,5 +1,5 @@
 import { TriageResultSchema, type TriageResult } from '@zaviya/shared'
-import { zodToJsonSchema, isQuotaExhausted } from '@zaviya/llm'
+import { zodToJsonSchema, isQuotaExhausted, isInputBlocked } from '@zaviya/llm'
 import type { LLMRouter } from '@zaviya/llm'
 import type { Queue } from 'bullmq'
 import type { PayloadClient } from '../payload-client.js'
@@ -116,6 +116,16 @@ export async function processTriageJob(
       const delay = Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000) + 5_000
       await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: 4, jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
       logger.info({ clusterId: data.clusterId, delayMs: delay }, 'triage quota exhausted, requeued')
+      return
+    }
+    if (isInputBlocked(e)) {
+      // The model refuses this text itself (violence, "sensitive words"): asking again can never work and the 15-minute
+      // sweep would queue it forever, so close it with a reason the editor can see in the rejects (ZAV-182).
+      await deps.payload.patchCluster(data.clusterId, {
+        status: 'rejected',
+        triage: { codeOutcome: 'reject', deferReason: 'model blocked the input: every Gemini model refused the prompt' },
+      })
+      logger.info({ clusterId: data.clusterId, model: e.model }, 'triage: model blocked the input, cluster rejected')
       return
     }
     logger.warn({ err: e, clusterId: data.clusterId }, 'triage LLM skipped/failed')

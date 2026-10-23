@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { QuotaExhaustedError } from '@zaviya/llm'
+import { InputBlockedError, QuotaExhaustedError } from '@zaviya/llm'
 import { DEFER_RELEASE_MIN, HEADLINE_ONLY_REJECT, HEADLINE_ONLY_RETRY_MIN, HEADLINE_ONLY_WAITING, LONELY_TRIAGE_MIN, processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './triage.js'
 
 describe('processTriageJob', () => {
@@ -17,6 +17,22 @@ describe('processTriageJob', () => {
     expect(data).toEqual({ clusterId: '1' })
     expect(opts.delay).toBeGreaterThan(9 * 60_000)
     expect(payload.patchCluster).not.toHaveBeenCalled()
+  })
+
+  it('rejects the cluster with a reason when the model blocks the input, instead of leaving it new (ZAV-182)', async () => {
+    const add = vi.fn()
+    const router = { chat: vi.fn().mockRejectedValue(new InputBlockedError('gemma-4-26b-a4b-it', 'sensitive words')) }
+    const payload = {
+      getCluster: vi.fn().mockResolvedValue({ id: '5', items: [], maxTier: 2, distinctSources: 2 }),
+      getSettings: vi.fn().mockResolvedValue({}),
+      patchCluster: vi.fn(),
+    }
+    await processTriageJob({ clusterId: '5' }, { router, payload, writeQueue: {}, triageQueue: { add } } as never)
+    expect(add).not.toHaveBeenCalled()
+    expect(payload.patchCluster).toHaveBeenCalledWith('5', {
+      status: 'rejected',
+      triage: expect.objectContaining({ codeOutcome: 'reject', deferReason: expect.stringContaining('model blocked the input') }),
+    })
   })
 
   it('retries once with a smaller prompt when the reply is truncated JSON (ZAV-21)', async () => {

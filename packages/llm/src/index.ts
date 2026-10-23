@@ -1,6 +1,6 @@
 export * from './types.js'
 export { OllamaProvider } from './ollama.js'
-export { GeminiProvider, QuotaExhaustedError, isQuotaExhausted, geminiModelStatus } from './gemini.js'
+export { GeminiProvider, QuotaExhaustedError, isQuotaExhausted, InputBlockedError, isInputBlocked, geminiModelStatus } from './gemini.js'
 export { LLMRouter, DEFAULT_LOCAL_MODEL, type LLMRouterOptions, type RouterSettings } from './router.js'
 export { runToolLoop, type ToolLoopResult } from './tools.js'
 export { Semaphore } from './semaphore.js'
