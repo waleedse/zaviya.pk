@@ -150,7 +150,7 @@ def run_image_good(p):
                "--diffusion-model", str(SD_MODELS / "z_image_turbo-Q4_K.gguf"),
                "--vae", str(SD_MODELS / "ae.safetensors"),
                "--llm", str(SD_MODELS / "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"),
-               "-p", p["prompt"], "--cfg-scale", "1.0", "--steps", "8", "-W", str(w), "-H", str(h),
+               "-p", p["prompt"], "--cfg-scale", "1.0", "--steps", str(int(p.get("steps", 8))), "-W", str(w), "-H", str(h),
                "-t", os.environ.get("SD_THREADS", "6"), "--seed", str(int(p.get("seed", 7))), "-o", str(out)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=25 * 60)
         if r.returncode != 0 or not out.exists():

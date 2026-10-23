@@ -25,6 +25,16 @@ export const AGENT_ONLINE_MS = 3 * 60_000
 export const SLOT_BUFFER_MS = 45 * 60_000
 export const IMAGE_STYLE =
   'flat vector illustration, soft gradient background in deep navy and warm yellow, clean simple shapes, friendly modern infographic style, no text, no letters, no numbers, no logos'
+/** 384 px and 6 steps: about 40% of the work of 512 px and 8 steps, which matters when the Mac is busy with the owner's own apps */
+export const IMAGE_SIZE = 384
+export const IMAGE_STEPS = 6
+
+/** Fewer pictures than beats: a picture stays up for about two beats (the drift differs per beat). Beat i uses picture groupOf(i). */
+export function imagePlan(beats: number): { count: number; groupOf: (beat: number) => number } {
+  const count = Math.max(1, Math.min(beats, Math.max(3, Math.ceil((beats * 2) / 3))))
+  return { count, groupOf: (i) => Math.min(count - 1, Math.floor((i * count) / beats)) }
+}
+
 export const CTA = 'ایسی مزید کام کی باتیں زاویہ پر'
 
 export interface ExplainerDeps {
@@ -182,9 +192,11 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   // a retry after a failed round gets fresh job ids: a failed job must not answer for it
   const attempt = `exp-${idea.id}-f${idea.failures ?? 0}`
   const tts = await hub.enqueue('tts', { sentences: sentences.map((s) => s.spoken), lengthScale: 0.9 }, `${attempt}-tts`)
+  const plan = imagePlan(script.beats.length)
+  const firstBeatOf = (g: number) => script.beats.findIndex((_, i) => plan.groupOf(i) === g)
   const images = await Promise.all(
-    script.beats.map((b, i) =>
-      hub.enqueue('image', { prompt: `${b.imagePrompt}, ${IMAGE_STYLE}`, width: 512, height: 512, quality: 'good', seed: 11 + i }, `${attempt}-img${i}`),
+    Array.from({ length: plan.count }, (_, g) =>
+      hub.enqueue('image', { prompt: `${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, width: IMAGE_SIZE, height: IMAGE_SIZE, quality: 'good', steps: IMAGE_STEPS, seed: 11 + g }, `${attempt}-img${g}`),
     ),
   )
   const voice = await hub.waitFor(tts, ASSET_WAIT_MS)
@@ -194,17 +206,18 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   if (!wav || !sentenceMs || sentenceMs.length !== sentences.length) return fail('assets-failed', 'the voice answer is incomplete')
   writeFileSync(path.join(assets, 'voice.wav'), wav)
 
-  const beatFiles: string[] = []
-  for (const [i, id] of images.entries()) {
+  const groupFiles: string[] = []
+  for (const [g, id] of images.entries()) {
     const wait = Math.max(0, ASSET_WAIT_MS - (deps.now() - startedAt))
     const job = await hub.waitFor(id, wait)
-    const file = `beat${i + 1}.png`
+    const file = `pic${g + 1}.png`
     let bytes: Buffer | null = job?.status === 'done' ? hub.readFile(job) : null
-    if (!bytes && deps.fallbackImage) bytes = await deps.fallbackImage(`${script.beats[i]!.imagePrompt}, ${IMAGE_STYLE}`, 1024, 1024).catch(() => null)
-    if (!bytes) return fail('assets-failed', `picture ${i + 1}: ${job?.error ?? 'did not come back in time'}`)
+    if (!bytes && deps.fallbackImage) bytes = await deps.fallbackImage(`${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, 1024, 1024).catch(() => null)
+    if (!bytes) return fail('assets-failed', `picture ${g + 1}: ${job?.error ?? 'did not come back in time'}`)
     writeFileSync(path.join(assets, file), bytes)
-    beatFiles.push(file)
+    groupFiles.push(file)
   }
+  const beatFiles = script.beats.map((_, i) => groupFiles[plan.groupOf(i)]!)
 
   // 4. compose and render
   let timeline: NarratedTimeline

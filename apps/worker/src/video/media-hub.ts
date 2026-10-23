@@ -28,6 +28,8 @@ export interface ImagePayload {
   /** fast: SDXS (seconds, simple scenes); good: Z-Image Turbo (minutes, better) */
   quality: 'fast' | 'good'
   seed?: number
+  /** sampling steps for quality "good" (default 8) */
+  steps?: number
 }
 
 export interface MediaJob {
