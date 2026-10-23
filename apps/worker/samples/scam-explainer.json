@@ -1,0 +1,15 @@
+{
+  "title": "How to avoid WhatsApp and SMS bank scams",
+  "titleUr": "واٹس ایپ اور ایس ایم ایس کے دھوکے سے کیسے بچیں",
+  "cta": "ایسی مزید کام کی باتیں زاویہ پر",
+  "music": "audio/calm.wav",
+  "imageStyle": "flat vector illustration, soft gradient background in deep navy and warm yellow, clean simple shapes, friendly modern infographic style, no text, no letters, no numbers, no logos",
+  "beats": [
+    { "kicker": "کیا آپ کو بھی ایسا پیغام ملا؟", "credit": "AI illustration", "text": "کیا آپ کو کبھی ایسا پیغام ملا ہے کہ آپ کا اکاؤنٹ بند ہونے والا ہے؟", "imagePrompt": "a smartphone screen showing a red warning triangle notification, a worried hand holding the phone" },
+    { "kicker": "ٹھگوں کا طریقہ", "credit": "AI illustration", "text": "یہ ٹھگوں کا پرانا طریقہ ہے۔ وہ بینک، ایزی پیسہ یا جاز کیش بن کر پیغام بھیجتے ہیں، اور آپ کو جلدی میں ڈال دیتے ہیں۔", "imagePrompt": "a masked figure in a hoodie hiding behind a bank building facade like a mask, pretending to be a trusted company" },
+    { "kicker": "پہلی بات", "credit": "AI illustration", "text": "کسی کو اپنا او ٹی پی یا پن کوڈ کبھی نہ بتائیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا۔", "imagePrompt": "a big padlock with a keyhole in front of a smartphone, a hand pushing away a speech bubble, security concept" },
+    { "kicker": "دوسری بات", "credit": "AI illustration", "text": "پیغام میں آئے ہوئے لنک پر کلک نہ کریں۔ ایپ یا ویب سائٹ خود کھول کر دیکھیں۔", "imagePrompt": "a mouse cursor about to click a suspicious fishing hook link bubble, with a stop hand sign blocking it" },
+    { "kicker": "تیسری بات", "credit": "AI illustration", "text": "اگر شک ہو تو کال کاٹ دیں، اور بینک کی اپنی ہیلپ لائن پر خود فون کریں، جو آپ کے کارڈ یا ایپ میں لکھی ہوتی ہے۔", "imagePrompt": "a person hanging up a phone call and then dialing a trusted bank helpline from a bank card in the other hand" },
+    { "kicker": "اگر دھوکا ہو جائے", "credit": "AI illustration", "text": "اگر دھوکا ہو جائے تو فوراً بینک کو بتا کر اکاؤنٹ بلاک کروائیں، اور ایف آئی اے کے سائبر کرائم ونگ میں شکایت کریں۔", "imagePrompt": "a shield with a checkmark protecting a bank card and a smartphone, a helping hand reaching out, safety and support" }
+  ]
+}

@@ -231,6 +231,9 @@ export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Pr
   return gap >= minIntervalMs ? 0 : minIntervalMs - gap + Math.floor(Math.random() * 90_000)
 }
 
+/** Redis key of a story's Urdu headline, read by the video service */
+export const storyUrKey = (articleId: string) => `story:ur:${articleId}`
+
 export async function processPublishJob(
   data: {
     clusterId: string
@@ -242,7 +245,7 @@ export async function processPublishJob(
     triage?: TriageResult
     articleId?: string
   },
-  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; gate?: { redis: Redis } },
+  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; gate?: { redis: Redis }; redis?: Redis },
 ): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
@@ -363,6 +366,11 @@ export async function processPublishJob(
 
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })
   logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId) }, 'published')
+
+  // The Urdu headline the writer made for the social card is the voice line of the voiced news video (the site stores no Urdu title)
+  const headlineUr = data.write.en.card?.headlineUr?.trim()
+  const kv = deps.redis ?? deps.gate?.redis
+  if (headlineUr && kv) await kv.set(storyUrKey(String(res.id)), JSON.stringify({ headlineUr }), 'EX', 7 * 86400).catch(() => undefined)
 
   const platforms = ['facebook', 'instagram', 'x'] as const
   // Social copy may not change a figure (ZAV-120): hold a platform's post when it states a number the article does not

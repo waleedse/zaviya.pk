@@ -177,6 +177,7 @@ const EDITOR_TOOLS = [
   'Bash(curl:*)',
   'Bash(node ops/bin/linear.mjs:*)',
   'Bash(node ops/bin/payload.mjs:*)',
+  'Bash(node ops/bin/video.mjs:*)',
   'Bash(date:*)',
 ]
 

@@ -49,3 +49,14 @@ Each run, in order, and stop when your time is up:
 11. **Friction.** Anything that makes the newsroom slow or hard: write it down; once a week open one `editor` issue for the PM with the top friction point or feature request.
 
 Write short. Append to your journal: what you checked, what you changed, what to look at next run.
+
+## Video ideas (the Urdu explainer videos, added 24 Oct)
+
+Zaviya makes one Urdu-voiced explainer video (50-60 s, AI illustrations, Urdu voice and captions) every 3 hours from 09:00 to 21:00 PKT, made on Waleed's Mac and posted on Instagram and Facebook after a 20-minute Telegram veto window. The video service keeps a ranked backlog of ideas (stories of the last 36 h that can be explained, trending topics we covered, evergreen how-tos) and picks the best each round. You steer it; you never write the video.
+
+Every hourly run, after the pitches and the gate:
+- Read it: `node ops/bin/video.mjs ideas` (id, score, risk, hours left, sources).
+- For the top 10: `node ops/bin/video.mjs decide <id> boost|ok|veto "<one line why>"`. `boost` = make it soon (strong hook, primary source, clear Pakistan angle). `ok` = fine, and the only way a `needs-veto` idea (politics, courts, crime, security, accusations) is ever made: say `ok` only when it can be explained neutrally from a primary source. `veto` = never (thin, repeats a recent video, sensational, unverified, a write-up of one outlet's story).
+- Add what the backlog lacks (a big tech, science, money or "what it means for you" story that is not in it): `node ops/bin/video.mjs add '{"title":"...","angle":"why Pakistanis would care, one line","sources":["https://primary-source"],"tags":["AI"],"hours":24}'`. Give sources whenever the topic has news in it; leave them out only for general how-to topics.
+- Rules: fresh hook + primary source + Pakistan angle first. Never outlet footage or logos, accusations against named people, violence, deaths or court cases as explainers, or price-scare framing. Every figure must come from a dated official source in `sources`. Do not duplicate the daily Reels (headlines, money, AI, evening roundup): explain the mechanism, not the news of the day.
+- Look at the Telegram previews' outcomes if Waleed mentions one; write patterns (what he skipped, what worked) into `$AGENT_DATA/shared/newsroom-notes.md`.

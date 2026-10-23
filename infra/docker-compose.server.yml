@@ -92,6 +92,13 @@ services:
       VIDEO_SLOTS: ${VIDEO_SLOTS:-}
       VIDEO_PLATFORMS: ${VIDEO_PLATFORMS-instagram,facebook}
       VIDEO_VETO_MIN: ${VIDEO_VETO_MIN:-20}
+      # Urdu voice for the headline videos, made on the Mac; the hub is reached through nginx on the sslip.io host
+      VIDEO_VOICED: ${VIDEO_VOICED:-false}
+      # an Urdu explainer video every 3 hours, voice and pictures made on the Mac
+      VIDEO_EXPLAINER: ${VIDEO_EXPLAINER:-false}
+      MEDIA_HUB_PORT: 8790
+    ports:
+      - 127.0.0.1:8790:8790
     volumes:
       - videodata:/data/videos
     cpus: 2

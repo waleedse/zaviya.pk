@@ -13,10 +13,12 @@ import {
   type ApiArticle,
   type ApiDataPoint,
   type Captions,
+  type NarratedTimeline,
   type Platform,
   type Timeline,
 } from './lib.js'
 import { editionKey, hhmm, karachiDate, postAtMs, type Slot } from './schedule.js'
+import type { NarrateArgs, NarrateResult } from './narrate-news.js'
 import type { VideoTelegram } from './telegram.js'
 
 export interface RedisLike {
@@ -34,6 +36,9 @@ export interface JobDeps {
   /** downloads a hero image (or makes a category gradient) and returns its file name inside `dir` */
   prepareImage(url: string | undefined, dir: string, id: number, color: string): Promise<string>
   render(args: { timeline: Timeline; outDir: string; imagesDir: string }): Promise<{ mp4: string; cover: string; durationMs: number }>
+  /** voiced news: an Urdu voice for the headlines, or null when it cannot be made (the silent video is rendered then) */
+  narrate?(args: NarrateArgs): Promise<NarrateResult | null>
+  renderNarrated?(args: { timeline: NarratedTimeline; outDir: string; assetsDir: string }): Promise<{ mp4: string; cover: string; durationMs: number }>
   telegram: VideoTelegram
   postReel(platform: VideoPlatform, input: { file: string; text: string; title?: string }): Promise<ReelResult>
   sleep(ms: number): Promise<void>
@@ -152,7 +157,22 @@ export async function runEdition(deps: JobDeps, slot: Slot, opts: RunOptions = {
     const lead = timeline.scenes.find((s) => s.kind === 'story')
     leadId = lead?.kind === 'story' ? lead.storyId : input.stories[0]?.id
 
-    const r = await deps.render({ timeline, outDir: dir, imagesDir })
+    // voiced when the Mac agent can make the voice; otherwise (or if anything goes wrong) the silent video as before
+    let voiced: NarrateResult | null = null
+    if (deps.narrate && deps.renderNarrated && (slot.format === 'headlines30' || slot.format === 'roundup60')) {
+      voiced = await deps.narrate({ stories: input.stories, timeline, imagesDir, outDir: dir, edition: slot.edition }).catch((e: unknown) => {
+        log.warn({ err: String(e) }, 'voiced news failed: making the silent video')
+        return null
+      })
+    }
+    let r: { mp4: string; cover: string; durationMs: number } | undefined
+    if (voiced && deps.renderNarrated) {
+      r = await deps.renderNarrated({ timeline: voiced.timeline, outDir: dir, assetsDir: voiced.assetsDir }).catch((e: unknown) => {
+        log.warn({ err: String(e) }, 'voiced render failed: making the silent video')
+        return undefined
+      })
+    }
+    r ??= await deps.render({ timeline, outDir: dir, imagesDir })
     mp4 = r.mp4
     renderMs = r.durationMs
 

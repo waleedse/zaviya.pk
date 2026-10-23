@@ -52,7 +52,7 @@ function setup(over: Partial<JobDeps> = {}, cfgOver: Partial<VideoConfig> = {}) 
   const upserts: Record<string, unknown>[] = []
   const posts: string[] = []
   const deps: JobDeps = {
-    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, trendReel: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, ...cfgOver },
+    cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, trendReel: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, voiced: false, explainer: false, mediaHubPort: 8790, ...cfgOver },
     redis,
     payload: { upsertSocialPost: vi.fn(async (b) => void upserts.push(b)) },
     fetchArticles: vi.fn(async () => Array.from({ length: 8 }, (_, i) => article(i))),
@@ -192,6 +192,38 @@ describe('runEdition', () => {
       const ids = tl.scenes.filter((s: { kind: string }) => s.kind === 'story').map((s: { storyId: number }) => s.storyId)
       expect(ids.slice(0, 3)).not.toContain(100)
     }
+  })
+})
+
+describe('voiced news', () => {
+  const voicedResult = { timeline: { kind: 'narrated', totalFrames: 100 } as never, assetsDir: '/tmp/assets' }
+
+  it('renders the voiced video when the voice could be made', async () => {
+    const renderNarrated = vi.fn(async ({ outDir }: { outDir: string }) => {
+      const mp4 = path.join(outDir, 'video.mp4')
+      writeFileSync(mp4, 'v')
+      return { mp4, cover: path.join(outDir, 'cover.png'), durationMs: 5 }
+    })
+    const { deps } = setup({ narrate: vi.fn(async () => voicedResult), renderNarrated })
+    const out = await runEdition(deps, morning!, { dry: true })
+    expect(out.status).toBe('dry')
+    expect(renderNarrated).toHaveBeenCalledTimes(1)
+    expect(deps.render).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the silent video when the voice is not available, or breaks', async () => {
+    const a = setup({ narrate: vi.fn(async () => null), renderNarrated: vi.fn() })
+    expect((await runEdition(a.deps, morning!, { dry: true })).status).toBe('dry')
+    expect(a.deps.render).toHaveBeenCalledTimes(1)
+    expect(a.deps.renderNarrated).not.toHaveBeenCalled()
+
+    const b = setup({ narrate: vi.fn(async () => voicedResult), renderNarrated: vi.fn(async () => { throw new Error('chrome crashed') }) })
+    expect((await runEdition(b.deps, morning!, { dry: true })).status).toBe('dry')
+    expect(b.deps.render).toHaveBeenCalledTimes(1)
+
+    const c = setup({ narrate: vi.fn(async () => { throw new Error('hub down') }), renderNarrated: vi.fn() })
+    expect((await runEdition(c.deps, morning!, { dry: true })).status).toBe('dry')
+    expect(c.deps.render).toHaveBeenCalledTimes(1)
   })
 })
 

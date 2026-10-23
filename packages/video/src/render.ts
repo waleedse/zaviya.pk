@@ -7,6 +7,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { FPS } from './constants'
 import { checkVideo, QaError, type QaResult } from './qa'
+import type { NarratedTimeline } from './narrated'
 import type { Timeline } from './types'
 
 export { QaError } from './qa'
@@ -106,4 +107,71 @@ export async function makeGradientImage(color: string, file: string): Promise<vo
 <pattern id="p" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#fff" stroke-opacity="0.08" stroke-width="2"/></pattern></defs>
 <rect width="1600" height="900" fill="url(#g)"/><rect width="1600" height="900" fill="url(#p)"/></svg>`
   await sharp(Buffer.from(svg)).jpeg({ quality: 88 }).toFile(file)
+}
+
+// ---- narrated videos (explainers, voiced news) -------------------------------------------------
+
+export interface RenderNarratedOptions {
+  timeline: NarratedTimeline
+  outDir: string
+  bundleDir: string
+  /** folder with the voice WAV and the pictures named in the timeline; copied into the bundle's public/narrated for the render */
+  assetsDir: string
+  concurrency?: number
+  browserExecutable?: string | null
+  onProgress?: (progress: number) => void
+}
+
+/** The server and the Mac can be busy with other jobs while a render starts: give the browser two minutes, not Remotion's 28 seconds */
+const SLOW_MS = 120_000
+
+export async function renderNarrated(o: RenderNarratedOptions): Promise<RenderEditionResult> {
+  const started = Date.now()
+  mkdirSync(o.outDir, { recursive: true })
+  if (!existsSync(path.join(o.bundleDir, 'index.html'))) throw new Error(`no bundle at ${o.bundleDir}: run pnpm --filter @zaviya/video bundle`)
+  const publicDir = path.join(o.bundleDir, 'public', 'narrated')
+  mkdirSync(publicDir, { recursive: true })
+  const copied: string[] = []
+  for (const f of readdirSync(o.assetsDir)) {
+    cpSync(path.join(o.assetsDir, f), path.join(publicDir, f))
+    copied.push(path.join(publicDir, f))
+  }
+  const inputProps = { timeline: o.timeline }
+  const mp4 = path.join(o.outDir, 'video.mp4')
+  const cover = path.join(o.outDir, 'cover.png')
+  const browserExecutable = o.browserExecutable ?? null
+  try {
+    const comp = await selectComposition({ serveUrl: o.bundleDir, id: 'Narrated', inputProps, browserExecutable, timeoutInMilliseconds: SLOW_MS })
+    if (comp.durationInFrames !== o.timeline.totalFrames) throw new Error('composition duration does not match the timeline')
+    let last = -1
+    await renderMedia({
+      composition: comp,
+      serveUrl: o.bundleDir,
+      browserExecutable,
+      codec: 'h264',
+      pixelFormat: 'yuv420p',
+      // PNG frames: with JPEG frames ffmpeg ends up with full-range yuvj420p, which the QA gate (and some platforms) refuse
+      imageFormat: 'png',
+      audioCodec: 'aac',
+      crf: 20,
+      concurrency: o.concurrency ?? 2,
+      timeoutInMilliseconds: SLOW_MS,
+      inputProps,
+      outputLocation: mp4,
+      onProgress: ({ progress }) => {
+        const pct = Math.floor(progress * 10)
+        if (pct !== last) {
+          last = pct
+          o.onProgress?.(progress)
+        }
+      },
+    })
+    const first = o.timeline.beats[0]!
+    await renderStill({ composition: comp, serveUrl: o.bundleDir, output: cover, inputProps, timeoutInMilliseconds: SLOW_MS, frame: Math.min(first.from + 40, o.timeline.totalFrames - 1), imageFormat: 'png', browserExecutable })
+  } finally {
+    for (const f of copied) rmSync(f, { force: true })
+  }
+  const qa = await checkVideo(mp4, o.timeline.totalFrames / FPS)
+  if (!qa.pass) throw new QaError(qa, mp4)
+  return { mp4, cover, durationMs: Date.now() - started, qa }
 }

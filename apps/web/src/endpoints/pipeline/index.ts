@@ -684,7 +684,7 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
-    // ZAV-115: what already went out today, so the social worker can hold to settings.dailyCaps.
+    // ZAV-115: what already went out today, so the social worker can hold to settings.dailyCaps (article posts; reels are counted separately).
     // Counts posted rows, rows in flight, and "failed" rows that carry an external id (they are live, ZAV-114).
     path: '/pipeline/social-count',
     method: 'get',
@@ -703,6 +703,8 @@ const pipelineEndpoints: Endpoint[] = [
             and: [
               { platform: { equals: platform } },
               { createdAt: { greater_than_equal: since.toISOString() } },
+              // Reels (daily and explainer videos) have their own schedule; the article-post cap counts article posts only
+              { format: { not_equals: 'reel' } },
               {
                 or: [
                   { status: { in: ['posted', 'posting'] } },
