@@ -4,10 +4,8 @@ import { logger } from '../logger.js'
 
 /**
  * Social post cards (1080x1350): the story's hero photo full-bleed, the headline in English and Urdu on top.
- * Rendered in headless Chromium because Satori cannot shape Nastaliq. Three looks:
- *   bilingual - everyday stories (Urdu headline above, English below)
- *   figure    - stories that turn on one number
- *   ticker    - breaking news
+ * Rendered in headless Chromium because Satori cannot shape Nastaliq. One look for every story (breaking adds a red tag,
+ * a number from the writer becomes the boxed word); the template names stay for callers that still pick one.
  */
 export type PostCardTemplate = 'bilingual' | 'figure' | 'ticker'
 
@@ -77,52 +75,14 @@ function categoryLabel(slug: string): string {
   return CATEGORIES.find((c) => c.slug === slug)?.en ?? slug
 }
 
-export function postCardHtml(input: PostCardInput, template = chooseTemplate(input)): string {
+export function postCardHtml(input: PostCardInput, _template = chooseTemplate(input)): string {
   const photo = input.photo ? `<img class="bg" src="${input.photo}" alt="">` : ''
   const time = escapeHtml(input.time ?? '')
   const cat = escapeHtml(categoryLabel(input.category).toUpperCase())
-  const size = headlineSize(input.title, template)
-
-  if (template === 'ticker') {
-    const red = '#E5231B'
-    return page(
-      `${photo}
-<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,0) 28%,${red}E0 72%,${red} 100%)"></div>
-<div class="mono" style="position:absolute;top:56px;left:56px;display:flex;align-items:center;gap:14px;font-size:24px">
-  <div style="width:18px;height:18px;border-radius:18px;background:${red};box-shadow:0 0 0 6px rgba(255,255,255,.35)"></div>
-  <div style="background:#fff;color:#111;padding:6px 14px">BREAKING${time ? ` · ${time}` : ''}</div>
-</div>
-${input.headlineUr ? `<div class="ur" style="position:absolute;left:56px;right:56px;top:140px;font-size:56px;line-height:1.9;text-shadow:0 2px 18px rgba(0,0,0,.5)">${markHighlight(input.headlineUr, input.highlightUr, 'hl-dark')}</div>` : ''}
-<div class="en" style="position:absolute;left:56px;right:56px;bottom:200px;font-size:${size}px">${markHighlight(input.title, input.highlight, 'hl-dark')}</div>
-<div class="mono" style="position:absolute;left:0;bottom:96px;width:1080px;height:76px;background:#111;display:flex;align-items:center;gap:28px;white-space:nowrap;overflow:hidden;font-size:26px">
-  <div style="height:76px;display:flex;align-items:center;padding:0 22px;background:${red}">ZAVIYA</div>
-  <div>BREAKING ● ${cat} ● BREAKING ● ${cat} ● BREAKING ●</div>
-</div>
-<div class="mono" style="position:absolute;left:56px;right:56px;bottom:36px;display:flex;justify-content:space-between;font-size:20px"><div>∠ ZAVIYA</div><div>LIVE UPDATES → ZAVIYA.PK</div></div>`,
-      `.hl-dark{font-style:italic;color:#FFE14D}`,
-    )
-  }
-
-  if (template === 'figure' && input.figure) {
-    const lime = '#C6FF3D'
-    const fig = escapeHtml(input.figure.value)
-    const figSize = Math.min(330, Math.floor(1000 / (fig.length * 0.9)))
-    return page(
-      `${photo}
-<div style="position:absolute;inset:0;background:linear-gradient(200deg,rgba(0,0,0,.05) 15%,rgba(0,0,0,.88) 72%)"></div>
-<div class="mono" style="position:absolute;top:56px;left:56px;right:56px;display:flex;justify-content:space-between;align-items:center;font-size:22px">
-  <div style="background:${lime};color:#111;padding:6px 14px">ZAVIYA / NUMBERS</div><div>${cat}</div>
-</div>
-<div style="position:absolute;top:250px;left:44px;right:44px;font-family:'Unbounded',sans-serif;font-weight:900;font-size:${figSize}px;line-height:.9;letter-spacing:-0.04em;white-space:nowrap;-webkit-text-stroke:3px #fff;color:transparent">${fig}</div>
-<div class="mono" style="position:absolute;top:${250 + figSize * 0.95 + 24}px;left:56px;right:56px;font-size:26px;color:${lime}">↳ ${escapeHtml(input.figure.label.toUpperCase())}</div>
-<div style="position:absolute;left:56px;right:56px;bottom:56px;display:flex;flex-direction:column;gap:30px">
-  ${input.headlineUr ? `<div class="ur" style="font-size:46px;line-height:1.9">${escapeHtml(input.headlineUr)}</div>` : ''}
-  <div class="en" style="font-size:${size}px">${markHighlight(input.title, input.highlight)}</div>
-  <div class="mono" style="display:flex;justify-content:space-between;border-top:3px solid ${lime};padding-top:20px;font-size:22px"><div>∠ AAP PAR ASAR INSIDE</div><div>ZAVIYA.PK</div></div>
-</div>`,
-      `.hl{font-style:italic;color:${lime}}`,
-    )
-  }
+  // One look for every story (22 Oct: the NUMBERS and ticker looks were still going out and read as the old design)
+  const size = headlineSize(input.title, 'bilingual')
+  const figure = input.figure?.value && input.title.toLowerCase().includes(input.figure.value.toLowerCase()) ? input.figure.value : null
+  const highlight = input.highlight || figure
 
   // bilingual: the feed look that works for news pages: photo, logo top-left, centred bold headline, key words boxed
   const y = BRAND_YELLOW
@@ -133,8 +93,9 @@ ${input.headlineUr ? `<div class="ur" style="position:absolute;left:56px;right:5
   <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
   <div class="mono" style="font-size:20px;background:rgba(0,0,0,.45);padding:8px 16px;border-radius:6px">${cat}${time ? ` · ${time}` : ''}</div>
 </div>
+${input.breaking ? `<div class="mono" style="position:absolute;top:140px;left:60px;display:flex;align-items:center;gap:12px;font-size:26px;background:#E5231B;padding:10px 20px;border-radius:6px"><div style="width:16px;height:16px;border-radius:16px;background:#fff"></div>BREAKING</div>` : ''}
 <div style="position:absolute;left:56px;right:56px;bottom:64px;display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center">
-  <div class="en" style="font-size:${size}px;font-weight:800;line-height:1.14;letter-spacing:-0.025em;text-shadow:0 2px 24px rgba(0,0,0,.55)">${markHighlight(input.title, input.highlight)}</div>
+  <div class="en" style="font-size:${size}px;font-weight:800;line-height:1.14;letter-spacing:-0.025em;text-shadow:0 2px 24px rgba(0,0,0,.55)">${markHighlight(input.title, highlight)}</div>
   <div style="width:150px;height:6px;background:${y}"></div>
   ${input.headlineUr ? `<div class="ur" style="font-size:50px;line-height:1.8;text-align:center;color:rgba(255,255,255,.95)">${markHighlight(input.headlineUr, input.highlightUr, 'hl-ur')}</div>` : ''}
   <div class="mono" style="font-size:20px;color:rgba(255,255,255,.75)">POORI KHABAR → ZAVIYA.PK</div>
