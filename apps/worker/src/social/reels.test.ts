@@ -47,6 +47,13 @@ describe('postInstagramReel (ZAV-180)', () => {
     expect(r.calls.some((c) => c.endsWith('/media_publish'))).toBe(false)
   })
 
+  it('sends the file again to the same address when the first upload fails and the container is still waiting', async () => {
+    let uploads = 0
+    const r = run([{ status_code: 'IN_PROGRESS' }, { status_code: 'FINISHED' }], () => (++uploads === 1 ? new Response(UPLOAD_400, { status: 400 }) : json({ success: true })))
+    expect(await r.result).toEqual({ ok: true, id: 'M1' })
+    expect(uploads).toBe(2)
+  })
+
   it('keeps a plain 200 upload working', async () => {
     const r = run([{ status_code: 'FINISHED' }], () => json({ success: true }))
     expect(await r.result).toEqual({ ok: true, id: 'M1' })
