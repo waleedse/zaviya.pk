@@ -80,6 +80,9 @@ const envSchema = z.object({
   IMAGE_SOURCE: z.enum(['flux', 'extension', 'zimage']).catch('flux').default('flux'),
   /** fal.ai key for Z-Image Turbo (IMAGE_SOURCE=zimage): fast, about half a cent a picture */
   FAL_KEY: optionalStr,
+  /** The video service's media hub: the explainer pictures are claimed from it (needs MEDIA_AGENT_TOKEN, the same token the Mac agent uses) */
+  MEDIA_AGENT_TOKEN: optionalStr,
+  VIDEO_HUB_URL: z.string().default('http://video:8790'),
   /** Cloudflare Workers AI (FLUX) for hero images: account id (same as R2) + API token */
   CLOUDFLARE_ACCOUNT_ID: optionalStr,
   CLOUDFLARE_AI_TOKEN: optionalStr,

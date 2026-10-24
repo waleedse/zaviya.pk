@@ -28,7 +28,7 @@ function drift(kind: number, p: number): { scale: number; x: number; y: number }
   }
 }
 
-const BeatLayer: React.FC<{ beat: NarratedBeat; seqFrom: number; accent: string }> = ({ beat, seqFrom, accent }) => {
+const BeatLayer: React.FC<{ beat: NarratedBeat; seqFrom: number; accent: string; layout: 'card' | 'full' }> = ({ beat, seqFrom, accent, layout }) => {
   const local = useCurrentFrame()
   const abs = local + seqFrom
   const fadeIn = interpolate(local, [0, FADE], [0, 1], { ...clamp, easing: Easing.out(Easing.quad) })
@@ -36,6 +36,43 @@ const BeatLayer: React.FC<{ beat: NarratedBeat; seqFrom: number; accent: string 
   const d = drift(beat.drift, p)
   const chunk = [...beat.chunks].reverse().find((c) => c.from <= abs) ?? beat.chunks[0]
   const pop = chunk ? spring({ frame: abs - chunk.from, fps: FPS, config: { damping: 16, stiffness: 190, mass: 0.6 } }) : 1
+
+  if (layout === 'full') {
+    // a vertical photograph filling the screen, drifting slowly, with the words on a dark fade at the bottom
+    const fd = { scale: 1.08 + 0.14 * p, x: beat.drift % 2 === 0 ? -2 + 4 * p : 2 - 4 * p, y: beat.drift < 2 ? 1.5 - 3 * p : -1.5 + 3 * p }
+    return (
+      <AbsoluteFill style={{ opacity: fadeIn, background: '#05080f' }}>
+        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${fd.x}%, ${fd.y}%) scale(${fd.scale})`, filter: 'saturate(1.08) contrast(1.04)' }} />
+        <AbsoluteFill style={{ background: 'linear-gradient(180deg, rgba(3,6,12,0.62) 0%, rgba(3,6,12,0) 20%, rgba(3,6,12,0) 42%, rgba(3,6,12,0.72) 66%, rgba(3,6,12,0.95) 100%)' }} />
+        {beat.credit ? (
+          <div style={{ position: 'absolute', right: SAFE.right, top: 150, padding: '6px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', color: 'rgba(255,255,255,0.85)', fontFamily: FONT.mono, fontSize: 22, letterSpacing: 1 }}>{beat.credit}</div>
+        ) : null}
+        {beat.kicker ? (
+          <div style={{ position: 'absolute', left: SAFE.left, right: SAFE.right, top: 1262, textAlign: 'center', direction: 'rtl' }}>
+            <span style={{ display: 'inline-block', padding: '2px 28px 8px', borderRadius: 14, background: accent, color: '#0B1630', fontFamily: FONT.urdu, fontSize: 40, lineHeight: 1.9 }}>{beat.kicker}</span>
+          </div>
+        ) : null}
+        {chunk ? (
+          <div style={{ position: 'absolute', left: SAFE.left, right: SAFE.right, top: beat.kicker ? 1368 : 1330, height: 330, display: 'flex', alignItems: 'center', justifyContent: 'center', direction: 'rtl' }}>
+            <div
+              style={{
+                fontFamily: FONT.urdu,
+                fontSize: 92,
+                lineHeight: 1.9,
+                color: '#fff',
+                textAlign: 'center',
+                textShadow: '0 4px 30px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7)',
+                opacity: interpolate(pop, [0, 1], [0.2, 1]),
+                transform: `translateY(${interpolate(pop, [0, 1], [22, 0])}px) scale(${interpolate(pop, [0, 1], [0.94, 1])})`,
+              }}
+            >
+              {chunk.text}
+            </div>
+          </div>
+        ) : null}
+      </AbsoluteFill>
+    )
+  }
 
   return (
     <AbsoluteFill style={{ opacity: fadeIn }}>
@@ -104,7 +141,7 @@ export const Narrated: React.FC<{ timeline: NarratedTimeline }> = ({ timeline })
             const dur = b.from + b.durationInFrames - from + (i < timeline.beats.length - 1 ? FADE : 12)
             return (
               <Sequence key={i} from={from} durationInFrames={dur}>
-                <BeatLayer beat={b} seqFrom={from} accent={theme.accent} />
+                <BeatLayer beat={b} seqFrom={from} accent={theme.accent} layout={timeline.layout ?? 'card'} />
               </Sequence>
             )
           })}

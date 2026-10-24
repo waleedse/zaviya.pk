@@ -27,6 +27,10 @@ interface Opts {
   clusterId: string
   scene?: string | null
   fetchImpl?: typeof fetch
+  /** use this prompt as it is (no news-photo wrapper) and this size (default 1280x720) */
+  rawPrompt?: string
+  width?: number
+  height?: number
 }
 
 async function run(model: string, prompt: string, opts: Opts & { accountId: string; token: string }): Promise<string | null> {
@@ -38,8 +42,8 @@ async function run(model: string, prompt: string, opts: Opts & { accountId: stri
     // FLUX.2 takes multipart input
     const form = new FormData()
     form.append('prompt', prompt)
-    form.append('width', '1280')
-    form.append('height', '720')
+    form.append('width', String(opts.width ?? 1280))
+    form.append('height', String(opts.height ?? 720))
     body = form
   } else {
     body = JSON.stringify({ prompt, steps: 8 })
@@ -58,7 +62,7 @@ async function run(model: string, prompt: string, opts: Opts & { accountId: stri
 export async function generateHeroViaWorkersAI(brief: string, opts: Opts): Promise<Blob | null> {
   if (!opts.accountId || !opts.token) return null
   const creds = { ...opts, accountId: opts.accountId, token: opts.token }
-  const prompt = fluxPrompt(brief, opts.scene)
+  const prompt = opts.rawPrompt ?? fluxPrompt(brief, opts.scene)
   for (const model of [PRIMARY, FALLBACK]) {
     try {
       const b64 = await run(model, prompt, creds)

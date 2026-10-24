@@ -8,7 +8,7 @@ import type { ThemeName } from './types'
 
 export const NARRATED_LEAD_IN_FRAMES = 12
 export const NARRATED_END_FRAMES = 66
-export const NARRATED_MAX_SECONDS = 90
+export const NARRATED_MAX_SECONDS = 150
 /** the silence the voice adds after each sentence; captions end before it */
 export const SENTENCE_GAP_MS = 280
 
@@ -37,6 +37,8 @@ export interface NarratedInput {
   /** background music under audio/ (served by staticFile), kept very low under the voice */
   music?: string
   theme?: ThemeName
+  /** card: a rounded picture on a blurred copy of itself (16:9 and square pictures); full: a vertical picture filling the screen */
+  layout?: 'card' | 'full'
   /** the line on the end card */
   cta: string
   site?: string
@@ -64,6 +66,7 @@ export interface NarratedTimeline {
   title: string
   titleUr: string
   theme: ThemeName
+  layout: 'card' | 'full'
   beats: NarratedBeat[]
   audio: string
   music?: string
@@ -117,6 +120,7 @@ export function composeNarrated(input: NarratedInput): NarratedTimeline {
     title: input.title,
     titleUr: input.titleUr,
     theme: input.theme ?? 'tech',
+    layout: input.layout ?? 'card',
     beats,
     audio: input.audio,
     music: input.music,

@@ -48,7 +48,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean;
   const upserts: Record<string, unknown>[] = []
   if (opts.agentOnline !== false) void hub.markAgentSeen()
   agent = setInterval(async () => {
-    const job = await hub.claim(['tts', 'image'], 'test')
+    const job = await hub.claim(['tts', 'image', 'gemini'], 'test')
     if (!job) return
     claimed.push({ kind: job.kind, payload: job.payload })
     if (job.kind === 'tts') await hub.complete(job.id, Buffer.from('RIFF'), 'audio/wav', { sentenceMs: (job.payload as { sentences: string[] }).sentences.map(() => 3000) })
@@ -103,13 +103,13 @@ describe('runExplainerRound', () => {
   })
 
   it('makes the video with the pictures that arrived when the Mac is slow, and fails with too few', async () => {
-    const some = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 2 })
+    const some = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 3 })
     await some.store.put(evergreen)
     expect((await runExplainerRound(some.deps, { dry: true, ideaId: 'scam1' })).status).toBe('dry')
     expect(some.deps.renderNarrated).toHaveBeenCalledTimes(1)
     clearInterval(agent)
 
-    const few = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 1 })
+    const few = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 2 })
     await few.store.put(evergreen)
     const out = await runExplainerRound(few.deps, { dry: true, ideaId: 'scam1' })
     expect(out.status).toBe('assets-failed')
@@ -197,15 +197,10 @@ describe('runExplainerRound', () => {
 })
 
 describe('imagePlan', () => {
-  it('makes fewer pictures than beats and gives every beat one', () => {
-    expect(imagePlan(6).count).toBe(4)
-    expect(imagePlan(5).count).toBe(4)
-    expect(imagePlan(7).count).toBe(5)
-    expect(imagePlan(3).count).toBe(3)
-    const p = imagePlan(6)
-    const used = Array.from({ length: 6 }, (_, i) => p.groupOf(i))
-    expect(used).toEqual([0, 0, 1, 2, 2, 3])
-    expect(new Set(used).size).toBe(p.count)
+  it('makes one picture per beat', () => {
+    const p = imagePlan(9)
+    expect(p.count).toBe(9)
+    expect(Array.from({ length: 9 }, (_, i) => p.groupOf(i))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8])
   })
 })
 

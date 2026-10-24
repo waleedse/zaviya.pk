@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import path from 'node:path'
 import { logger } from '../logger.js'
 
-export type MediaKind = 'tts' | 'image'
+export type MediaKind = 'tts' | 'image' | 'gemini'
 
 export interface TtsPayload {
   /** Sentences already spelled out by toSpeechText (Urdu letters only) */
@@ -32,10 +32,18 @@ export interface ImagePayload {
   steps?: number
 }
 
+/** A photorealistic vertical picture made by the main worker (Gemini through the Mac extension, FLUX as the fallback) */
+export interface GeminiPayload {
+  /** the scene, written as a photograph; the worker adds the style and the safety lines */
+  prompt: string
+  width?: number
+  height?: number
+}
+
 export interface MediaJob {
   id: string
   kind: MediaKind
-  payload: TtsPayload | ImagePayload
+  payload: TtsPayload | ImagePayload | GeminiPayload
   status: 'queued' | 'leased' | 'done' | 'failed'
   attempts: number
   createdAt: number
@@ -57,7 +65,8 @@ export interface HubStore {
   all(list: string): Promise<string[]>
 }
 
-export const LEASE_MS: Record<MediaKind, number> = { tts: 10 * 60_000, image: 25 * 60_000 }
+export const LEASE_MS: Record<MediaKind, number> = { tts: 10 * 60_000, image: 25 * 60_000, gemini: 12 * 60_000 }
+const KINDS: MediaKind[] = ['tts', 'image', 'gemini']
 const MAX_ATTEMPTS = 3
 const JOB_TTL_S = 3 * 24 * 3600
 
@@ -78,7 +87,7 @@ export class MediaHub {
     return raw ? (JSON.parse(raw) as MediaJob) : null
   }
 
-  async enqueue(kind: MediaKind, payload: TtsPayload | ImagePayload, id: string = randomUUID()): Promise<string> {
+  async enqueue(kind: MediaKind, payload: TtsPayload | ImagePayload | GeminiPayload, id: string = randomUUID()): Promise<string> {
     if (await this.get(id)) return id
     await this.save({ id, kind, payload, status: 'queued', attempts: 0, createdAt: this.now() })
     await this.store.push(this.list(kind), id)
@@ -87,7 +96,7 @@ export class MediaHub {
 
   /** Puts jobs whose lease ran out back in the queue (or fails them after three tries). */
   async reapExpired(): Promise<void> {
-    for (const kind of ['tts', 'image'] as const) {
+    for (const kind of KINDS) {
       for (const id of await this.store.all(`media:leased:${kind}`)) {
         const job = await this.get(id)
         if (!job || job.status !== 'leased') {
@@ -247,7 +256,7 @@ export function startMediaHubServer(hub: MediaHub, opts: { port: number; token: 
 
       if (req.method === 'POST' && url.pathname === '/claim') {
         const body = JSON.parse((await readBody(req, 64 * 1024)).toString() || '{}') as { agent?: string; kinds?: MediaKind[]; waitSec?: number }
-        const kinds = (body.kinds ?? ['tts', 'image']).filter((k): k is MediaKind => k === 'tts' || k === 'image')
+        const kinds = (body.kinds ?? ['tts', 'image']).filter((k): k is MediaKind => k === 'tts' || k === 'image' || k === 'gemini')
         const until = Date.now() + Math.min(Math.max(body.waitSec ?? 20, 0), 30) * 1000
         for (;;) {
           const job = await hub.claim(kinds, body.agent ?? 'agent')

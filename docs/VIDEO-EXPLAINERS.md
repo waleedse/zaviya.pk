@@ -167,3 +167,11 @@ Known limits: the Mac must be on (sleep stops the agent; headless Chrome renders
 - **A release restarts the video container**: a round in flight at that moment is retried by BullMQ with its pictures kept (job ids are stable per idea and attempt).
 - **Dry runs**: `video.mjs run --dry --now` queues behind other rounds (one worker); it makes everything and previews, but never posts.
 - Local Remotion renders on the owner's Mac need `chrome-wrapper.sh`; the Mac agent must be awake (a closed lid stops it: voiced videos fall back to silent, explainer rounds are skipped with one notice a day in the logs).
+
+### v2 (24 Oct, afternoon): what Waleed asked for after the first videos
+
+- **Topics**: famous and trending things only (technology, AI, space and science, how things work, companies and products, cricket, health, daily-life money, viral stories). **Government and public administration are never made**: `isGovernment()` in `explainer/ideas.ts` refuses ministers, budgets, taxes, policies, laws, courts, regulators, the IMF, public jobs and the like, at discovery, in the ranking (an editor boost does not lift it), when the editor adds an idea, and in the writer's prompt (risk "high" is thrown away). Evergreen topics were reworked toward popular science and technology.
+- **Research** is the editor's hourly job (it has WebSearch): trending topics with 2 to 4 readable source URLs, added with `video.mjs add`. The writer has no web access and uses only those pages.
+- **Longer**: 8 to 11 beats, 200 to 280 spoken words, about 90 to 120 seconds (limit 150 s).
+- **Pictures**: one realistic vertical photograph per beat from **Gemini** (Chrome extension on the Mac, the same route as the news hero images), FLUX portrait on Cloudflare Workers AI as the fallback (`explainer/gemini-images.ts`). The video service queues hub jobs of kind `gemini`; the main worker claims them over HTTP (`VIDEO_HUB_URL`, same token). Z-Image on the Mac is no longer used for explainers (the Mac agent only makes the voice).
+- **Design**: `layout: 'full'` in the narrated composition: the vertical photograph fills the screen with a slow drift, gradients top and bottom, a kicker chip and large Urdu captions, an "AI image" tag.

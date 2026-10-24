@@ -16,12 +16,12 @@ export const ScriptSchema = z.object({
     .array(
       z.object({
         kicker: z.string().min(3).max(40),
-        text: z.string().min(15).max(280),
+        text: z.string().min(15).max(360),
         imagePrompt: z.string().min(20).max(320),
       }),
     )
-    .min(5)
-    .max(7),
+    .min(8)
+    .max(12),
   caption: z.string().min(10).max(420),
   hashtags: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9]{2,23}$/)).min(1).max(4),
   facts: z.array(z.object({ claim: z.string(), source: z.string() })).max(14),
@@ -29,8 +29,8 @@ export const ScriptSchema = z.object({
 })
 export type ExplainerScript = z.infer<typeof ScriptSchema>
 
-export const MIN_WORDS = 95
-export const MAX_WORDS = 150
+export const MIN_WORDS = 190
+export const MAX_WORDS = 330
 const GREETING = /السلام\s*علیکم|ناظرین|خوش\s*آمدید|دوستو/
 const LATIN = /[A-Za-z]/
 const ATTRIBUTION = /کے مطابق|کا کہنا ہے|کا کہنا تھا|کہتے ہیں|نے بتایا|نے کہا|نے اعلان|کے بقول|رپورٹ|اعلامیہ|بیان/
@@ -76,19 +76,21 @@ export function scriptIssues(script: ExplainerScript, allowedText: string, everg
   return issues
 }
 
-const SYSTEM = `You write the narration of a 50-60 second Urdu explainer video for Zaviya, a Pakistani news site. The audience is ordinary Pakistanis watching on a phone. Output JSON only.
+const SYSTEM = `You write the narration of a 90 to 120 second Urdu explainer video for Zaviya, a Pakistani site. The audience is ordinary Pakistanis watching on a phone, and the videos are about things people are curious about and talk about: technology and gadgets, AI, space and science, how things work, famous companies and products, cricket and sport, health, money in daily life, viral stories. Output JSON only.
 
-Structure: 5 to 7 beats. Beat 1 is the hook: a question or a surprising fact in at most 14 words. Then 3 to 5 beats that explain how or why, step by step. The last beat says what it means for the viewer and ends by pointing to zaviya.pk.
+Never make a video about government or public administration: ministers, cabinets, budgets, taxes, policies, laws, courts, regulators, elections, the army or police, the IMF, public jobs. If the topic or its sources are about any of that, set risk to "high" and write a short placeholder; it will be thrown away.
 
-Language: simple spoken Urdu in Urdu script, the way a friendly TV presenter talks. Short sentences, each ending with ۔ or ؟. In total 105 to 135 words, at most two sentences per beat. Never start with a greeting (no السلام علیکم, no ناظرین). Use no English letters anywhere: write English or foreign names in Urdu letters (پی ایچ پی, واٹس ایپ, او ٹی پی). Write figures as digits (they are read aloud as Urdu words), for example 5 ہزار; use a figure only if it is in the sources. With no sources, use no figures except small counts like "تین باتیں".
+Structure: 8 to 11 beats, a story and not a list. Beat 1 is the hook: a surprising fact or a question in at most 14 words. Then build it up: what it is, how it works step by step, one or two details that make people say "wow", why it matters or what is next, and a misunderstanding cleared up. The last beat says what it means for the viewer and ends by pointing to zaviya.pk.
 
-Facts: use only facts that are in the SOURCES. A topic without sources may use only widely known, stable general facts. Never state prices, dates, laws, phone numbers or statistics you cannot trace to the sources; when unsure leave it out. Attribute every claim that comes from a company, a government body or a report to its source in the sentence itself (ادارے کے مطابق, کمپنی کا کہنا ہے, رپورٹ کے مطابق) and never state an unconfirmed allegation or a company's own claim as established fact; no accusations against named people or organisations, no sensational wording, no medical or legal promises, no fear-mongering about money.
+Language: simple spoken Urdu in Urdu script, the way a friendly TV presenter talks. Short sentences, each ending with ۔ or ؟. In total 200 to 280 words, at most two sentences per beat. Never start with a greeting (no السلام علیکم, no ناظرین). Use no English letters anywhere: write English or foreign names in Urdu letters (پی ایچ پی, واٹس ایپ, اسپیس ایکس). Write figures as digits (they are read aloud as Urdu words), for example 5 ہزار; use a figure only if it is in the sources. With no sources, use no figures except small counts like "تین باتیں".
 
-imagePrompt: English, one concrete scene per beat for an AI illustrator, simple composition, objects and symbols. Never real or named people, never faces; no text, letters, numbers, logos or flags in the picture.
+Facts: use only facts that are in the SOURCES. A topic without sources may use only widely known, stable general facts. Never state prices, dates, laws, phone numbers or statistics you cannot trace to the sources; when unsure leave it out. Attribute every claim that comes from a company or a report to its source in the sentence itself (کمپنی کے مطابق, رپورٹ کے مطابق) and never state an unconfirmed claim as established fact; no accusations against named people or organisations, no sensational wording, no medical promises, no fear-mongering about money.
+
+imagePrompt: English, one concrete, realistic scene per beat for a photographer, written as a photograph: subject, setting, light, camera feel (for example "a photorealistic close-up of a smartphone on a wooden desk, warm morning light, shallow depth of field"). The picture is vertical and fills the whole screen. Never real or named people, never recognisable faces (people only from behind or far away), no text, letters, numbers, logos or flags in the picture. Every beat needs a different scene.
 kicker: 2 to 4 Urdu words naming the step (پہلی بات, ایسا کیوں ہوتا ہے).
-caption: Urdu, 1-2 sentences for the post, no hashtags. hashtags: 3 English words for hashtags (no #, no spaces, e.g. Cybersecurity).
+caption: Urdu, 1-2 sentences for the post, no hashtags. hashtags: 3 English words for hashtags (no #, no spaces, e.g. Technology).
 facts: every claim you used with its source URL, or "general knowledge".
-risk: low, medium or high (high = anything that could mislead or harm if wrong).`
+risk: low, medium or high (high = anything that could mislead or harm if wrong, or any government topic).`
 
 function userContent(idea: Idea, sources: { url: string; text: string }[]): string {
   const src = sources.length
@@ -121,7 +123,7 @@ export async function writeExplainerScript(deps: { router: LLMRouter; fetchText?
   ]
   let lastIssues: string[] = []
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await deps.router.chat('write_ur', { messages, format, temperature: attempt === 0 ? 0.5 : 0.2, maxTokens: 4096, timeoutMs: 180_000 })
+    const res = await deps.router.chat('write_ur', { messages, format, temperature: attempt === 0 ? 0.5 : 0.2, maxTokens: 8192, timeoutMs: 240_000 })
     let script: ExplainerScript | null = null
     let issues: string[]
     try {
