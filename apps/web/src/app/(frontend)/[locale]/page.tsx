@@ -13,6 +13,7 @@ import { ScrollFeature } from '@/components/home/ScrollFeature'
 import { SectionHeader } from '@/components/home/SectionHeader'
 import { Slider } from '@/components/home/Slider'
 import { TOOLS } from '@/components/home/tools'
+import { NewsletterCTA } from '@/components/marketing/NewsletterCTA'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
 import { getCategoryFeed, getFrontPagePlan, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
@@ -391,6 +392,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       )}
       <div className="container-wide mt-14">
         <WhatsAppCTA locale={locale} />
+      </div>
+      <div className="container-wide mt-6">
+        <NewsletterCTA locale={locale} source="home" />
       </div>
     </div>
   )
