@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scriptIssues, writeExplainerScript, type ExplainerScript } from './script.js'
+import { cleanBrief, scriptIssues, writeExplainerScript, type ExplainerScript } from './script.js'
 import type { Idea } from './ideas.js'
 
 const beat = (text: string, imagePrompt = 'a smartphone and a shield symbol on a plain background') => ({ kicker: 'پہلی بات', text, imagePrompt })
@@ -25,15 +25,13 @@ describe('scriptIssues', () => {
     expect(scriptIssues(good(), '', true)).toEqual([])
   })
 
-  it('catches greetings, English words, long scripts, bad picture briefs and invented figures', () => {
+  it('catches greetings, English words, long scripts and invented figures', () => {
     const s = good()
     s.beats[0]!.text = 'السلام علیکم! کیا آپ کو Blorptastic پیغام ملا ہے؟'
-    s.beats[1]!.imagePrompt = 'a portrait with a logo and text on the wall'
     s.beats[2]!.text = 'ہر سال 7500 لوگ دھوکا کھاتے ہیں۔'
     const issues = scriptIssues(s, '', true).join(' | ')
     expect(issues).toMatch(/greeting/)
     expect(issues).toMatch(/Blorptastic/)
-    expect(issues).toMatch(/picture brief/)
     expect(issues).toMatch(/7500/)
   })
 
@@ -49,6 +47,14 @@ describe('scriptIssues', () => {
     const s = good()
     s.beats[2]!.text = 'رپورٹ کے مطابق ہر سال 7500 لوگ دھوکا کھاتے ہیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا اور نہ پیغام میں مانگتا ہے۔'
     expect(scriptIssues(s, 'In 2025 7,500 people reported it', false)).toEqual([])
+  })
+})
+
+describe('cleanBrief', () => {
+  it('takes faces, lettering and logos out of a picture brief instead of rejecting the script', () => {
+    expect(cleanBrief('A doctor portrait with a logo and text on the wall, flat illustration')).toBe('A doctor with a and on the wall, flat illustration')
+    expect(cleanBrief('A student at a desk, no text, no logos, simple flat style')).toBe('A student at a desk, , simple flat style'.replace(', ,', ','))
+    expect(cleanBrief('Stethoscope and clipboard with a checkmark')).toBe('Stethoscope and clipboard with a checkmark')
   })
 })
 
