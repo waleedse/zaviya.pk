@@ -142,6 +142,23 @@ def run_image_fast(p):
     return buf.getvalue(), "image/png", {"model": "sdxs-512", "width": w, "height": h}
 
 
+def user_idle_seconds():
+    """Seconds since the last key or mouse event (0 if unknown)."""
+    try:
+        out = subprocess.run(["ioreg", "-c", "IOHIDSystem"], capture_output=True, text=True, timeout=5).stdout
+        m = re.search(r'"HIDIdleTime" = (\d+)', out)
+        return int(m.group(1)) / 1e9 if m else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def priority():
+    """(nice, threads): the whole Mac when its owner has been away for 10 minutes, a polite share while it is being used."""
+    if user_idle_seconds() > 600:
+        return 0, os.environ.get("SD_THREADS_IDLE", "8")
+    return 10, os.environ.get("SD_THREADS", "4")
+
+
 def diffusion_model():
     """Z-Image Turbo Q2_K (2.6 GB) by default: on a Mac that is also used for everything else, the Q4 model (3.9 GB) swaps and a
     picture took 25 minutes; Q2_K took under 5. Set SD_DIFFUSION to a file name in the models folder to use another quant."""
@@ -155,12 +172,13 @@ def run_image_good(p):
     w, h = (int(p["width"]) // 16) * 16, (int(p["height"]) // 16) * 16
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "out.png"
-        cmd = ["nice", "-n", "10", str(SD_CLI),
+        nice, threads = priority()
+        cmd = ["nice", "-n", str(nice), str(SD_CLI),
                "--diffusion-model", str(diffusion_model()),
                "--vae", str(SD_MODELS / "ae.safetensors"),
                "--llm", str(SD_MODELS / "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"),
                "-p", p["prompt"], "--cfg-scale", "1.0", "--steps", str(int(p.get("steps", 8))), "-W", str(w), "-H", str(h),
-               "-t", os.environ.get("SD_THREADS", "6"), "--seed", str(int(p.get("seed", 7))), "-o", str(out)]
+               "-t", threads, "--seed", str(int(p.get("seed", 7))), "-o", str(out)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=60 * 60)
         if r.returncode != 0 or not out.exists():
             raise RuntimeError("sd-cli failed: " + (r.stderr or r.stdout)[-300:])
