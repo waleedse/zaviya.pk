@@ -9,8 +9,6 @@
   <key>EnvironmentVariables</key><dict><key>ZAVIYA_AGENT_HOME</key><string>__HOME__</string><key>HF_HUB_DISABLE_TELEMETRY</key><string>1</string></dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Background</string>
-  <key>Nice</key><integer>10</integer>
   <key>StandardOutPath</key><string>__HOME__/launchd.out.log</string>
   <key>StandardErrorPath</key><string>__HOME__/launchd.err.log</string>
 </dict></plist>
