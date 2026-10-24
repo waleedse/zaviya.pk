@@ -47,11 +47,42 @@ describe('postInstagramReel (ZAV-180)', () => {
     expect(r.calls.some((c) => c.endsWith('/media_publish'))).toBe(false)
   })
 
-  it('sends the file again to the same address when the first upload fails and the container is still waiting', async () => {
-    let uploads = 0
-    const r = run([{ status_code: 'IN_PROGRESS' }, { status_code: 'FINISHED' }], () => (++uploads === 1 ? new Response(UPLOAD_400, { status: 400 }) : json({ success: true })))
-    expect(await r.result).toEqual({ ok: true, id: 'M1' })
-    expect(uploads).toBe(2)
+  it('abandons a container that stays IN_PROGRESS and publishes the next one that finishes', async () => {
+    const created: string[] = []
+    let polls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url)
+        if (u.includes('rupload')) return new Response(UPLOAD_400, { status: 400 })
+        if (u.endsWith('/media')) {
+          created.push(`C${created.length + 1}`)
+          return json({ id: created.at(-1), uri: 'https://rupload.facebook.com/ig-api-upload/x' })
+        }
+        if (u.endsWith('/media_publish')) return json({ id: 'M1' })
+        // the first container never finishes (18 polls); the second finishes at its first poll
+        return json(created.length < 2 ? { status_code: 'IN_PROGRESS' } : { status_code: 'FINISHED' })
+      }),
+    )
+    void polls
+    expect(await postInstagramReel({ file, caption: 'c' }, { igUserId: 'IG', token: 't' })).toEqual({ ok: true, id: 'M1' })
+    expect(created).toEqual(['C1', 'C2'])
+  })
+
+  it('gives up after six containers and reports the last upload error', async () => {
+    const r = run([{ status_code: 'IN_PROGRESS' }], () => new Response(UPLOAD_400, { status: 400 }))
+    const out = await r.result
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/after 6 containers/)
+    expect(out.error).toMatch(/upload HTTP 400/)
+    expect(r.calls.filter((c) => c.endsWith('/media') && c.startsWith('POST')).length).toBe(6)
+  })
+
+  it('does not retry a refused container request', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ error: { message: 'no permission', code: 10 } })))
+    const out = await postInstagramReel({ file, caption: 'c' }, { igUserId: 'IG', token: 't' })
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/code 10/)
   })
 
   it('keeps a plain 200 upload working', async () => {
@@ -59,10 +90,4 @@ describe('postInstagramReel (ZAV-180)', () => {
     expect(await r.result).toEqual({ ok: true, id: 'M1' })
   })
 
-  it('does not publish a container that never finishes, and says how long it waited', async () => {
-    const r = run([{ status_code: 'IN_PROGRESS' }], () => new Response(UPLOAD_400, { status: 400 }))
-    const out = await r.result
-    expect(out.ok).toBe(false)
-    expect(out.error).toMatch(/timed out after 8 min/)
-  })
 })

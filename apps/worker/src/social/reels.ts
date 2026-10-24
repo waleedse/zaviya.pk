@@ -47,58 +47,75 @@ async function upload(uri: string, file: Buffer, token: string): Promise<string 
 
 const errText = (e: GraphError['error'], step: string) => `${step}: ${e?.message ?? 'unknown error'}${e?.code ? ` (code ${e.code})` : ''}`
 
-/** Instagram Reel: create a resumable container, upload, wait until processed, publish. */
+/** How often a new container is tried, and how long each one gets to finish after the upload */
+export const IG_ATTEMPTS = 6
+const IG_POLLS = 18 // x 5 s = 90 s
+
+/**
+ * Instagram Reel: create a resumable container, upload, wait until processed, publish.
+ *
+ * Meta's upload endpoint answers 400 "ProcessingFailedError" (retriable:false) after about 33 s for videos over ~35 s although it
+ * has the whole file (ZAV-180). Measured on 24 Oct with curl and the same file: about half of the containers then go to FINISHED
+ * within seconds, the other half stay IN_PROGRESS for ever (a re-upload to the same container does not help; the caption makes no
+ * difference). So an upload error is not final, but a container that has not finished after 90 s is abandoned and a fresh one is
+ * made, up to six times. If every container ends in ERROR or never finishes, the last upload error and status text are reported.
+ */
 export async function postInstagramReel(
   input: { file: string; caption: string; thumbOffsetMs?: number },
   cfg: { igUserId: string; token: string },
 ): Promise<ReelResult> {
   const file = await readFile(input.file)
-  const created = await graph<{ id?: string; uri?: string }>(
-    'POST',
-    `${cfg.igUserId}/media`,
-    {
-      media_type: 'REELS',
-      upload_type: 'resumable',
-      caption: input.caption,
-      share_to_feed: 'true',
-      ...(input.thumbOffsetMs !== undefined ? { thumb_offset: String(input.thumbOffsetMs) } : {}),
-    },
-    cfg.token,
-  )
-  if (!created.id || !created.uri) return { ok: false, error: errText(created.error, 'create container') }
-
-  // ZAV-180: Meta's upload endpoint answers 400 "ProcessingFailedError" (retriable:false) after about 33 s for longer
-  // videos although it has the whole file: the container then goes on to FINISHED (reproduced with the failing 60 s
-  // digest and a re-encoded copy). So an upload error is not final; the container status is the verdict. If the
-  // container ends in ERROR the upload error and Meta's status text are both reported.
-  let upErr = await upload(created.uri, file, cfg.token)
-  if (upErr) logger.warn({ containerId: created.id, upErr }, 'Instagram reel upload reported an error, checking the container status')
-  // 24 Oct: two videos of 36 and 55 s got the same 400 and their containers stayed IN_PROGRESS for good (the bytes never arrived),
-  // while the same file uploaded a minute later went through. A resumable upload can be sent again to the same address, so do that
-  // (twice at most) while the container has neither finished nor failed.
-  for (let again = 0; upErr && again < 2; again++) {
-    await sleep(10_000)
-    const st = await graph<{ status_code?: string }>('GET', created.id, { fields: 'status_code' }, cfg.token)
-    if (st.status_code === 'FINISHED' || st.status_code === 'ERROR' || st.status_code === 'EXPIRED') break
-    upErr = await upload(created.uri, file, cfg.token)
-    logger.warn({ containerId: created.id, attempt: again + 2, upErr: upErr ?? 'ok' }, 'Instagram reel uploaded again')
-  }
-
-  // Processing usually takes 10-60 s (a late upload answer or a 60 s video can take minutes): wait up to 8 minutes
-  for (let i = 0; i < 96; i++) {
-    await sleep(5_000)
-    const st = await graph<{ status_code?: string; status?: string }>('GET', created.id, { fields: 'status_code,status' }, cfg.token)
-    if (st.status_code === 'FINISHED') break
-    if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') {
-      return { ok: false, error: `processing: ${st.status ?? st.status_code}${upErr ? ` (${upErr})` : ''}`.slice(0, 600) }
+  let last = 'no attempt made'
+  for (let attempt = 1; attempt <= IG_ATTEMPTS; attempt++) {
+    const created = await graph<{ id?: string; uri?: string }>(
+      'POST',
+      `${cfg.igUserId}/media`,
+      {
+        media_type: 'REELS',
+        upload_type: 'resumable',
+        caption: input.caption,
+        share_to_feed: 'true',
+        ...(input.thumbOffsetMs !== undefined ? { thumb_offset: String(input.thumbOffsetMs) } : {}),
+      },
+      cfg.token,
+    )
+    if (!created.id || !created.uri) {
+      last = errText(created.error, 'create container')
+      // a refused request (permissions, limits) will not get better in a minute; a network blip might
+      if (created.error?.code) return { ok: false, error: last }
+      await sleep(15_000)
+      continue
     }
-    if (i === 95) return { ok: false, error: `processing: timed out after 8 min${upErr ? ` (${upErr})` : ''}`.slice(0, 600) }
-  }
 
-  const pub = await graph<{ id?: string }>('POST', `${cfg.igUserId}/media_publish`, { creation_id: created.id }, cfg.token)
-  if (!pub.id) return { ok: false, error: errText(pub.error, 'publish') }
-  logger.info({ id: pub.id }, 'Instagram Reel published')
-  return { ok: true, id: pub.id }
+    const upErr = await upload(created.uri, file, cfg.token)
+    if (upErr) logger.warn({ containerId: created.id, attempt, upErr }, 'Instagram reel upload reported an error, checking the container status')
+
+    let verdict: 'finished' | 'error' | 'waiting' = 'waiting'
+    let statusText = ''
+    for (let i = 0; i < IG_POLLS; i++) {
+      await sleep(5_000)
+      const st = await graph<{ status_code?: string; status?: string }>('GET', created.id, { fields: 'status_code,status' }, cfg.token)
+      statusText = st.status ?? st.status_code ?? ''
+      if (st.status_code === 'FINISHED') {
+        verdict = 'finished'
+        break
+      }
+      if (st.status_code === 'ERROR' || st.status_code === 'EXPIRED') {
+        verdict = 'error'
+        break
+      }
+    }
+    if (verdict === 'finished') {
+      const pub = await graph<{ id?: string }>('POST', `${cfg.igUserId}/media_publish`, { creation_id: created.id }, cfg.token)
+      if (!pub.id) return { ok: false, error: errText(pub.error, 'publish') }
+      logger.info({ id: pub.id, attempt }, 'Instagram Reel published')
+      return { ok: true, id: pub.id }
+    }
+    last = verdict === 'error' ? `processing: ${statusText}` : 'processing: not finished after 90 s'
+    if (upErr) last += ` (${upErr})`
+    logger.warn({ containerId: created.id, attempt, last }, 'Instagram container did not finish: trying a new one')
+  }
+  return { ok: false, error: `${last} (after ${IG_ATTEMPTS} containers)`.slice(0, 600) }
 }
 
 /** Facebook Page Reel: start, upload, finish with PUBLISHED. */
