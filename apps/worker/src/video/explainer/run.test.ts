@@ -37,9 +37,10 @@ function fakeRedis() {
 let agent: ReturnType<typeof setInterval> | undefined
 afterEach(() => clearInterval(agent))
 
-function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean } = {}) {
+function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean; realClock?: boolean; imagesDone?: number } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'exp-'))
-  const hub = new MediaHub(memoryHubStore(), dir, () => NOW, 5)
+  const hub = new MediaHub(memoryHubStore(), dir, opts.realClock ? Date.now : () => NOW, 5)
+  let imagesLeft = opts.imagesDone ?? Infinity
   const redis = fakeRedis()
   const store = new IdeaStore(memoryIdeaRedis())
   const posts: string[] = []
@@ -49,7 +50,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean 
     const job = await hub.claim(['tts', 'image'], 'test')
     if (!job) return
     if (job.kind === 'tts') await hub.complete(job.id, Buffer.from('RIFF'), 'audio/wav', { sentenceMs: (job.payload as { sentences: string[] }).sentences.map(() => 3000) })
-    else await hub.complete(job.id, Buffer.from('PNG'), 'image/png', {})
+    else if (imagesLeft-- > 0) await hub.complete(job.id, Buffer.from('PNG'), 'image/png', {})
   }, 5)
   const deps: ExplainerDeps = {
     cfg: { enabled: true, slots: parseSlots(undefined), platforms: ['instagram', 'facebook'], vetoMin: 20, flash: false, trendReel: false, dataDir: dir, bundleDir: '/none', concurrency: 1, siteUrl: 'https://zaviya.pk', keepDays: 14, voiced: false, explainer: false, mediaHubPort: 8790 },
@@ -68,7 +69,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean 
     }),
     payload: { upsertSocialPost: vi.fn(async (b) => void upserts.push(b)) },
     sleep: vi.fn(async () => {}),
-    now: () => NOW,
+    now: opts.realClock ? Date.now : () => NOW,
     ...over,
   }
   return { deps, redis, store, posts, upserts, hub }
@@ -97,6 +98,20 @@ describe('runExplainerRound', () => {
     expect(redis.m.get(`explainer:done:${out.key}`)).toBe('posted')
     expect((await runExplainerRound(deps, { now: true, ideaId: 'scam1' })).status).toBe('already-done')
     expect(posts).toHaveLength(2)
+  })
+
+  it('makes the video with the pictures that arrived when the Mac is slow, and fails with too few', async () => {
+    const some = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 2 })
+    await some.store.put(evergreen)
+    expect((await runExplainerRound(some.deps, { dry: true, ideaId: 'scam1' })).status).toBe('dry')
+    expect(some.deps.renderNarrated).toHaveBeenCalledTimes(1)
+    clearInterval(agent)
+
+    const few = setup({ assetWaitMs: 400 }, { realClock: true, imagesDone: 1 })
+    await few.store.put(evergreen)
+    const out = await runExplainerRound(few.deps, { dry: true, ideaId: 'scam1' })
+    expect(out.status).toBe('assets-failed')
+    expect(few.deps.renderNarrated).not.toHaveBeenCalled()
   })
 
   it('does not make a video from a script rated medium or high risk', async () => {

@@ -19,7 +19,9 @@ import { discoverIdeas, IdeaStore, pickIdea, type DiscoverArticle, type Idea } f
 import type { ExplainerScript, ScriptResult } from './script.js'
 
 export const SCRIPT_WAIT_MS = 12 * 60_000
-export const ASSET_WAIT_MS = 110 * 60_000
+export const ASSET_WAIT_MS = 150 * 60_000
+/** a video is made with at least this many pictures; beats of a missing picture show the nearest one that arrived */
+export const MIN_PICTURES = 2
 export const AGENT_ONLINE_MS = 3 * 60_000
 /** an explainer never posts within this long of a scheduled video */
 export const SLOT_BUFFER_MS = 45 * 60_000
@@ -49,6 +51,8 @@ export interface ExplainerDeps {
   requestScript(idea: Idea): Promise<ScriptResult | null>
   /** a picture from a paid API when the Mac did not deliver in time; null = none */
   fallbackImage?(prompt: string, width: number, height: number): Promise<Buffer | null>
+  /** how long to wait for the voice and pictures (default ASSET_WAIT_MS) */
+  assetWaitMs?: number
   renderNarrated(args: { timeline: NarratedTimeline; outDir: string; assetsDir: string }): Promise<{ mp4: string; cover: string; durationMs: number }>
   telegram: VideoTelegram
   postReel(platform: VideoPlatform, input: { file: string; text: string; title?: string }): Promise<ReelResult>
@@ -199,23 +203,42 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
       hub.enqueue('image', { prompt: `${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, width: IMAGE_SIZE, height: IMAGE_SIZE, quality: 'good', steps: IMAGE_STEPS, seed: 11 + g }, `${attempt}-img${g}`),
     ),
   )
-  const voice = await hub.waitFor(tts, ASSET_WAIT_MS)
+  const budget = deps.assetWaitMs ?? ASSET_WAIT_MS
+  const voice = await hub.waitFor(tts, budget)
   if (voice?.status !== 'done') return fail('assets-failed', `voice: ${voice?.error ?? 'did not come back in time'}`)
   const wav = hub.readFile(voice)
   const sentenceMs = (voice.meta as { sentenceMs?: number[] } | undefined)?.sentenceMs
   if (!wav || !sentenceMs || sentenceMs.length !== sentences.length) return fail('assets-failed', 'the voice answer is incomplete')
   writeFileSync(path.join(assets, 'voice.wav'), wav)
 
-  const groupFiles: string[] = []
+  const groupFiles: (string | null)[] = []
+  const missing: string[] = []
   for (const [g, id] of images.entries()) {
-    const wait = Math.max(0, ASSET_WAIT_MS - (deps.now() - startedAt))
+    const wait = Math.max(0, budget - (deps.now() - startedAt))
     const job = await hub.waitFor(id, wait)
     const file = `pic${g + 1}.png`
     let bytes: Buffer | null = job?.status === 'done' ? hub.readFile(job) : null
     if (!bytes && deps.fallbackImage) bytes = await deps.fallbackImage(`${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, 1024, 1024).catch(() => null)
-    if (!bytes) return fail('assets-failed', `picture ${g + 1}: ${job?.error ?? 'did not come back in time'}`)
+    if (!bytes) {
+      groupFiles.push(null)
+      missing.push(`picture ${g + 1}: ${job?.error ?? 'did not come back in time'}`)
+      continue
+    }
     writeFileSync(path.join(assets, file), bytes)
     groupFiles.push(file)
+  }
+  // a slow Mac may deliver only some pictures: make the video with the ones that came, each missing one replaced by the nearest
+  const arrived = groupFiles.filter((f): f is string => !!f)
+  if (arrived.length < Math.min(MIN_PICTURES, groupFiles.length)) return fail('assets-failed', missing.join('; '))
+  if (missing.length) {
+    log.warn({ missing }, 'some pictures did not arrive: reusing the nearest one')
+    groupFiles.forEach((f, g) => {
+      if (f) return
+      for (let d = 1; d < groupFiles.length; d++) {
+        const near = groupFiles[g - d] ?? groupFiles[g + d]
+        if (near) return void (groupFiles[g] = near)
+      }
+    })
   }
   const beatFiles = script.beats.map((_, i) => groupFiles[plan.groupOf(i)]!)
 
