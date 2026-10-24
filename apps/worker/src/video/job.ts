@@ -19,6 +19,7 @@ import {
 } from './lib.js'
 import { editionKey, hhmm, karachiDate, postAtMs, type Slot } from './schedule.js'
 import type { NarrateArgs, NarrateResult } from './narrate-news.js'
+import { postWithRetry } from './post-retry.js'
 import type { VideoTelegram } from './telegram.js'
 
 export interface RedisLike {
@@ -226,12 +227,7 @@ export async function runEdition(deps: JobDeps, slot: Slot, opts: RunOptions = {
       continue
     }
     const copy = captions[platform]
-    let result: ReelResult
-    try {
-      result = await deps.postReel(platform, { file: mp4, text: copy.text, title: copy.title })
-    } catch (e) {
-      result = { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
+    const result: ReelResult = await postWithRetry(() => deps.postReel(platform, { file: mp4, text: copy.text, title: copy.title }), deps.sleep)
     await deps.payload
       .upsertSocialPost({
         idempotencyKey: sha1Hex(`video:${key}:${platform}`),
