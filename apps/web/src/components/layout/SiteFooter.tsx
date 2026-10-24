@@ -67,6 +67,11 @@ export function SiteFooter({ locale }: { locale: Locale }) {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link href={localePath(locale, '/widgets')} className="hover:text-white">
+                {isUr ? 'ویب سائٹ کے لیے ریٹ ویجٹ' : 'Rates widget for your site'}
+              </Link>
+            </li>
           </ul>
         </div>
         <div className="md:col-span-2">

@@ -13,6 +13,7 @@ export type TrafficSource =
   | 'x'
   | 'youtube'
   | 'push'
+  | 'embed'
   | 'internal'
   | 'direct'
   | 'other'
