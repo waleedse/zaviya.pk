@@ -19,6 +19,10 @@ describe('scoring', () => {
     expect(scoreIdea(idea({ createdAt: NOW - 5 * DAY }), NOW)).toBeGreaterThan(scoreIdea(idea(), NOW))
   })
 
+  it('moves an idea back after a failed round', () => {
+    expect(scoreIdea(idea({ failures: 1 }), NOW)).toBeLessThan(scoreIdea(idea(), NOW) - 20)
+  })
+
   it('fades a news idea as its hook ages', () => {
     const fresh = idea({ hookUntil: NOW + 30 * HOUR, createdAt: NOW - HOUR })
     const old = idea({ hookUntil: NOW + 2 * HOUR, createdAt: NOW - 34 * HOUR })
