@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  dropUnsupportedFaqs,
   checkOriginality,
   checkUrduLocale,
   checkBannedAndClickbait,
@@ -37,5 +38,23 @@ describe('qa rule fixes', () => {
     const body = `Police chiefs reviewed protection plans on Saturday. The IGP warned: "${quote}." Officers will audit permits.`
     expect(_sq(body)).not.toContain('tolerated')
     expect(_co(body, [src])).toEqual([])
+  })
+})
+
+describe('FAQ questions must be supported by the sources (ZAV-200)', () => {
+  const sources = 'Arshad Nadeem threw 86.2m to win javelin gold at the national championship in Lahore. He said he is preparing for next year.'
+  it('drops a question about an event no source mentions', () => {
+    const faqs = [
+      { q: 'How far did Arshad Nadeem throw?', a: '86.2m.' },
+      { q: 'Did Arshad Nadeem withdraw from a Switzerland event?', a: 'No.' },
+      { q: 'Did he throw 90m?', a: 'No.' },
+    ]
+    const { kept, dropped } = dropUnsupportedFaqs(faqs, sources)
+    expect(kept.map((f) => f.q)).toEqual(['How far did Arshad Nadeem throw?'])
+    expect(dropped).toHaveLength(2)
+  })
+  it('keeps plain questions and ignores sentence-initial capitals', () => {
+    const { kept } = dropUnsupportedFaqs([{ q: 'What did he say about next year?', a: 'x' }, { q: 'Kya Lahore mein hua?', a: 'x' }], sources)
+    expect(kept).toHaveLength(2)
   })
 })

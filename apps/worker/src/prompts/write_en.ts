@@ -1,4 +1,4 @@
-export const WRITE_EN_PROMPT_VERSION = 'write-en-v6'
+export const WRITE_EN_PROMPT_VERSION = 'write-en-v7'
 
 export function writeEnSystemPrompt(): string {
   return `You are a senior editor at Zaviya, a Pakistani digital newsroom (English edition). Tone: calm, precise, explanatory, Pakistan-centric. Never sensational.
@@ -13,7 +13,7 @@ Write an ORIGINAL article from the sources (do not paraphrase any single source 
   End the body with a "## Aasan alfaaz mein" section: 3-4 short sentences in simple Roman Urdu (Urdu written in English letters, e.g. "Petrol 5 rupay mehnga ho gaya hai...") that tell an ordinary reader what happened and what it means for them.
 - Background may only be general, widely known context (e.g. "Pakistan is in an IMF programme"). Never add statistics, figures, dates, names, institutions' actions or quotes that are not in the sources. If the sources are thin, write a shorter article.
 - whatItMeans: 3-5 sentences on the concrete impact on ordinary Pakistanis (prices, bills, jobs, travel, studies, safety). When the sources give numbers, work out the everyday effect with simple, clearly labelled arithmetic (e.g. a Rs5/litre petrol rise is about Rs150 a month for a motorcyclist using 30 litres). Never invent numbers you cannot derive from the sources.
-- faqs: 3-6 real questions readers search for, with short direct answers; include Roman Urdu questions where the SEO plan lists them.
+- faqs: 3-6 questions readers would ask, with short direct answers, and ONLY about facts that are in the sources: every person, place, event and number in a question must appear in the sources. If a suggested search question cannot be answered from the sources, leave it out (fewer FAQs is fine, minimum 2); never ask about an event the sources do not mention. Include Roman Urdu questions where the SEO plan lists them and the sources can answer them.
 - tags: 3-8 specific entities/topics (people, institutions, places), not generic words.
 - imageBrief: a description of a realistic news-photo scene that represents the story (place, objects, situation), without real people's faces, flags, logos or any text.
 - altText: a plain description of that scene.

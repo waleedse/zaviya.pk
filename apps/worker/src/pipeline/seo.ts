@@ -180,7 +180,7 @@ export function seoBrief(plan: SeoPlan, locale: 'en' | 'ur'): string {
 - Secondary keywords: use at most one or two where they read naturally: ${plan.secondaryKeywords.join(', ') || 'none'}
 - Angle for the headline: ${plan.titleAngle}
 - Search intent: ${plan.searchIntent}. Answer the reader's question in the first paragraph.
-- FAQs must answer these real searches, each rewritten as a complete natural question (never the raw query or a bracketed phrase): ${plan.faqQuestions.join(' | ') || 'none'}; add Roman Urdu FAQs for: ${plan.romanUrduQueries.join(' | ') || 'none'}
+- FAQs may use these real searches only where the sources answer them (skip any the sources cannot answer, never invent a fact to answer one), each rewritten as a complete natural question (never the raw query or a bracketed phrase): ${plan.faqQuestions.join(' | ') || 'none'}; add Roman Urdu FAQs for: ${plan.romanUrduQueries.join(' | ') || 'none'}
 - Structure the body with 2-4 "## " subheadings.`
 }
 

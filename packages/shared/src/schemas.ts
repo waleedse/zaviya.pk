@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CATEGORY_SLUGS, PRIORITIES, SENSITIVITY_FLAGS } from './constants'
+import { tidyReason } from './reason'
 import { HealRequestSchema, HealReportSchema } from './heal'
 
 /** LLM triage output. Validated before any rule runs. */
@@ -14,7 +15,7 @@ export const TriageResultSchema = z.object({
   suggestedPriority: z.enum(PRIORITIES),
   decision: z.enum(['publish', 'review', 'reject']),
   /** A wordy model reply is cut to fit instead of failing the whole verdict (about one triage in five did) */
-  reason: z.preprocess((v) => (typeof v === 'string' && v.length > 400 ? `${v.slice(0, 399)}…` : v), z.string().max(400)),
+  reason: z.preprocess((v) => (typeof v === 'string' ? tidyReason(v) : v), z.string().max(400)),
   /** What kind of piece the sources are: a report, opinion/editorial/column, or a long feature/analysis (ZAV-155) */
   storyKind: z.enum(['news', 'opinion', 'feature']).optional(),
   /** Where the event happens: in Pakistan (or to Pakistanis there), or abroad (ZAV-155) */

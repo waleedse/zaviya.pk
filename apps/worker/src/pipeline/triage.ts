@@ -1,4 +1,4 @@
-import { TriageResultSchema, type TriageResult } from '@zaviya/shared'
+import { TriageResultSchema, repetitionCutoff, type TriageResult } from '@zaviya/shared'
 import { zodToJsonSchema, isQuotaExhausted, isInputBlocked } from '@zaviya/llm'
 import type { LLMRouter } from '@zaviya/llm'
 import type { Queue } from 'bullmq'
@@ -11,6 +11,12 @@ import { enrichFromExtension } from './write.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { findSameStory } from './same-story.js'
 import { opinionCue, routeByStoryKind } from './story-kind.js'
+
+class ReasonLoopError extends Error {
+  constructor() {
+    super('triage reason is a repetition loop')
+  }
+}
 
 export const HEADLINE_ONLY_REJECT = 'headline only: the article body could not be read, so it is not pitched'
 export const HEADLINE_ONLY_WAITING = 'headline only: waiting for the extension to read the article'
@@ -89,7 +95,7 @@ export async function processTriageJob(
   try {
     const format = zodToJsonSchema(TriageResultSchema, { target: 'openApi3' }) as Record<string, unknown>
     const timeoutMs = 180_000
-    const ask = async (limits: { items: number; chars: number }) => {
+    const ask = async (limits: { items: number; chars: number }, final = false) => {
       const result = await deps.router.chat('triage', {
         messages: [
           { role: 'system', content: triageSystemPrompt() },
@@ -100,14 +106,17 @@ export async function processTriageJob(
         maxTokens: 2048,
         timeoutMs,
       })
-      return TriageResultSchema.parse(JSON.parse(result.content))
+      const raw = JSON.parse(result.content) as { reason?: unknown }
+      // ZAV-200: a reason stuck in a repetition loop is unreadable; ask again once, the schema cuts it if it loops again
+      if (!final && typeof raw.reason === 'string' && repetitionCutoff(raw.reason) !== null) throw new ReasonLoopError()
+      return TriageResultSchema.parse(raw)
     }
     try {
       triage = await ask({ items: 8, chars: 700 })
     } catch (e) {
-      if (!(e instanceof SyntaxError)) throw e
-      logger.info({ clusterId: data.clusterId }, 'triage reply was not valid JSON, retrying with a smaller prompt')
-      triage = await ask({ items: 3, chars: 300 })
+      if (!(e instanceof SyntaxError) && !(e instanceof ReasonLoopError)) throw e
+      logger.info({ clusterId: data.clusterId, loop: e instanceof ReasonLoopError }, 'triage reply was not usable (invalid JSON or a looping reason), retrying with a smaller prompt')
+      triage = await ask({ items: 3, chars: 300 }, true)
     }
   } catch (e) {
     if (isQuotaExhausted(e)) {
