@@ -72,6 +72,11 @@ export function SiteFooter({ locale }: { locale: Locale }) {
                 {isUr ? 'ویب سائٹ کے لیے ریٹ ویجٹ' : 'Rates widget for your site'}
               </Link>
             </li>
+            <li>
+              <Link href={localePath(locale, '/subscribe')} className="hover:text-white">
+                {isUr ? 'صبح کا بریفنگ (ای میل)' : 'Morning briefing by email'}
+              </Link>
+            </li>
           </ul>
         </div>
         <div className="md:col-span-2">

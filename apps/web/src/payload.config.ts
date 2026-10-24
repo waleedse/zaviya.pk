@@ -29,6 +29,7 @@ import { Settings } from './globals/Settings'
 import { FrontPage } from './globals/FrontPage'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
 import { ANALYTICS_DDL } from './lib/analytics'
+import { NEWSLETTER_DDL } from './lib/newsletter'
 import { LEARNING_DDL } from './lib/learning'
 import { migrations } from './migrations'
 
@@ -142,7 +143,7 @@ export default buildConfig({
       `)
 
       await drizzle.execute(sql`ALTER TYPE enum_sources_type ADD VALUE IF NOT EXISTS 'instagram'`)
-      for (const stmt of [...ANALYTICS_DDL, ...LEARNING_DDL]) await drizzle.execute(stmt)
+      for (const stmt of [...ANALYTICS_DDL, ...LEARNING_DDL, ...NEWSLETTER_DDL]) await drizzle.execute(stmt)
 
       await drizzle.execute(sql`
         CREATE INDEX IF NOT EXISTS source_items_embedding_hnsw_idx
