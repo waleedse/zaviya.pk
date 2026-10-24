@@ -33,6 +33,7 @@ export const MIN_WORDS = 95
 export const MAX_WORDS = 150
 const GREETING = /السلام\s*علیکم|ناظرین|خوش\s*آمدید|دوستو/
 const LATIN = /[A-Za-z]/
+const ATTRIBUTION = /کے مطابق|کا کہنا ہے|کا کہنا تھا|کہتے ہیں|نے بتایا|نے کہا|نے اعلان|کے بقول|رپورٹ|اعلامیہ|بیان/
 
 /** What is wrong with a script, in words the writer can act on. Empty = fine. */
 export function scriptIssues(script: ExplainerScript, allowedText: string, evergreen: boolean): string[] {
@@ -52,6 +53,8 @@ export function scriptIssues(script: ExplainerScript, allowedText: string, everg
       issues.push(`beat ${n}: the picture brief must not ask for faces, text, letters, logos or flags`)
     }
   })
+  // a video made from news must say whose claim it is
+  if (!evergreen && !ATTRIBUTION.test(script.beats.map((b) => b.text).join(' '))) issues.push('attribute the claims to their source in the sentences (کے مطابق, کا کہنا ہے, نے بتایا, نے اعلان کیا)')
   if (words < MIN_WORDS) issues.push(`the narration is ${words} words: it needs at least ${MIN_WORDS}`)
   if (words > MAX_WORDS) issues.push(`the narration is ${words} words: it must be at most ${MAX_WORDS}`)
   if (LATIN.test(script.titleUr) || LATIN.test(script.caption)) issues.push('titleUr and caption must be Urdu letters only')
@@ -69,7 +72,7 @@ Structure: 5 to 7 beats. Beat 1 is the hook: a question or a surprising fact in 
 
 Language: simple spoken Urdu in Urdu script, the way a friendly TV presenter talks. Short sentences, each ending with ۔ or ؟. In total 105 to 135 words, at most two sentences per beat. Never start with a greeting (no السلام علیکم, no ناظرین). Use no English letters anywhere: write English or foreign names in Urdu letters (پی ایچ پی, واٹس ایپ, او ٹی پی). Write figures as digits (they are read aloud as Urdu words), for example 5 ہزار; use a figure only if it is in the sources. With no sources, use no figures except small counts like "تین باتیں".
 
-Facts: use only facts that are in the SOURCES. A topic without sources may use only widely known, stable general facts. Never state prices, dates, laws, phone numbers or statistics you cannot trace to the sources; when unsure leave it out. No accusations against named people, no sensational wording, no medical or legal promises, no fear-mongering about money.
+Facts: use only facts that are in the SOURCES. A topic without sources may use only widely known, stable general facts. Never state prices, dates, laws, phone numbers or statistics you cannot trace to the sources; when unsure leave it out. Attribute every claim that comes from a company, a government body or a report to its source in the sentence itself (ادارے کے مطابق, کمپنی کا کہنا ہے, رپورٹ کے مطابق) and never state an unconfirmed allegation or a company's own claim as established fact; no accusations against named people or organisations, no sensational wording, no medical or legal promises, no fear-mongering about money.
 
 imagePrompt: English, one concrete scene per beat for an AI illustrator, simple composition, objects and symbols. Never real or named people, never faces; no text, letters, numbers, logos or flags in the picture.
 kicker: 2 to 4 Urdu words naming the step (پہلی بات, ایسا کیوں ہوتا ہے).
