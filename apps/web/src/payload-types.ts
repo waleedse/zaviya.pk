@@ -382,7 +382,7 @@ export interface Article {
 export interface Category {
   id: number;
   name: string;
-  slug: 'pakistan' | 'world' | 'business' | 'tech-telecom' | 'ai' | 'autos' | 'cricket' | 'education-jobs' | 'trending';
+  slug: 'pakistan' | 'world' | 'business' | 'tech-telecom' | 'ai' | 'autos' | 'cricket' | 'sports' | 'education-jobs' | 'trending';
   color: string;
   description?: string | null;
   order?: number | null;

@@ -90,6 +90,10 @@ const HEADLINES: Record<CategorySlug, { en: string[]; ur: string[] }> = {
       'پی سی بی نے پی ایس ایل 12 کا شیڈول جاری کر دیا، افتتاحی میچ لاہور میں',
     ],
   },
+  sports: {
+    en: ['Pakistan athletes name squad for the South Asian Games', 'National hockey league opens with a full house in Lahore'],
+    ur: ['پاکستانی کھلاڑیوں نے جنوبی ایشیائی کھیلوں کے لیے اسکواڈ کا اعلان کر دیا', 'قومی ہاکی لیگ کا لاہور میں بھرپور آغاز'],
+  },
   'education-jobs': {
     en: [
       'BISE Lahore announces matric supplementary results date',

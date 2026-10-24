@@ -71,9 +71,9 @@ describe('applyTriageRules', () => {
       lastPublishedAt: new Date(now.getTime() - 5 * 60_000).toISOString(),
     })
     expect(d.outcome).toBe('defer')
-    // The interval is capped at 15 minutes (4 stories an hour), so 5 minutes in leaves 10
-    expect(d.retryInMs).toBeGreaterThanOrEqual(10 * 60_000)
-    expect(d.retryInMs).toBeLessThan(16 * 60_000)
+    // The interval is capped at 10 minutes (6 stories an hour), so 5 minutes in leaves 5
+    expect(d.retryInMs).toBeGreaterThanOrEqual(5 * 60_000)
+    expect(d.retryInMs).toBeLessThan(11 * 60_000)
   })
 
   it('does not block on "unverified" when credible sources exist', () => {

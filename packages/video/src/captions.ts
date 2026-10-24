@@ -49,6 +49,7 @@ const CATEGORY_TAG: Record<string, string> = {
   'tech-telecom': '#Tech',
   ai: '#ArtificialIntelligence',
   cricket: '#Cricket',
+  sports: '#Sports',
   'education-jobs': '#Jobs',
 }
 

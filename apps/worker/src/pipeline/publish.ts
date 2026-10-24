@@ -8,6 +8,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
+import { effectiveIntervalMin } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
@@ -221,8 +222,8 @@ async function categoryOverdue(payload: PayloadClient, category: string, now = D
 /** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
 export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
   const settings = await payload.getSettings()
-  // Never slower than one story every 15 minutes: 4 an hour is the floor (Waleed, 16 Oct)
-  const minIntervalMs = Math.min(settings.minIntervalMin ?? 15, 15) * 60_000
+  // Never slower than one story every MAX_PUBLISH_INTERVAL_MIN minutes (10 since ZAV-201, was 15)
+  const minIntervalMs = effectiveIntervalMin(settings) * 60_000
   const cap = settings.dailyCaps?.articles ?? 96
   if ((settings.articlesPublishedToday ?? 0) >= cap) return 60 * 60_000
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0

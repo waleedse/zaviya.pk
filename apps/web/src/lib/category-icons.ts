@@ -5,6 +5,7 @@ import {
   Flag,
   Flame,
   Globe,
+  Medal,
   GraduationCap,
   Newspaper,
   Trophy,
@@ -20,6 +21,7 @@ const ICONS: Record<string, LucideIcon> = {
   ai: Sparkles,
   autos: Car,
   cricket: Trophy,
+  sports: Medal,
   'education-jobs': GraduationCap,
   trending: Flame,
 }
