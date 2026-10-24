@@ -71,8 +71,18 @@ export async function postInstagramReel(
   // videos although it has the whole file: the container then goes on to FINISHED (reproduced with the failing 60 s
   // digest and a re-encoded copy). So an upload error is not final; the container status is the verdict. If the
   // container ends in ERROR the upload error and Meta's status text are both reported.
-  const upErr = await upload(created.uri, file, cfg.token)
+  let upErr = await upload(created.uri, file, cfg.token)
   if (upErr) logger.warn({ containerId: created.id, upErr }, 'Instagram reel upload reported an error, checking the container status')
+  // 24 Oct: two videos of 36 and 55 s got the same 400 and their containers stayed IN_PROGRESS for good (the bytes never arrived),
+  // while the same file uploaded a minute later went through. A resumable upload can be sent again to the same address, so do that
+  // (twice at most) while the container has neither finished nor failed.
+  for (let again = 0; upErr && again < 2; again++) {
+    await sleep(10_000)
+    const st = await graph<{ status_code?: string }>('GET', created.id, { fields: 'status_code' }, cfg.token)
+    if (st.status_code === 'FINISHED' || st.status_code === 'ERROR' || st.status_code === 'EXPIRED') break
+    upErr = await upload(created.uri, file, cfg.token)
+    logger.warn({ containerId: created.id, attempt: again + 2, upErr: upErr ?? 'ok' }, 'Instagram reel uploaded again')
+  }
 
   // Processing usually takes 10-60 s (a late upload answer or a 60 s video can take minutes): wait up to 8 minutes
   for (let i = 0; i < 96; i++) {
