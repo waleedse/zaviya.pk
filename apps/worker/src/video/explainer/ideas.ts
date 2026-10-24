@@ -73,6 +73,8 @@ export function scoreIdea(idea: Idea, now: number): number {
     // evergreen ideas that keep waiting creep upward, so a good one is not starved forever
     s += Math.min(10, (now - idea.createdAt) / DAY)
   }
+  // a round that failed on this idea moves it back, so the next round tries another one
+  s -= (idea.failures ?? 0) * 25
   if (idea.decision === 'boost') s += 40
   if (idea.decision === 'ok') s += 10
   return s

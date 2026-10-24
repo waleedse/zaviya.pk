@@ -184,8 +184,10 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   })
   if (!written) return fail('script-failed', 'the script could not be written')
   const script = written.script
-  // Nobody previews these videos unless Telegram is set up: only a script its own writer rates low risk goes out
-  if (script.risk !== 'low') return fail('script-failed', `the writer rated the script ${script.risk} risk`)
+  // Nobody previews these videos unless Telegram is set up: a script its writer rates high risk never goes out, and a medium one
+  // only when the editor reviewed the idea (ok or boost); the editor is the second pair of eyes
+  const reviewed = idea.decision === 'ok' || idea.decision === 'boost'
+  if (script.risk === 'high' || (script.risk === 'medium' && !reviewed)) return fail('script-failed', `the writer rated the script ${script.risk} risk${reviewed ? '' : ' and the editor has not approved the idea'}`)
 
   // 3. voice and pictures (Mac agent)
   const dir = path.join(cfg.dataDir, key)

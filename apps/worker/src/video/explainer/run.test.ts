@@ -123,6 +123,16 @@ describe('runExplainerRound', () => {
     expect(deps.renderNarrated).not.toHaveBeenCalled()
   })
 
+  it('makes a medium-risk script when the editor approved the idea, never a high-risk one', async () => {
+    const mk = (risk: 'medium' | 'high') => setup({ requestScript: vi.fn(async () => ({ script: { ...script, risk }, model: 'test', sourceUrls: [] })) })
+    const ok = mk('medium')
+    await ok.store.put({ ...evergreen, decision: 'ok' })
+    expect((await runExplainerRound(ok.deps, { dry: true, ideaId: 'scam1' })).status).toBe('dry')
+    const high = mk('high')
+    await high.store.put({ ...evergreen, decision: 'boost' })
+    expect((await runExplainerRound(high.deps, { dry: true, ideaId: 'scam1' })).status).toBe('script-failed')
+  })
+
   it('does nothing when the Mac agent is offline', async () => {
     const { deps, store } = setup({}, { agentOnline: false })
     await store.put(evergreen)
