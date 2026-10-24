@@ -53,6 +53,24 @@ describe('processTriageJob', () => {
     expect(payload.patchCluster).toHaveBeenCalled()
   })
 
+  it('asks again once when the reason is a repetition loop, and cuts it if it loops again (ZAV-200)', async () => {
+    const verdict = (reason: string) => JSON.stringify({ pakistanRelevance: 0.9, newsworthiness: 0.9, sourceCredibility: 0.9, category: 'pakistan', sensitivityFlags: [], isUpdateOfExisting: false, suggestedPriority: 'normal', decision: 'publish', reason })
+    const loop = `Fine. ${'ability to '.repeat(30)}`
+    const chat = vi.fn().mockResolvedValueOnce({ content: verdict(loop) }).mockResolvedValueOnce({ content: verdict(loop) })
+    const items = Array.from({ length: 6 }, (_, i) => ({ title: `t${i}`, contentText: 'x'.repeat(900), source: { name: 'Dawn', trustTier: 1 } }))
+    const payload = {
+      getCluster: vi.fn().mockResolvedValue({ id: '3', items, maxTier: 1, distinctSources: 2 }),
+      getSettings: vi.fn().mockResolvedValue({}),
+      patchCluster: vi.fn(),
+      recentArticles: vi.fn().mockResolvedValue([]),
+    }
+    await processTriageJob({ clusterId: '3' }, { router: { chat }, payload, writeQueue: { add: vi.fn() } } as never)
+    expect(chat).toHaveBeenCalledTimes(2)
+    const patched = JSON.stringify(payload.patchCluster.mock.calls)
+    expect(patched).toContain('repeated itself')
+    expect(patched).not.toContain('ability to ability to ability to ability to')
+  })
+
   const triageJson = {
     pakistanRelevance: 0.9,
     newsworthiness: 0.9,

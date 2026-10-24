@@ -102,3 +102,34 @@ export function extractUrls(markdown: string): string[] {
   for (const u of markdown.match(bareRe) ?? []) urls.add(u.replace(/[.,]+$/, ''))
   return [...urls]
 }
+
+const FAQ_COMMON = new Set(['pakistan', 'pakistani', 'pakistanis', 'karachi', 'lahore', 'islamabad', 'urdu', 'english', 'roman', 'rupees', 'zaviya'])
+
+/** Names and numbers a FAQ question asks about: capitalised words after the first word, and digit runs. */
+export function faqQuestionTerms(question: string): string[] {
+  const words = question.replace(/[?؟]/g, ' ').split(/\s+/).filter(Boolean)
+  const terms: string[] = []
+  words.forEach((raw, i) => {
+    const w = raw.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').replace(/['’]s$/i, '')
+    if (!w) return
+    if (/\d/.test(w)) terms.push(w.replace(/[,]/g, ''))
+    else if (i > 0 && /^\p{Lu}/u.test(w) && w.length >= 3 && !FAQ_COMMON.has(w.toLowerCase())) terms.push(w)
+  })
+  return terms
+}
+
+/**
+ * ZAV-200: the FAQ must only ask about things the sources contain. The writer once added "Did Arshad Nadeem withdraw
+ * from a Switzerland event?" to a javelin story that never mentioned Switzerland. A question that names a person,
+ * place or number that is absent from every source is dropped (the others stay).
+ */
+export function dropUnsupportedFaqs<T extends { q: string }>(faqs: T[], sourceText: string): { kept: T[]; dropped: T[] } {
+  const hay = sourceText.toLowerCase().replace(/,/g, '')
+  const kept: T[] = []
+  const dropped: T[] = []
+  for (const f of faqs) {
+    const missing = faqQuestionTerms(f.q).filter((t) => !hay.includes(t.toLowerCase()))
+    ;(missing.length ? dropped : kept).push(f)
+  }
+  return { kept, dropped }
+}

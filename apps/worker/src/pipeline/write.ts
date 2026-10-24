@@ -5,7 +5,7 @@ import { isQuotaExhausted, zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
 import type { PayloadClient } from '../payload-client.js'
 import { writeEnSystemPrompt, WRITE_EN_PROMPT_VERSION } from '../prompts/write_en.js'
 import { writeUrSystemPrompt, WRITE_UR_PROMPT_VERSION } from '../prompts/write_ur.js'
-import { extractUrls } from './qa-checks.js'
+import { extractUrls, dropUnsupportedFaqs } from './qa-checks.js'
 import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
@@ -243,6 +243,17 @@ export async function processWriteJob(
     if (isQuotaExhausted(e)) throw e
     logger.warn({ err: e instanceof Error ? e.message : e }, 'write_ur failed')
     return null
+  }
+
+  // ZAV-200: a FAQ question about a person, place or number that no source mentions is dropped
+  const sourceText = cluster.items.map((it) => `${it.title} ${it.summary ?? ''} ${it.contentText ?? ''}`).join('\n')
+  for (const part of [en, ur]) {
+    if (!part?.faqs?.length) continue
+    const { kept, dropped } = dropUnsupportedFaqs(part.faqs, sourceText)
+    if (dropped.length) {
+      part.faqs = kept
+      logger.info({ clusterId: data.clusterId, dropped: dropped.map((f) => f.q) }, 'FAQ questions not supported by the sources dropped')
+    }
   }
 
   logger.info({ clusterId: data.clusterId, en: en.model, ur: ur?.model, title: en.title }, 'article written')
