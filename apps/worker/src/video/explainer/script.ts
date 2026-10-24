@@ -35,6 +35,19 @@ const GREETING = /السلام\s*علیکم|ناظرین|خوش\s*آمدید|د�
 const LATIN = /[A-Za-z]/
 const ATTRIBUTION = /کے مطابق|کا کہنا ہے|کا کہنا تھا|کہتے ہیں|نے بتایا|نے کہا|نے اعلان|کے بقول|رپورٹ|اعلامیہ|بیان/
 
+const BANNED_IN_BRIEF = /\b(faces?|portraits?|selfies?|logos?|flags?|banners?|posters?|signs?|signboards?|texts?|letters?|words?|numbers?|digits?|captions?|labels?|headlines?|screenshots?|newspapers?|currency notes?)\b/gi
+
+/** The picture brief with anything that invites faces, lettering or logos taken out (the style suffix also says "no text"); the writer is not asked again for this. */
+export function cleanBrief(prompt: string): string {
+  return prompt
+    .replace(/\b(no|without)\s+(\w+\s+){0,2}?(faces?|text|letters?|logos?|flags?|numbers?|words?)\b/gi, '')
+    .replace(BANNED_IN_BRIEF, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;])/g, '$1')
+    .replace(/(,\s*){2,}/g, ', ')
+    .trim()
+}
+
 /** What is wrong with a script, in words the writer can act on. Empty = fine. */
 export function scriptIssues(script: ExplainerScript, allowedText: string, evergreen: boolean): string[] {
   const issues: string[] = []
@@ -49,9 +62,6 @@ export function scriptIssues(script: ExplainerScript, allowedText: string, everg
     if (sentences.length > 2) issues.push(`beat ${n}: at most two sentences`)
     for (const s of sentences) if (toSpeechText(s).text.split(/\s+/).length > 26) issues.push(`beat ${n}: a sentence is too long, split it`)
     if (!/[۔؟]$/.test(b.text.trim())) issues.push(`beat ${n}: end with ۔ or ؟`)
-    if (/(face|portrait|logo|flag|text|letters?|words?|numbers?)\b/i.test(b.imagePrompt.replace(/\bno (faces?|text|letters?|logos?|flags?|numbers?|words?)\b/gi, ''))) {
-      issues.push(`beat ${n}: the picture brief must not ask for faces, text, letters, logos or flags`)
-    }
   })
   // a video made from news must say whose claim it is
   if (!evergreen && !ATTRIBUTION.test(script.beats.map((b) => b.text).join(' '))) issues.push('attribute the claims to their source in the sentences (کے مطابق, کا کہنا ہے, نے بتایا, نے اعلان کیا)')
@@ -116,6 +126,7 @@ export async function writeExplainerScript(deps: { router: LLMRouter; fetchText?
     let issues: string[]
     try {
       script = ScriptSchema.parse(JSON.parse(extractJson(res.content)))
+      script = { ...script, beats: script.beats.map((b) => ({ ...b, imagePrompt: cleanBrief(b.imagePrompt) })) }
       issues = scriptIssues(script, allowed, evergreen)
     } catch (e) {
       issues = [`the JSON is invalid: ${e instanceof Error ? e.message.slice(0, 400) : String(e)}`]
