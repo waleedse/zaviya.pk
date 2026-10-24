@@ -23,9 +23,9 @@ if [ ! -x "$AH/sd/sd-cli" ]; then
   cp "$AH/sd-src/build/bin/sd-cli" "$AH/sd/sd-cli"
 fi
 
-# 3. Z-Image Turbo files (Apache-2.0): diffusion model Q4_K, text encoder, VAE
+# 3. Z-Image Turbo files (Apache-2.0): diffusion model Q2_K (Q4_K is better but swaps on a busy 16 GB Mac), text encoder, VAE
 dl() { [ -s "$AH/models/$2" ] || curl -fL -C - -o "$AH/models/$2" "$1"; }
-dl https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf z_image_turbo-Q4_K.gguf
+dl https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q2_K.gguf z_image_turbo-Q2_K.gguf
 dl https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf Qwen3-4B-Instruct-2507-Q4_K_M.gguf
 dl https://huggingface.co/Comfy-Org/Z-Image-Turbo/resolve/main/split_files/vae/ae.safetensors ae.safetensors
 

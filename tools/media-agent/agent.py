@@ -142,20 +142,29 @@ def run_image_fast(p):
     return buf.getvalue(), "image/png", {"model": "sdxs-512", "width": w, "height": h}
 
 
+def diffusion_model():
+    """Z-Image Turbo Q2_K (2.6 GB) by default: on a Mac that is also used for everything else, the Q4 model (3.9 GB) swaps and a
+    picture took 25 minutes; Q2_K took under 5. Set SD_DIFFUSION to a file name in the models folder to use another quant."""
+    for name in (os.environ.get("SD_DIFFUSION"), "z_image_turbo-Q2_K.gguf", "z_image_turbo-Q4_K.gguf"):
+        if name and (SD_MODELS / name).exists():
+            return SD_MODELS / name
+    raise RuntimeError("no Z-Image Turbo model in " + str(SD_MODELS))
+
+
 def run_image_good(p):
     w, h = (int(p["width"]) // 16) * 16, (int(p["height"]) // 16) * 16
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "out.png"
         cmd = ["nice", "-n", "10", str(SD_CLI),
-               "--diffusion-model", str(SD_MODELS / "z_image_turbo-Q4_K.gguf"),
+               "--diffusion-model", str(diffusion_model()),
                "--vae", str(SD_MODELS / "ae.safetensors"),
                "--llm", str(SD_MODELS / "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"),
                "-p", p["prompt"], "--cfg-scale", "1.0", "--steps", str(int(p.get("steps", 8))), "-W", str(w), "-H", str(h),
                "-t", os.environ.get("SD_THREADS", "6"), "--seed", str(int(p.get("seed", 7))), "-o", str(out)]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=25 * 60)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=60 * 60)
         if r.returncode != 0 or not out.exists():
             raise RuntimeError("sd-cli failed: " + (r.stderr or r.stdout)[-300:])
-        return out.read_bytes(), "image/png", {"model": "z-image-turbo-q4", "width": w, "height": h}
+        return out.read_bytes(), "image/png", {"model": "z-image-turbo", "width": w, "height": h}
 
 
 def run_image(payload):
