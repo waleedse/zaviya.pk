@@ -157,3 +157,13 @@ Operating it:
 - Rollback: set the flag to `false` (and `docker compose ... up -d video`), or `docker stop zaviya-video-1`; the news worker and the site are not involved.
 
 Known limits: the Mac must be on (sleep stops the agent; headless Chrome renders on the Mac need `chrome-wrapper.sh`: this Mac's headless Chrome never fires `requestAnimationFrame` without `--in-process-gpu --disable-gpu-compositing`); the voice is one speaker and one style; there is no automatic voice check (ASR round trip) yet; a script with a figure that is not in its sources is rejected, so topics with news need readable sources.
+
+
+### Lessons from the first day (24 Oct 2026)
+
+- **Pictures on the Mac**: Z-Image Turbo Q4_K at 512 px took 25 min a picture while the Mac was busy (swap) and the agent was throttled; the agent now uses the **Q2_K** model, **384 px, 6 steps**, about **four pictures per video** (each stays for two beats), normal priority and 8 threads when the owner has been away for 10 minutes, and a polite share otherwise: about 6 minutes a picture. A round waits up to 150 min and is made with the pictures that arrived (at least two); the missing ones show the nearest.
+- **Telegram is not configured on the server** (empty token): there is no preview or Skip button, and failures are only in the logs. Safety is therefore in code: a script must pass the guards (figures from the sources, no English words, attribution for news-based scripts), the writer must rate it low risk (medium only for ideas the editor approved with ok or boost; high never), and ideas about politics, courts, crime, security or world affairs need the editor's ok. Manual skip: `redis-cli set video:skip:<round key> 1` (the round key is in the logs, e.g. `2026-10-24-explainer-12`).
+- **Instagram** sometimes fails to process a good file (`ProcessingFailedError`); posts now retry once after three minutes.
+- **A release restarts the video container**: a round in flight at that moment is retried by BullMQ with its pictures kept (job ids are stable per idea and attempt).
+- **Dry runs**: `video.mjs run --dry --now` queues behind other rounds (one worker); it makes everything and previews, but never posts.
+- Local Remotion renders on the owner's Mac need `chrome-wrapper.sh`; the Mac agent must be awake (a closed lid stops it: voiced videos fall back to silent, explainer rounds are skipped with one notice a day in the logs).
