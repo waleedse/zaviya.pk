@@ -30,6 +30,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|admin|_next|sitemap\\.xml|news-sitemap\\.xml|robots\\.txt|rss\\.xml|ur/rss\\.xml|favicon|.*\\..*).*)',
+    '/((?!api|admin|embed|_next|sitemap\\.xml|news-sitemap\\.xml|robots\\.txt|rss\\.xml|ur/rss\\.xml|favicon|.*\\..*).*)',
   ],
 }
