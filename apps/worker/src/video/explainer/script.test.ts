@@ -37,9 +37,17 @@ describe('scriptIssues', () => {
     expect(issues).toMatch(/7500/)
   })
 
+  it('asks a news-based script to name its source, but not an evergreen one', () => {
+    expect(scriptIssues(good(), '', true).join(' ')).not.toMatch(/attribute/)
+    expect(scriptIssues(good(), 'some article text', false).join(' ')).toMatch(/attribute/)
+    const s = good()
+    s.beats[1]!.text = 'کمپنی کے مطابق یہ ٹھگوں کا پرانا طریقہ ہے۔ وہ بینک بن کر پیغام بھیجتے ہیں، اور جلدی میں ڈال دیتے ہیں۔'
+    expect(scriptIssues(s, 'some article text', false).join(' ')).not.toMatch(/attribute/)
+  })
+
   it('allows a figure that the sources state', () => {
     const s = good()
-    s.beats[2]!.text = 'ہر سال 7500 لوگ دھوکا کھاتے ہیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا اور نہ پیغام میں مانگتا ہے۔'
+    s.beats[2]!.text = 'رپورٹ کے مطابق ہر سال 7500 لوگ دھوکا کھاتے ہیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا اور نہ پیغام میں مانگتا ہے۔'
     expect(scriptIssues(s, 'In 2025 7,500 people reported it', false)).toEqual([])
   })
 })
