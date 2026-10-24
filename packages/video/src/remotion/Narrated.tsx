@@ -100,7 +100,8 @@ export const Narrated: React.FC<{ timeline: NarratedTimeline }> = ({ timeline })
         <AbsoluteFill style={{ background: BRAND.navy }}>
           {timeline.beats.map((b, i) => {
             const from = i === 0 ? 0 : b.from
-            const dur = b.from + b.durationInFrames - from + (i < timeline.beats.length - 1 ? FADE : 0)
+            // every beat (the last one too) runs a little into the next scene, so the fade never dips to an empty screen
+            const dur = b.from + b.durationInFrames - from + (i < timeline.beats.length - 1 ? FADE : 12)
             return (
               <Sequence key={i} from={from} durationInFrames={dur}>
                 <BeatLayer beat={b} seqFrom={from} accent={theme.accent} />
