@@ -196,14 +196,16 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   mkdirSync(assets, { recursive: true })
   const sentences = scriptSentences(script)
   if (!sentences.length) return fail('script-failed', 'the script has nothing to say')
-  // a retry after a failed round gets fresh job ids: a failed job must not answer for it
+  // Job ids carry a hash of what is asked for: a finished voice or picture is reused only for the very same script (an older script of
+  // the same idea must never lend its voice), and a retry after a failed round gets fresh ids (a failed job must not answer for it)
   const attempt = `exp-${idea.id}-f${idea.failures ?? 0}`
-  const tts = await hub.enqueue('tts', { sentences: sentences.map((s) => s.spoken), lengthScale: 0.9 }, `${attempt}-tts`)
+  const spokenLines = sentences.map((s) => s.spoken)
+  const tts = await hub.enqueue('tts', { sentences: spokenLines, lengthScale: 0.9 }, `${attempt}-tts-${sha1Hex(spokenLines.join('|')).slice(0, 8)}`)
   const plan = imagePlan(script.beats.length)
   const firstBeatOf = (g: number) => script.beats.findIndex((_, i) => plan.groupOf(i) === g)
   const images = await Promise.all(
     Array.from({ length: plan.count }, (_, g) =>
-      hub.enqueue('image', { prompt: `${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, width: IMAGE_SIZE, height: IMAGE_SIZE, quality: 'good', steps: IMAGE_STEPS, seed: 11 + g }, `${attempt}-img${g}`),
+      hub.enqueue('image', { prompt: `${script.beats[firstBeatOf(g)]!.imagePrompt}, ${IMAGE_STYLE}`, width: IMAGE_SIZE, height: IMAGE_SIZE, quality: 'good', steps: IMAGE_STEPS, seed: 11 + g }, `${attempt}-img${g}-${sha1Hex(script.beats[firstBeatOf(g)]!.imagePrompt).slice(0, 8)}`),
     ),
   )
   const budget = deps.assetWaitMs ?? ASSET_WAIT_MS

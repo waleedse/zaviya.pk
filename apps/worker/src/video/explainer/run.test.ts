@@ -41,6 +41,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean;
   const dir = mkdtempSync(path.join(tmpdir(), 'exp-'))
   const hub = new MediaHub(memoryHubStore(), dir, opts.realClock ? Date.now : () => NOW, 5)
   let imagesLeft = opts.imagesDone ?? Infinity
+  const claimed: { kind: string; payload: unknown }[] = []
   const redis = fakeRedis()
   const store = new IdeaStore(memoryIdeaRedis())
   const posts: string[] = []
@@ -49,6 +50,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean;
   agent = setInterval(async () => {
     const job = await hub.claim(['tts', 'image'], 'test')
     if (!job) return
+    claimed.push({ kind: job.kind, payload: job.payload })
     if (job.kind === 'tts') await hub.complete(job.id, Buffer.from('RIFF'), 'audio/wav', { sentenceMs: (job.payload as { sentences: string[] }).sentences.map(() => 3000) })
     else if (imagesLeft-- > 0) await hub.complete(job.id, Buffer.from('PNG'), 'image/png', {})
   }, 5)
@@ -72,7 +74,7 @@ function setup(over: Partial<ExplainerDeps> = {}, opts: { agentOnline?: boolean;
     now: opts.realClock ? Date.now : () => NOW,
     ...over,
   }
-  return { deps, redis, store, posts, upserts, hub }
+  return { deps, redis, store, posts, upserts, hub, claimed }
 }
 
 describe('runExplainerRound', () => {
@@ -131,6 +133,24 @@ describe('runExplainerRound', () => {
     const high = mk('high')
     await high.store.put({ ...evergreen, decision: 'boost' })
     expect((await runExplainerRound(high.deps, { dry: true, ideaId: 'scam1' })).status).toBe('script-failed')
+  })
+
+  it('never reuses the voice of an older script of the same idea', async () => {
+    const other: ExplainerScript = { ...script, beats: script.beats.map((b, i) => (i === 1 ? { ...b, text: 'یہ بالکل نیا جملہ ہے۔ اور یہ دوسرا نیا جملہ ہے۔' } : b)) }
+    const answers = [script, other]
+    const { deps, store, claimed } = setup({ requestScript: vi.fn(async () => ({ script: answers.shift()!, model: 'test', sourceUrls: [] })) })
+    await store.put(evergreen)
+    await runExplainerRound(deps, { dry: true, ideaId: 'scam1', round: 'one' })
+    await runExplainerRound(deps, { dry: true, ideaId: 'scam1', round: 'two' })
+    const voices = claimed.filter((c) => c.kind === 'tts').map((c) => JSON.stringify((c.payload as { sentences: string[] }).sentences))
+    expect(voices).toHaveLength(2)
+    expect(voices[0]).not.toBe(voices[1])
+    // the same script again reuses its voice (no third job)
+    const again = setup({ requestScript: vi.fn(async () => ({ script, model: 'test', sourceUrls: [] })) })
+    await again.store.put(evergreen)
+    await runExplainerRound(again.deps, { dry: true, ideaId: 'scam1', round: 'a' })
+    await runExplainerRound(again.deps, { dry: true, ideaId: 'scam1', round: 'b' })
+    expect(again.claimed.filter((c) => c.kind === 'tts')).toHaveLength(1)
   })
 
   it('does nothing when the Mac agent is offline', async () => {
