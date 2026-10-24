@@ -22,6 +22,7 @@ export const CATEGORIES = [
   { slug: 'ai', en: 'AI', ur: 'مصنوعی ذہانت', color: '#0891B2' },
   { slug: 'autos', en: 'Autos', ur: 'آٹوز', color: '#E4572E' },
   { slug: 'cricket', en: 'Cricket', ur: 'کرکٹ', color: '#1B998B' },
+  { slug: 'sports', en: 'Sports', ur: 'کھیل', color: '#2E7D32' },
   { slug: 'education-jobs', en: 'Jobs', ur: 'تعلیم و نوکریاں', color: '#C2185B' },
   { slug: 'trending', en: 'Trending', ur: 'ٹرینڈنگ', color: '#FF7A00' },
 ] as const

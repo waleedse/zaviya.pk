@@ -26,6 +26,16 @@ export interface TriageDecision {
 const HARD_FLAGS = new Set(['military', 'judiciary', 'religion', 'blasphemy', 'violence', 'death', 'minor', 'election'])
 
 /** Desks where a thin-source code reject has repeatedly binned good Pakistan stories (ZAV-6). */
+/**
+ * The publishing gap in minutes: Settings.minIntervalMin, never more than this ceiling. 10 minutes
+ * since 24 Oct (ZAV-201: 15-20 clusters waited at decision publish while the day was at 89 of 96); was 15
+ * since 16 Oct. Revert by setting it back to 15. Breaking news ignores the gap.
+ */
+export const MAX_PUBLISH_INTERVAL_MIN = 10
+export function effectiveIntervalMin(settings: { minIntervalMin?: number }): number {
+  return Math.min(settings.minIntervalMin ?? MAX_PUBLISH_INTERVAL_MIN, MAX_PUBLISH_INTERVAL_MIN)
+}
+
 const PROTECTED_CATEGORIES = new Set(['cricket', 'education-jobs', 'business', 'ai'])
 /** Desks that run global stories with no Pakistan angle (ZAV-83); relevance is floored for scoring. */
 const GLOBAL_DESKS = new Set(['ai'])
@@ -150,8 +160,7 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
     }
   }
 
-  // At most 15 minutes, so the 4-an-hour floor holds
-  const minInterval = Math.min(ctx.settings.minIntervalMin ?? 15, 15)
+  const minInterval = effectiveIntervalMin(ctx.settings)
   if (wouldPublish && !isBreaking && ctx.lastPublishedAt && minutesSince(ctx.lastPublishedAt, now) < minInterval) {
     const waitMin = minInterval - minutesSince(ctx.lastPublishedAt, now)
     return {

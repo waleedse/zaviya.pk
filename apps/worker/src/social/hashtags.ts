@@ -10,6 +10,7 @@ const CATEGORY_TAGS: Record<string, string[]> = {
   'tech-telecom': ['#TechPakistan'],
   ai: ['#AI'],
   cricket: ['#PakistanCricket', '#Cricket'],
+  sports: ['#PakistanSports', '#Sports'],
   'education-jobs': ['#JobsInPakistan'],
 }
 

@@ -30,6 +30,7 @@ import { FrontPage } from './globals/FrontPage'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
 import { ANALYTICS_DDL } from './lib/analytics'
 import { NEWSLETTER_DDL } from './lib/newsletter'
+import { ensureBootstrapCategories } from './lib/category-bootstrap'
 import { LEARNING_DDL } from './lib/learning'
 import { migrations } from './migrations'
 
@@ -143,7 +144,16 @@ export default buildConfig({
       `)
 
       await drizzle.execute(sql`ALTER TYPE enum_sources_type ADD VALUE IF NOT EXISTS 'instagram'`)
+      // ZAV-201: new category slugs are added to the select enum here (additive, idempotent), no migration
+      await drizzle.execute(sql`ALTER TYPE enum_categories_slug ADD VALUE IF NOT EXISTS 'sports'`)
       for (const stmt of [...ANALYTICS_DDL, ...LEARNING_DDL, ...NEWSLETTER_DDL]) await drizzle.execute(stmt)
+
+      try {
+        const made = await ensureBootstrapCategories(payload)
+        if (made.length) payload.logger.info({ made }, 'bootstrap categories created')
+      } catch (err) {
+        payload.logger.error({ err }, 'bootstrap categories failed (retried on next boot)')
+      }
 
       await drizzle.execute(sql`
         CREATE INDEX IF NOT EXISTS source_items_embedding_hnsw_idx

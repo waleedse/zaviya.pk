@@ -150,6 +150,10 @@ export const SECTION_SEO: Record<string, { en: { title: string; description: str
     en: { title: 'Cricket News: Pakistan Team, PSL, Scores & Schedules', description: 'Pakistan cricket news, PSL updates, match previews, squads, results and schedules.' },
     ur: { title: 'کرکٹ کی خبریں: پاکستان ٹیم، پی ایس ایل اور شیڈول', description: 'پاکستان کرکٹ ٹیم، پی ایس ایل، میچز کے نتائج، اسکواڈ اور شیڈول کی تازہ خبریں۔' },
   },
+  sports: {
+    en: { title: 'Sports News Pakistan: Athletics, Hockey, Football & Olympics', description: 'Pakistan sports news beyond cricket: athletics, hockey, football, Olympics, squash and more, with results and schedules.' },
+    ur: { title: 'کھیلوں کی خبریں: ایتھلیٹکس، ہاکی، فٹبال اور اولمپکس', description: 'کرکٹ کے علاوہ پاکستان کے کھیلوں کی خبریں: ایتھلیٹکس، ہاکی، فٹبال، اولمپکس اور اسکواش۔' },
+  },
   'education-jobs': {
     en: { title: 'Education & Jobs Pakistan: Results, Admissions, Govt Jobs', description: 'Board results, admissions, scholarships, government jobs and education policy news in Pakistan.' },
     ur: { title: 'تعلیم و نوکریاں: نتائج، داخلے اور سرکاری نوکریاں', description: 'بورڈ کے نتائج، داخلے، اسکالرشپس، سرکاری نوکریاں اور تعلیمی پالیسی کی خبریں۔' },
