@@ -30,7 +30,7 @@ describe('composeNarrated', () => {
   })
 
   it('refuses a video that is too long or empty', () => {
-    expect(() => composeNarrated({ title: 'T', titleUr: 'ٹی', beats: [beat([95_000])], audio: 'v.wav', cta: 'c' })).toThrow(/shorten/)
+    expect(() => composeNarrated({ title: 'T', titleUr: 'ٹی', beats: [beat([155_000])], audio: 'v.wav', cta: 'c' })).toThrow(/shorten/)
     expect(() => composeNarrated({ title: 'T', titleUr: 'ٹی', beats: [], audio: 'v.wav', cta: 'c' })).toThrow()
   })
 })

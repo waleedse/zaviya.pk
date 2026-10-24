@@ -37,6 +37,17 @@ export const DAY = 24 * HOUR
 const SENSITIVE =
   /\b(terror\w*|blast|bomb\w*|killed|kills?|dead|death|martyr\w*|murder\w*|rape\w*|harass\w*|abduct\w*|kidnap\w*|massacre|shooting|attack\w*|militan\w*|court|verdict|convict\w*|acquit\w*|arrest\w*|accused|bail|blasphem\w*|sectarian|election\w*|rigging|ISPR|army|military|PTI|PMLN|PML-N|PPP|Imran|Nawaz|Sharif|Zardari|Bilawal|protest\w*|riot\w*|war|ceasefire|strike on|missile|drone|minister\w*|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|diplomat\w*|summit|delegation|envoy|opposition|coalition|ruling|treaty|sanction\w*)\b/i
 
+/**
+ * Government and public-administration topics are never made (Waleed, 24 Oct): ministers, budgets, taxes, courts, regulators, the
+ * IMF, public jobs and the like. Unlike SENSITIVE, an editor's ok or boost does not lift this.
+ */
+const GOVERNMENT =
+  /\b(govt|government\w*|minister\w*|ministry|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|prime minister|PM|federal|provincial|budget|tax(?:es|ation)?|FBR|SBP|State Bank|OGRA|NEPRA|PTA|NADRA|policy|policies|ordinance|laws?|court\w*|supreme|judge\w*|election\w*|ECP|IMF|World Bank|subsid\w*|privati[sz]\w*|DISCOs?|regulator\w*|authority|commission|PPSC|FPSC|NTS|vacanc\w*|scholarship\w*|levy|levies|duty|duties|tariff\w*|army|military|ISPR|police|FIA|NAB|PML-?N|PTI|PPP)\b/i
+
+export function isGovernment(text: string): boolean {
+  return GOVERNMENT.test(text)
+}
+
 export function isSensitive(text: string): boolean {
   return SENSITIVE.test(text)
 }
@@ -62,6 +73,7 @@ export function similar(a: string, b: string): number {
 /** Higher is better. Excluded ideas (vetoed, expired, made, needs-veto without approval) return -Infinity. */
 export function scoreIdea(idea: Idea, now: number): number {
   if (idea.status !== 'backlog' || idea.decision === 'veto') return -Infinity
+  if (isGovernment(`${idea.title} ${idea.angle}`)) return -Infinity
   if (idea.hookUntil !== undefined && now > idea.hookUntil) return -Infinity
   if (idea.risk === 'needs-veto' && idea.decision !== 'ok' && idea.decision !== 'boost') return -Infinity
   let s = idea.baseScore
@@ -110,8 +122,8 @@ export interface DiscoverArticle {
   tags?: string[]
 }
 
-/** Categories where an explainer makes sense: money, technology, AI and jobs news can be explained; politics, world affairs and crime cannot. */
-export const EXPLAINABLE = new Set(['business', 'tech-telecom', 'ai', 'education-jobs'])
+/** Categories where an explainer can come from the news: technology, AI, business, cricket and world stories (anything about government or violence is filtered out by words). */
+export const EXPLAINABLE = new Set(['business', 'tech-telecom', 'ai', 'cricket', 'world'])
 
 export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: string[]; now: number }): Idea[] {
   const { articles, trends, now } = input
@@ -126,6 +138,7 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
     const age = now - Date.parse(a.publishedAt)
     if (!(age >= 0 && age <= 36 * HOUR) || !EXPLAINABLE.has(a.category) || a.isBreaking) continue
     const text = `${a.title} ${a.dek ?? ''}`
+    if (isGovernment(text)) continue
     const trending = trends.some((t) => t.trim().length >= 4 && similar(t, a.title) >= 0.6)
     add({
       id: ideaId(a.title),
@@ -135,7 +148,7 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
       articleId: a.id,
       sources: [a.url],
       tags: (a.tags ?? []).slice(0, 4),
-      baseScore: (trending ? 30 : 14) + (a.priority === 'high' ? 10 : 0),
+      baseScore: (trending ? 34 : 12) + (a.priority === 'high' ? 8 : 0),
       createdAt: now,
       hookUntil: Date.parse(a.publishedAt) + 36 * HOUR,
       risk: isSensitive(text) ? 'needs-veto' : 'low',

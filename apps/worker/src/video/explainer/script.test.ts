@@ -3,20 +3,18 @@ import { cleanBrief, scriptIssues, writeExplainerScript, type ExplainerScript } 
 import type { Idea } from './ideas.js'
 
 const beat = (text: string, imagePrompt = 'a smartphone and a shield symbol on a plain background') => ({ kicker: 'پہلی بات', text, imagePrompt })
+const SENTENCES = [
+  'یہ ایک مثال کا جملہ ہے جو کافی الفاظ رکھتا ہے۔',
+  'اس سے ویڈیو کی لمبائی پوری ہوتی ہے اور بات سمجھ آتی ہے۔',
+]
+const longBeat = (extra = '') => beat(`${extra}${SENTENCES.join(' ')}`)
 const good = (): ExplainerScript => ({
-  title: 'How to avoid bank scams',
-  titleUr: 'بینک کے دھوکے سے کیسے بچیں',
-  beats: [
-    beat('کیا آپ کو کبھی ایسا پیغام ملا ہے کہ اکاؤنٹ بند ہونے والا ہے؟'),
-    beat('یہ ٹھگوں کا پرانا طریقہ ہے۔ وہ بینک بن کر پیغام بھیجتے ہیں، اور جلدی میں ڈال دیتے ہیں۔'),
-    beat('کسی کو اپنا او ٹی پی کبھی نہ بتائیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا اور نہ پیغام میں مانگتا ہے۔'),
-    beat('پیغام میں آئے ہوئے لنک پر کلک نہ کریں۔ ایپ یا ویب سائٹ خود کھول کر دیکھیں اور ہر بات کی تصدیق کریں۔'),
-    beat('اگر شک ہو تو کال کاٹ دیں۔ بینک کی اپنی ہیلپ لائن پر خود فون کریں، جو آپ کے کارڈ پر لکھی ہوتی ہے۔'),
-    beat('دھوکا ہو جائے تو فوراً بینک کو بتائیں اور اکاؤنٹ بلاک کروائیں۔ ایسی مزید کام کی باتیں زاویہ ڈاٹ پی کے پر دیکھیں۔'),
-  ],
-  caption: 'چار آسان عادتیں جو آپ کو دھوکے سے بچا سکتی ہیں۔',
-  hashtags: ['Scam', 'Cybersecurity', 'Banking'],
-  facts: [{ claim: 'banks do not ask for OTP', source: 'general knowledge' }],
+  title: 'How a black hole is born',
+  titleUr: 'بلیک ہول کیسے بنتا ہے',
+  beats: Array.from({ length: 9 }, () => longBeat()),
+  caption: 'ایک دلچسپ سائنسی کہانی جو آپ کو حیران کر دے گی۔',
+  hashtags: ['Space', 'Science', 'BlackHole'],
+  facts: [{ claim: 'general', source: 'general knowledge' }],
   risk: 'low',
 })
 
@@ -39,13 +37,13 @@ describe('scriptIssues', () => {
     expect(scriptIssues(good(), '', true).join(' ')).not.toMatch(/attribute/)
     expect(scriptIssues(good(), 'some article text', false).join(' ')).toMatch(/attribute/)
     const s = good()
-    s.beats[1]!.text = 'کمپنی کے مطابق یہ ٹھگوں کا پرانا طریقہ ہے۔ وہ بینک بن کر پیغام بھیجتے ہیں، اور جلدی میں ڈال دیتے ہیں۔'
+    s.beats[1]!.text = `کمپنی کے مطابق یہ بات درست ہے۔ ${SENTENCES.join(' ')}`
     expect(scriptIssues(s, 'some article text', false).join(' ')).not.toMatch(/attribute/)
   })
 
   it('allows a figure that the sources state', () => {
     const s = good()
-    s.beats[2]!.text = 'رپورٹ کے مطابق ہر سال 7500 لوگ دھوکا کھاتے ہیں۔ اصل بینک یہ کوڈ فون پر نہیں مانگتا اور نہ پیغام میں مانگتا ہے۔'
+    s.beats[2]!.text = `رپورٹ کے مطابق ہر سال 7500 لوگ دھوکا کھاتے ہیں۔ ${SENTENCES[0]}`
     expect(scriptIssues(s, 'In 2025 7,500 people reported it', false)).toEqual([])
   })
 })
@@ -73,7 +71,7 @@ describe('writeExplainerScript', () => {
     } }
     const r = await writeExplainerScript({ router: router as never }, idea)
     expect(calls).toBe(2)
-    expect(r.script.beats).toHaveLength(6)
+    expect(r.script.beats).toHaveLength(9)
   })
 
   it('gives up after three failed tries', async () => {

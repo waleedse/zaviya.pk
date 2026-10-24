@@ -11,6 +11,7 @@ import { processMediaJob } from './pipeline/media.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './pipeline/hero-backfill.js'
 import { processPublishJob } from './pipeline/publish.js'
 import { EXPLAINER_QUEUE, processExplainerScript, processHeadlineJob } from './video/explainer/script-job.js'
+import { startExplainerImageWorker } from './video/explainer/gemini-images.js'
 import { fetchRssFeed, jobLikeDropped, toSourceItemInputs } from './ingest/rss.js'
 import { BUILTIN_SOURCES, fetchPpscSourceItems, isPpscUrl } from './ingest/ppsc.js'
 import { isAllowedByRobots } from './ingest/robots.js'
@@ -319,6 +320,15 @@ export async function createWorkerRuntime(
       { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
+
+  // Explainer pictures: Gemini (through the extension) or FLUX, claimed from the video service's media hub
+  if (env.MEDIA_AGENT_TOKEN) {
+    startExplainerImageWorker({
+      hubUrl: env.VIDEO_HUB_URL,
+      token: env.MEDIA_AGENT_TOKEN,
+      deps: { bridge, geminiAccount: env.GEMINI_WEB_ACCOUNT, accountId: env.CLOUDFLARE_ACCOUNT_ID, aiToken: env.CLOUDFLARE_AI_TOKEN },
+    })
+  }
 
   // Explainer videos: the video service has no LLM, so the script is written here and left in Redis
   workers.push(

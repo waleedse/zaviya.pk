@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DAY, discoverIdeas, HOUR, IdeaStore, ideaId, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
+import { EVERGREEN } from './evergreen.js'
+import { DAY, discoverIdeas, isGovernment, HOUR, IdeaStore, ideaId, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
 
 const NOW = Date.UTC(2026, 9, 24, 8)
 const idea = (over: Partial<Idea> = {}): Idea => ({ id: ideaId(over.title ?? 'x'), title: 'Some topic about rockets', angle: 'a', origin: 'evergreen', sources: [], tags: [], baseScore: 16, createdAt: NOW, risk: 'low', status: 'backlog', ...over })
@@ -46,7 +47,8 @@ describe('discovery', () => {
       articles: [
         article(),
         article({ id: 2, title: 'Blast kills three near market', category: 'pakistan' }),
-        article({ id: 3, title: 'Court verdict on tax case', category: 'business' }),
+        article({ id: 3, title: 'Shooting near the cricket stadium', category: 'cricket' }),
+        article({ id: 11, title: 'Court verdict on tax case', category: 'business' }),
         article({ id: 4, title: 'Old story about chips', publishedAt: new Date(NOW - 50 * HOUR).toISOString() }),
         article({ id: 5, title: 'Big AI model launched', category: 'ai', isBreaking: true }),
         article({ id: 6, title: 'Foreign affairs update from abroad', category: 'world' }),
@@ -59,10 +61,23 @@ describe('discovery', () => {
     expect(byArticle(1)?.risk).toBe('low')
     expect(byArticle(2)).toBeUndefined()
     expect(byArticle(3)?.risk).toBe('needs-veto')
+    expect(byArticle(11)).toBeUndefined()
     expect(byArticle(4)).toBeUndefined()
     expect(byArticle(5)).toBeUndefined()
-    expect(byArticle(6)).toBeUndefined()
+    expect(byArticle(6)).toBeDefined()
     expect(found.filter((i) => i.origin === 'evergreen').length).toBeGreaterThan(20)
+  })
+
+  it('never makes government topics, whatever the editor says', () => {
+    expect(isGovernment('Govt cuts advance tax on imported phones')).toBe(true)
+    expect(isGovernment('Federal budget 2027 explained')).toBe(true)
+    expect(isGovernment('IMF approves new tranche for Pakistan')).toBe(true)
+    expect(isGovernment('How a black hole is born')).toBe(false)
+    expect(scoreIdea(idea({ title: 'Govt cuts tax on phones', decision: 'boost' }), NOW)).toBe(-Infinity)
+    expect(EVERGREEN.filter((e) => isGovernment(`${e.title} ${e.angle}`)).map((e) => e.title)).toEqual([])
+    const found = discoverIdeas({ articles: [article({ id: 9, title: 'Govt announces new tax on phones', category: 'tech-telecom' }), article({ id: 10, title: 'Starlink opens bookings', category: 'tech-telecom' })], trends: [], now: NOW })
+    expect(found.find((i) => i.articleId === 9)).toBeUndefined()
+    expect(found.find((i) => i.articleId === 10)).toBeDefined()
   })
 
   it('detects sensitive words', () => {

@@ -1,7 +1,7 @@
 /** The explainer backlog over HTTP for the editor agent (and for Waleed): list, add, decide, and make one now. */
 import { z } from 'zod'
 import type { ExtraRoutes } from '../media-hub.js'
-import { HOUR, ideaId, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
+import { HOUR, ideaId, isGovernment, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
 
 const AddSchema = z.object({
   title: z.string().min(8).max(160),
@@ -42,6 +42,7 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
     if (method === 'POST' && pathname === '/ideas') {
       const p = AddSchema.safeParse(body)
       if (!p.success) return { status: 400, body: { error: p.error.issues[0]?.message ?? 'invalid' } }
+      if (isGovernment(`${p.data.title} ${p.data.angle}`)) return { status: 400, body: { error: 'government and public-administration topics are not made as videos' } }
       const t = now()
       const idea: Idea = {
         id: ideaId(p.data.title),
