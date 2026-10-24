@@ -26,6 +26,8 @@ export interface OutgoingMail {
   body: string
   inReplyTo?: string | null
   references?: string | null
+  /** Newsletter mail (ZAV-109): sender name instead of "Zaviya Ops", extra headers such as List-Unsubscribe, instead of Auto-Submitted */
+  bulk?: { fromName: string; headers: Record<string, string> }
   /** Files to attach (multipart/mixed); the content is base64 already */
   attachments?: { filename: string; contentType: string; base64: string }[]
 }
@@ -102,7 +104,7 @@ export function buildMessage(from: string, mail: OutgoingMail, id: string, date 
   const attachments = mail.attachments ?? []
   const boundary = `zaviya_${id.replace(/[^\w]/g, '').slice(0, 24)}_mix`
   const headers = [
-    `From: Zaviya Ops <${from}>`,
+    `From: ${mail.bulk ? oneLine(mail.bulk.fromName).replace(/[<>"]/g, '') : 'Zaviya Ops'} <${from}>`,
     `To: <${oneLine(mail.to)}>`,
     `Subject: ${encWord(oneLine(mail.subject))}`,
     `Date: ${date.toUTCString().replace('GMT', '+0000')}`,
@@ -110,7 +112,9 @@ export function buildMessage(from: string, mail: OutgoingMail, id: string, date 
     ...(mail.inReplyTo
       ? [`In-Reply-To: ${oneLine(mail.inReplyTo)}`, `References: ${oneLine([mail.references, mail.inReplyTo].filter(Boolean).join(' '))}`]
       : []),
-    'Auto-Submitted: auto-replied',
+    ...(mail.bulk
+      ? [...Object.entries(mail.bulk.headers).map(([k, v]) => `${oneLine(k).replace(/[^\w-]/g, '')}: ${oneLine(v)}`)]
+      : ['Auto-Submitted: auto-replied']),
     'MIME-Version: 1.0',
   ]
   if (!attachments.length) {

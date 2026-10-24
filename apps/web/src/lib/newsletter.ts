@@ -97,6 +97,98 @@ export const NEWSLETTER_DDL = [
     confirmed_at timestamptz,
     unsubscribed_at timestamptz
   )`,
+  // Phase 2 (ZAV-109): the day (Asia/Karachi) of the last briefing sent, so a re-run never mails anyone twice
+  sql`ALTER TABLE zaviya_newsletter_subscribers ADD COLUMN IF NOT EXISTS last_briefing_on date`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_newsletter_ip_idx ON zaviya_newsletter_subscribers (ip_hash, created_at)`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_newsletter_unsent_idx ON zaviya_newsletter_subscribers (created_at) WHERE status = 'pending' AND confirm_sent_at IS NULL`,
 ]
+
+// ---------- worker side (phase 2): the worker reads and marks rows through /api/pipeline/newsletter/* ----------
+
+const idList = (ids: number[]) => sql.join(ids.map((i) => sql`${Math.trunc(i)}`), sql`, `)
+
+export interface SubscriberRow {
+  id: number
+  email: string
+  locale: string
+  token: string
+}
+
+/** Pending addresses that have not had their confirmation mail yet (3 days at most, then the request is stale). */
+export async function pendingConfirmations(limit: number): Promise<SubscriberRow[]> {
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`
+    SELECT id::int AS id, email, locale, token FROM zaviya_newsletter_subscribers
+    WHERE status = 'pending' AND confirm_sent_at IS NULL AND created_at > now() - interval '3 days'
+    ORDER BY created_at LIMIT ${limit}
+  `)
+  return res.rows as unknown as SubscriberRow[]
+}
+
+export async function markConfirmationSent(ids: number[]): Promise<number> {
+  if (!ids.length) return 0
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`
+    UPDATE zaviya_newsletter_subscribers SET confirm_sent_at = now()
+    WHERE id IN (${idList(ids)}) AND status = 'pending' RETURNING id
+  `)
+  return res.rows.length
+}
+
+/** Confirmed subscribers that have not had the briefing of `day` (YYYY-MM-DD, Karachi). */
+export async function subscribersForBriefing(day: string, limit: number): Promise<SubscriberRow[]> {
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`
+    SELECT id::int AS id, email, locale, token FROM zaviya_newsletter_subscribers
+    WHERE status = 'active' AND (last_briefing_on IS NULL OR last_briefing_on < ${day}::date)
+    ORDER BY id LIMIT ${limit}
+  `)
+  return res.rows as unknown as SubscriberRow[]
+}
+
+export async function markBriefed(ids: number[], day: string): Promise<number> {
+  if (!ids.length) return 0
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`
+    UPDATE zaviya_newsletter_subscribers SET last_briefing_on = ${day}::date
+    WHERE id IN (${idList(ids)}) AND status = 'active' RETURNING id
+  `)
+  return res.rows.length
+}
+
+export interface BriefingStory {
+  id: number
+  category: string
+  slugEn: string
+  titleEn: string
+  dekEn: string | null
+  slugUr: string | null
+  titleUr: string | null
+  dekUr: string | null
+}
+
+/** The five stories of the morning briefing: published in the last 30 hours, breaking and high priority first, then newest. */
+export async function briefingStories(limit = 5): Promise<BriefingStory[]> {
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`
+    SELECT a.id::int AS id, c.slug AS category,
+      en.slug AS "slugEn", en.title AS "titleEn", en.dek AS "dekEn",
+      ur.slug AS "slugUr", ur.title AS "titleUr", ur.dek AS "dekUr"
+    FROM articles a
+    JOIN articles_locales en ON en._parent_id = a.id AND en._locale = 'en'
+    LEFT JOIN articles_locales ur ON ur._parent_id = a.id AND ur._locale = 'ur'
+    LEFT JOIN categories c ON c.id = a.category_id
+    WHERE a._status = 'published' AND (a.workflow IS NULL OR a.workflow != 'retracted')
+      AND a.published_at > now() - interval '30 hours'
+      AND en.title IS NOT NULL AND en.slug IS NOT NULL AND c.slug IS NOT NULL
+    ORDER BY (a.is_breaking IS TRUE) DESC, (a.priority::text = 'high') DESC, a.published_at DESC
+    LIMIT ${limit}
+  `)
+  return res.rows as unknown as BriefingStory[]
+}
+
+export async function subscriberCounts(): Promise<Record<string, number>> {
+  const payload = await getPayloadClient()
+  const res = await payload.db.drizzle.execute(sql`SELECT status, count(*)::int AS n FROM zaviya_newsletter_subscribers GROUP BY status`)
+  return Object.fromEntries((res.rows as unknown as { status: string; n: number }[]).map((r) => [r.status, r.n]))
+}
