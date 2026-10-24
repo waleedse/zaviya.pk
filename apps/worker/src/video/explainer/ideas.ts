@@ -42,10 +42,12 @@ const SENSITIVE =
  * IMF, public jobs and the like. Unlike SENSITIVE, an editor's ok or boost does not lift this.
  */
 const GOVERNMENT =
-  /\b(govt|government\w*|minister\w*|ministry|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|prime minister|PM|federal|provincial|budget|tax(?:es|ation)?|FBR|SBP|State Bank|OGRA|NEPRA|PTA|NADRA|policy|policies|ordinance|laws?|court\w*|supreme|judge\w*|election\w*|ECP|IMF|World Bank|subsid\w*|privati[sz]\w*|DISCOs?|regulator\w*|authority|commission|PPSC|FPSC|NTS|vacanc\w*|scholarship\w*|levy|levies|duty|duties|tariff\w*|army|military|ISPR|police|FIA|NAB|PML-?N|PTI|PPP)\b/i
+  /\b(govt|government\w*|minister\w*|ministry|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|prime minister|PM|federal|provincial|budget|tax(?:es|ation)?|FBR|SBP|State Bank|OGRA|NEPRA|PTA|NADRA|policy|policies|ordinance|laws?|court\w*|supreme|judge\w*|election\w*|ECP|IMF|World Bank|subsid\w*|privati[sz]\w*|DISCOs?|regulator\w*|authority|commission|PPSC|FPSC|NTS|vacanc\w*|scholarship\w*|levy|levies|duty|duties|tariff\w*|army|military|ISPR|police|FIA|NAB|PML-?N|PTI|PPP|visas?|immigra\w+|passports?|embass\w+|consulate|residency|work permit|merit list|admissions?|HED|HEC|department|board|bureau|council|ministerial|public sector|civil servants?|pension\w*|salary increase|bill passed|IRIS|KTBA|customs|import duty|export policy)\b/i
+// laws named like "Companies Act 2017": a capitalised word before "Act"
+const NAMED_ACT = /\b[A-Z][a-z]+ Act\b|\bAct,? \d{4}\b/
 
 export function isGovernment(text: string): boolean {
-  return GOVERNMENT.test(text)
+  return GOVERNMENT.test(text) || NAMED_ACT.test(text)
 }
 
 export function isSensitive(text: string): boolean {
