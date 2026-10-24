@@ -12,6 +12,7 @@ import type { VideoConfig, VideoPlatform } from '../config.js'
 import type { RedisLike } from '../job.js'
 import { composeNarrated, type ApiArticle, type NarratedInput, type NarratedTimeline } from '../lib.js'
 import { MediaHub } from '../media-hub.js'
+import { postWithRetry } from '../post-retry.js'
 import { hhmm, karachiDate, KARACHI_OFFSET_MS, runsOn, slotTimeMs, type Slot } from '../schedule.js'
 import type { VideoTelegram } from '../telegram.js'
 import { speechSentences, toSpeechText } from '../urdu-speech.js'
@@ -311,12 +312,7 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
       continue
     }
     const copy = captions[platform]
-    let result: ReelResult
-    try {
-      result = await deps.postReel(platform, { file: mp4, text: copy.text, title: copy.title })
-    } catch (e) {
-      result = { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
+    const result: ReelResult = await postWithRetry(() => deps.postReel(platform, { file: mp4, text: copy.text, title: copy.title }), deps.sleep)
     await deps.payload
       .upsertSocialPost({
         idempotencyKey: sha1Hex(`explainer:${key}:${platform}`),
