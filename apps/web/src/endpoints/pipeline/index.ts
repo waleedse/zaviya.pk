@@ -14,6 +14,7 @@ import { handlePipelineArticles } from './articles'
 import { pageviewsReport } from '../../lib/pageviews-report'
 import { expireBreaking, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
+import { briefingStories, markBriefed, markConfirmationSent, pendingConfirmations, subscriberCounts, subscribersForBriefing } from '../../lib/newsletter'
 import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
 
 // Phase 2: Remotion reel render queue — see docs/GROWTH.md and lib/remotion-brief.ts
@@ -1332,6 +1333,52 @@ const pipelineEndpoints: Endpoint[] = [
         req,
       })
       return json({ ok: true, killSwitch: Boolean(settings.killSwitch), commands: commands.rows ?? [] })
+    },
+  },
+  // ZAV-109 phase 2: the worker mails the confirmation and the morning briefing; these four read and mark the rows
+  {
+    path: '/pipeline/newsletter/pending',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const limit = Math.max(1, Math.min(Number(new URL(req.url ?? 'http://x').searchParams.get('limit')) || 25, 100))
+      return json({ rows: await pendingConfirmations(limit), counts: await subscriberCounts() })
+    },
+  },
+  {
+    path: '/pipeline/newsletter/confirm-sent',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ ids: z.array(z.number().int().positive()).min(1).max(200) }))
+      if ('error' in parsed) return parsed.error
+      return json({ ok: true, marked: await markConfirmationSent(parsed.data.ids) })
+    },
+  },
+  {
+    path: '/pipeline/newsletter/briefing',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const q = new URL(req.url ?? 'http://x').searchParams
+      const day = q.get('day') ?? ''
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return badRequest('day must be YYYY-MM-DD')
+      const limit = Math.max(1, Math.min(Number(q.get('limit')) || 50, 200))
+      return json({ stories: await briefingStories(5), rows: await subscribersForBriefing(day, limit) })
+    },
+  },
+  {
+    path: '/pipeline/newsletter/briefed',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ ids: z.array(z.number().int().positive()).min(1).max(200), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+      if ('error' in parsed) return parsed.error
+      return json({ ok: true, marked: await markBriefed(parsed.data.ids, parsed.data.day) })
     },
   },
 ]

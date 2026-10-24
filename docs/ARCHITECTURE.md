@@ -449,3 +449,9 @@ BRIDGE_PORT=8787  BRIDGE_TOKEN=
 - Logs: pino (JSON) to stdout, sent on to Sentry for errors.
 - Heartbeat: the worker updates `settings.lastHeartbeat` every minute, and an uptime monitor alerts through Telegram.
 - KPI dashboard (in Payload admin): articles per day, approval-without-edit rate, median time from detection to publish, top categories by CTR, social reach.
+
+## Newsletter (ZAV-109)
+
+- Subscribers live in `zaviya_newsletter_subscribers` (raw SQL table created on web boot, no Payload migration; drop it to undo). Web: `/api/newsletter/{subscribe,confirm,unsubscribe}`, `/subscribe`, the form on the home page.
+- Sending (phase 2) is the worker's `newsletter` job on the `data` queue, every 10 minutes: confirmation mail to pending addresses, then the "Zaviya Morning Briefing" (top 5 of the last 30 h, breaking/high first) from 07:30 to 11:30 Asia/Karachi, at most 200 mails an hour, one per subscriber per day (`last_briefing_on`). The worker reads and marks rows through `/api/pipeline/newsletter/{pending,confirm-sent,briefing,briefed}` (bot key).
+- Off by default: needs `NEWSLETTER_SEND=true` and `NEWS_MAIL_PASSWORD` (user `NEWS_MAIL_USER`, default `news@zaviya.pk`, host `MAIL_HOST`) in `worker.env`, then a worker restart. Mails carry `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
