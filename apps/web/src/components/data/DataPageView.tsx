@@ -94,6 +94,14 @@ export default function DataPageView({ locale, page, slug }: { locale: Locale; p
             </section>
           )}
 
+          {page.key === 'usd-pkr' && (
+            <p className="mt-4 text-sm">
+              <Link href={localePath(locale, '/riyal-dirham-rate-pakistan')} className="font-semibold underline">
+                {isUr ? 'سعودی ریال اور درہم کا آج کا ریٹ' : 'Saudi riyal and UAE dirham rate today'}
+              </Link>
+            </p>
+          )}
+
           <p className="mt-4 text-xs leading-relaxed text-fg-subtle">
             <strong className="text-fg-muted">{d.source}:</strong> {page.source}
           </p>
