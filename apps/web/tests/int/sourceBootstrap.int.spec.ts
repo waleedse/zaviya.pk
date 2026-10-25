@@ -6,7 +6,7 @@ describe('bootstrap sources', () => {
   it('has unique keys that do not clash with the seed, and https urls', () => {
     const keys = BOOTSTRAP_SOURCES.map((s) => s.key)
     expect(new Set(keys).size).toBe(keys.length)
-    for (const k of keys) expect(SEED_SOURCES.some((s) => s.key === k)).toBe(false)
+    for (const k of keys) expect(SEED_SOURCES.some((s) => (s.key as string) === k)).toBe(false)
     for (const s of BOOTSTRAP_SOURCES) expect(s.url.startsWith('https://')).toBe(true)
   })
   it('creates only the missing ones and never updates', async () => {
