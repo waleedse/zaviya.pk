@@ -11,8 +11,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl()
   const payload = await getPayloadClient()
   const entries: MetadataRoute.Sitemap = [
-    { url: siteUrl, lastModified: new Date(), changeFrequency: 'hourly', priority: 1 },
-    { url: `${siteUrl}/ur`, lastModified: new Date(), changeFrequency: 'hourly', priority: 1 },
+    { url: siteUrl, changeFrequency: 'hourly', priority: 1 },
+    { url: `${siteUrl}/ur`, changeFrequency: 'hourly', priority: 1 },
   ]
 
   for (const c of CATEGORIES) {
@@ -94,6 +94,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
       })
     }
+  }
+
+  // lastmod of hubs = newest article change (a lastmod of "now" on every fetch is ignored by Google)
+  const hubMod = articles.docs.reduce<string | undefined>((m, a) => {
+    const t = (a.updatedAt ?? a.publishedAt) as string | undefined
+    return t && (!m || t > m) ? t : m
+  }, undefined)
+  if (hubMod) {
+    const hubs = new Set([siteUrl, `${siteUrl}/ur`, ...CATEGORIES.flatMap((c) => [`${siteUrl}/${c.slug}`, `${siteUrl}/ur/${c.slug}`])])
+    for (const e of entries) if (hubs.has(e.url)) e.lastModified = hubMod
   }
 
   if (urduEnabled()) return entries
