@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      { source: '/sbp-policy-rate-pakistan', destination: '/sbp-policy-rate', permanent: true },
       { source: '/zaviya-news', destination: '/about', permanent: true },
       { source: '/ur/zaviya-news', destination: '/ur/about', permanent: true },
     ]
