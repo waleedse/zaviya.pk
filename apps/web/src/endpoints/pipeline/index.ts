@@ -1,5 +1,5 @@
 import { sql } from '@payloadcms/db-postgres'
-import type { Endpoint, PayloadRequest } from 'payload'
+import type { Endpoint, PayloadRequest, Where } from 'payload'
 import { z } from 'zod'
 import { PRIORITIES, RATE_SERIES } from '@zaviya/shared'
 import {
@@ -16,6 +16,7 @@ import { expireBreaking, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
 import { briefingStories, markBriefed, markConfirmationSent, pendingConfirmations, subscriberCounts, subscribersForBriefing } from '../../lib/newsletter'
 import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
+import { STUCK_PAGE_SIZE, collectStuckApproved } from '../../lib/stuck-approved'
 
 // Phase 2: Remotion reel render queue — see docs/GROWTH.md and lib/remotion-brief.ts
 
@@ -1098,31 +1099,34 @@ const pipelineEndpoints: Endpoint[] = [
       const minAgeMin = Math.max(1, Math.min(Number(q.get('minAgeMin')) || 5, 24 * 60))
       const writingAgeMin = Math.max(minAgeMin, Math.min(Number(q.get('writingAgeMin')) || 45, 24 * 60))
       const publishAgeMin = Math.max(minAgeMin, Math.min(Number(q.get('publishAgeMin')) || 30, 24 * 60))
-      const res = await req.payload.find({
-        collection: 'story-clusters',
-        where: {
-          and: [
-            { status: { in: ['triaged', 'in_review', 'writing'] } },
-            { article: { exists: false } },
-            { updatedAt: { less_than: new Date(Date.now() - minAgeMin * 60_000).toISOString() } },
-            { updatedAt: { greater_than: new Date(Date.now() - 7 * 24 * 3_600_000).toISOString() } },
-          ],
+      const now = Date.now()
+      const where: Where = {
+        and: [
+          { status: { in: ['triaged', 'in_review', 'writing'] } },
+          { article: { exists: false } },
+          { updatedAt: { less_than: new Date(now - minAgeMin * 60_000).toISOString() } },
+          { updatedAt: { greater_than: new Date(now - 7 * 24 * 3_600_000).toISOString() } },
+        ],
+      }
+      // Page through: most old 'writing' clusters were never editor-approved and would crowd the approved ones out (ZAV-203)
+      const found = await collectStuckApproved(
+        async (page) => {
+          const res = await req.payload.find({
+            collection: 'story-clusters',
+            where,
+            sort: 'updatedAt',
+            limit: STUCK_PAGE_SIZE,
+            page,
+            depth: 0,
+            overrideAccess: true,
+          })
+          return { docs: res.docs, hasNextPage: res.hasNextPage }
         },
-        sort: 'updatedAt',
-        limit: 300,
-        depth: 0,
-        overrideAccess: true,
-      })
-      const ageMin = (c: { updatedAt?: unknown }) => (Date.now() - new Date(String(c.updatedAt)).getTime()) / 60_000
-      const clusters = res.docs
-        .filter((c) => {
-          const triage = (c.triage ?? {}) as { editorApproved?: boolean; codeOutcome?: string }
-          if (c.status === 'writing') return triage.editorApproved === true && ageMin(c) >= writingAgeMin
-          if (triage.editorApproved === true) return true
-          return c.status === 'triaged' && triage.codeOutcome === 'publish' && ageMin(c) >= publishAgeMin
-        })
-        .slice(0, 25)
-        .map((c) => ({ id: String(c.id), status: String(c.status), updatedAt: String(c.updatedAt), triage: (c.triage ?? {}) as Record<string, unknown> }))
+        now,
+        writingAgeMin,
+        publishAgeMin,
+      )
+      const clusters = found.map((c) => ({ id: String(c.id), status: String(c.status), updatedAt: String(c.updatedAt), triage: (c.triage ?? {}) as Record<string, unknown> }))
       return json({ clusters })
     },
   },
