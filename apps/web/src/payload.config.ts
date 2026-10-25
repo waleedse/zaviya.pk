@@ -31,6 +31,7 @@ import { pipelineEndpointsExport } from './endpoints/pipeline'
 import { ANALYTICS_DDL } from './lib/analytics'
 import { NEWSLETTER_DDL } from './lib/newsletter'
 import { ensureBootstrapCategories } from './lib/category-bootstrap'
+import { ensureBootstrapSources } from './lib/source-bootstrap'
 import { LEARNING_DDL } from './lib/learning'
 import { migrations } from './migrations'
 
@@ -153,6 +154,13 @@ export default buildConfig({
         if (made.length) payload.logger.info({ made }, 'bootstrap categories created')
       } catch (err) {
         payload.logger.error({ err }, 'bootstrap categories failed (retried on next boot)')
+      }
+
+      try {
+        const made = await ensureBootstrapSources(payload)
+        if (made.length) payload.logger.info({ made }, 'bootstrap sources created')
+      } catch (err) {
+        payload.logger.error({ err }, 'bootstrap sources failed (retried on next boot)')
       }
 
       await drizzle.execute(sql`
