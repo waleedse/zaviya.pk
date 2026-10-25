@@ -5,6 +5,7 @@ import { isQuotaExhausted, zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
 import type { PayloadClient } from '../payload-client.js'
 import { writeEnSystemPrompt, WRITE_EN_PROMPT_VERSION } from '../prompts/write_en.js'
 import { writeUrSystemPrompt, WRITE_UR_PROMPT_VERSION } from '../prompts/write_ur.js'
+import { parseModelJson } from './json-tolerant.js'
 import { extractUrls, dropUnsupportedFaqs } from './qa-checks.js'
 import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
@@ -34,16 +35,6 @@ function wrapSources(items: { id?: string; title: string; contentText?: string; 
         `<source id="${it.id ?? i}">\n${it.title}\n${it.summary ?? ''}\n${it.contentText ?? ''}\nURL: ${it.url}\n</source>`,
     )
     .join('\n\n')
-}
-
-function extractJson(text: string): string {
-  const t = text.trim()
-  if (t.startsWith('{')) return t
-  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(t)
-  if (fence?.[1]) return fence[1].trim()
-  const a = t.indexOf('{')
-  const b = t.lastIndexOf('}')
-  return a >= 0 && b > a ? t.slice(a, b + 1) : t
 }
 
 /** Related Zaviya stories the writer may link to (fetched up front instead of via tool calls). */
@@ -108,21 +99,30 @@ async function runLocaleWrite(
   let model = `${res.provider}:${res.model}`
   let parsed: WriterOutput
   try {
-    parsed = WriterOutputSchema.parse(JSON.parse(extractJson(res.content)))
+    parsed = WriterOutputSchema.parse(parseModelJson(res.content))
   } catch (err) {
     // One repair pass with the validation error, instead of discarding the draft.
-    const repair = await deps.router.chat(task, {
-      messages: [
-        ...messages,
-        { role: 'assistant', content: res.content },
-        { role: 'user', content: `That JSON is invalid: ${err instanceof Error ? err.message.slice(0, 800) : String(err)}. Return the corrected JSON only.` },
-      ],
-      format,
-      temperature: 0,
-      timeoutMs: 180_000,
-    })
-    model = `${repair.provider}:${repair.model}`
-    parsed = WriterOutputSchema.parse(JSON.parse(extractJson(repair.content)))
+    try {
+      const repair = await deps.router.chat(task, {
+        messages: [
+          ...messages,
+          { role: 'assistant', content: res.content },
+          { role: 'user', content: `That JSON is invalid: ${err instanceof Error ? err.message.slice(0, 800) : String(err)}. Return the corrected JSON only.` },
+        ],
+        format,
+        temperature: 0,
+        timeoutMs: 180_000,
+      })
+      model = `${repair.provider}:${repair.model}`
+      parsed = WriterOutputSchema.parse(parseModelJson(repair.content))
+    } catch (err2) {
+      if (isQuotaExhausted(err2)) throw err2
+      // ZAV-210: the repair failed too; one fresh attempt before the cluster is left stuck in 'writing'
+      logger.warn({ task, err: err2 instanceof Error ? err2.message : err2 }, 'writer JSON repair failed, retrying once')
+      const retry = await deps.router.chat(task, { messages, format, temperature: 0.2, maxTokens: 8192, timeoutMs: 180_000 })
+      model = `${retry.provider}:${retry.model}`
+      parsed = WriterOutputSchema.parse(parseModelJson(retry.content))
+    }
   }
 
   const checks = await Promise.all(
