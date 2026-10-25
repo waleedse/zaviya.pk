@@ -25,6 +25,15 @@ const nextConfig: NextConfig = {
     // IndexNow key file (ZAV-146): /<key>.txt is answered by /api/indexnow/<key>, which checks it against INDEXNOW_KEY
     return [{ source: '/:key([A-Za-z0-9-]{8,128}).txt', destination: '/api/indexnow/:key' }]
   },
+  async headers() {
+    // ZAV-215: Cloudflare was stamping its 4 h default max-age on the sitemaps, so Google could read a news sitemap hours old.
+    // Browsers/Google always revalidate; the edge may hold them a few minutes.
+    const cc = 'public, max-age=0, s-maxage=300, stale-while-revalidate=300'
+    return [
+      { source: '/sitemap.xml', headers: [{ key: 'Cache-Control', value: cc }] },
+      { source: '/news-sitemap.xml', headers: [{ key: 'Cache-Control', value: cc }] },
+    ]
+  },
   async redirects() {
     return [
       { source: '/zaviya-news', destination: '/about', permanent: true },
