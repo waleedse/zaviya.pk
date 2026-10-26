@@ -73,10 +73,22 @@ export function headlineOverlap(a: string, b: string): { shared: number; ratio: 
   return { shared, ratio, numbersConflict }
 }
 
+const CLOSING = /\b(clos(e|es|ed|ing|ure)|shut(s|ting)?|shutdown|halt(s|ed|ing)?|suspend(s|ed|ing)?|suspension|block(s|ed|ing)?|ban(s|ned)?)\b/i
+const REOPENING = /\b(re-?open(s|ed|ing)?|resum(e|es|ed|ing)|restor(e|es|ed|ing)|lift(s|ed|ing)?|unblock(s|ed|ing)?|revers(e|es|ed))\b/i
+
+/** "border closed" and "border reopened" are different news even when most words agree (ZAV-211). */
+function oppositeDirection(a: string, b: string): boolean {
+  const [ca, ra, cb, rb] = [CLOSING.test(a), REOPENING.test(a), CLOSING.test(b), REOPENING.test(b)]
+  return (ra && !ca && cb && !rb) || (rb && !cb && ca && !ra)
+}
+
 export function isSameEvent(a: string, b: string): boolean {
   const o = headlineOverlap(a, b)
-  return o.shared >= 3 && o.ratio >= 0.4 && !o.numbersConflict
+  return o.shared >= 3 && o.ratio >= 0.4 && !o.numbersConflict && !oppositeDirection(a, b)
 }
+
+/** A rolling cluster (hundreds of posts) matches an article only when a fair share of its titles do, not one stray post. */
+export const SAME_STORY_MIN_SHARE = 0.2
 
 export type SameStoryVerdict =
   | { kind: 'none' }
@@ -98,7 +110,10 @@ export function findSameStory(
   const matches = articles.filter((a) => {
     const t = a.publishedAt ? new Date(a.publishedAt).getTime() : now
     if (Number.isFinite(t) && now - t > SAME_STORY_WINDOW_MS) return false
-    return titles.some((ct) => isSameEvent(ct, a.title))
+    // The first title is the cluster headline: a match there counts on its own
+    if (titles[0] && isSameEvent(titles[0], a.title)) return true
+    const hits = titles.filter((ct) => isSameEvent(ct, a.title)).length
+    return hits > 0 && hits >= Math.ceil(titles.length * SAME_STORY_MIN_SHARE)
   })
   if (!matches.length) return { kind: 'none' }
   matches.sort((x, y) => Number(y.published) - Number(x.published) || (x.publishedAt ?? '').localeCompare(y.publishedAt ?? ''))

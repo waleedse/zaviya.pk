@@ -52,6 +52,27 @@ describe('isSameEvent', () => {
   })
 })
 
+describe('reopen versus close and rolling clusters (ZAV-211)', () => {
+  it('does not treat a reopening as the same event as the closing', () => {
+    expect(isSameEvent('Pakistan closes Gabd border crossing with Iran, trade halted', 'Pakistan reopens Gabd border crossing with Iran, trade resumes')).toBe(false)
+    expect(isSameEvent('Pakistan reopens Gabd border crossing with Iran', 'Gabd border crossing with Iran reopened - Dawn')).toBe(true)
+  })
+
+  it('one stray post in a 114-title cluster does not tie it to an older article', () => {
+    const lpg = art('1410', 'LPG price hike: Rates Hit Record Rs600 per Kg Amid Shortage', '2026-10-22T10:00:00Z')
+    const titles = ['Pakistan Closes Trade at Rimdan-Gabd Border Crossing with Iran - WANA News Agency']
+    for (let i = 0; i < 100; i++) titles.push(`Gabd border reopening update number ${i} from Iran trade desk`)
+    titles.push('LPG price hit record Rs600 per kg amid shortage')
+    expect(findSameStory(titles, [lpg], NOW).kind).toBe('none')
+  })
+
+  it('a headline match still counts on its own', () => {
+    const lpg = art('1410', 'LPG price hike: Rates Hit Record Rs600 per Kg Amid Shortage', '2026-10-22T10:00:00Z')
+    const titles = ['LPG price hit record Rs600 per kg amid shortage', ...Array.from({ length: 50 }, (_, i) => `Unrelated post ${i} about cricket`)]
+    expect(findSameStory(titles, [lpg], NOW).kind).toBe('update')
+  })
+})
+
 describe('findSameStory', () => {
   const polio1290 = art('1290', 'Karachi Polio Case Is First in Nearly Two Years; Tally Hits 7', '2026-10-19T16:23:41Z')
 
