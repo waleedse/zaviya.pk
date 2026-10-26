@@ -4,7 +4,9 @@
  * Never put a decision here before the statement is out. After each MPC: update POLICY, CORRIDOR and AS_OF.
  * KIBOR stays null until a fix is copied from https://www.sbp.org.pk/ecodata/kibor_index.asp (no invented numbers).
  */
-export const POLICY = { rate: 11.5, corridorFloor: 10.5, corridorCeiling: 12.5, asOf: '2026-10-23', lastChanged: null as string | null }
+// 26 Oct 2026 MPC: +50 bps to 12% (9-1 vote; Bloomberg and our own reports). The corridor is the policy rate +/- 1.0 point, the same width as the
+// 23 Oct figures; SBP's statement text was not readable (sbp.org.pk blocks fetches), so confirm 11.0-13.0 against the statement.
+export const POLICY = { rate: 12, corridorFloor: 11, corridorCeiling: 13, asOf: '2026-10-26', lastChanged: '2026-10-26' as string | null }
 
 export interface KiborRow {
   tenor: '3M' | '6M' | '12M'
