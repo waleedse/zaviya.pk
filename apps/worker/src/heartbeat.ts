@@ -120,6 +120,13 @@ export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInt
         (e) => logger.warn({ err: e }, 'breaking expiry failed'),
       )
     }
+    // Every ~15 minutes: LIVE badges on stories with no live update for 4 h come off (ZAV-214)
+    if (ticks % 45 === 2) {
+      void runtime.payload.expireLive().then(
+        (r) => void (r.expired.length && logger.info({ articles: r.expired }, 'live flags expired')),
+        (e) => logger.warn({ err: e }, 'live expiry failed'),
+      )
+    }
     // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one
     if (runtime.env.EDITOR_GATE && ++beats % 15 === 0) {
       void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
