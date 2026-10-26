@@ -69,3 +69,48 @@ export async function expireBreaking(payload: Payload, now = Date.now(), maxHour
   }
   return done
 }
+
+/** A live story with no live update (or, without updates, no publication) for this long is over (ZAV-214). */
+export const LIVE_MAX_HOURS = 4
+
+/** The last time a live story moved: its newest live update, else its publish time. */
+export function lastLiveActivity(a: { publishedAt?: string | null; updates?: { at?: string | null }[] | null }): number {
+  const times = [a.publishedAt, ...(a.updates ?? []).map((u) => u.at)].map((t) => (t ? Date.parse(t) : NaN)).filter((t) => !Number.isNaN(t))
+  return times.length ? Math.max(...times) : 0
+}
+
+/**
+ * Clears isLive on published stories whose last live update is older than LIVE_MAX_HOURS. Writes only the isLive flag in
+ * the English locale (never title, body or priority), so finished stories lose the LIVE badge without a full PATCH.
+ */
+export async function expireLive(payload: Payload, now = Date.now(), maxHours = LIVE_MAX_HOURS): Promise<number[]> {
+  const res = await payload.find({
+    collection: 'articles',
+    where: { and: [{ _status: { equals: 'published' } }, { isLive: { equals: true } }] },
+    locale: 'en',
+    depth: 0,
+    limit: 100,
+    overrideAccess: true,
+  })
+  const done: number[] = []
+  for (const a of res.docs) {
+    if (now - lastLiveActivity(a) < maxHours * 3_600_000) continue
+    await payload.update({ collection: 'articles', id: a.id, locale: 'en', data: { isLive: false }, overrideAccess: true })
+    await payload
+      .create({
+        collection: 'audit-log',
+        data: {
+          entity: 'articles',
+          entityId: String(a.id),
+          action: 'live-expired',
+          actor: 'system:live-expiry',
+          payload: { from: { isLive: true }, to: { isLive: false }, maxHours },
+          at: new Date(now).toISOString(),
+        },
+        overrideAccess: true,
+      })
+      .catch((e) => console.error('[live-expiry] could not write audit-log', a.id, e))
+    done.push(Number(a.id))
+  }
+  return done
+}

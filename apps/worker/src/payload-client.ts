@@ -267,6 +267,11 @@ export class PayloadClient {
     )
   }
 
+  /** Clears isLive on stories with no live update for 4 h (ZAV-214) */
+  expireLive() {
+    return this.request<{ expired: number[] }>('POST', '/api/pipeline/live/expire', {})
+  }
+
   /** Drops breaking flags older than 24 h on live articles (ZAV-143) */
   expireBreaking() {
     return this.request<{ expired: number[] }>('POST', '/api/pipeline/breaking/expire', {})

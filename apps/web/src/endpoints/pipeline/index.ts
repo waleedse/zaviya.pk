@@ -12,7 +12,7 @@ import {
 import { runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { pageviewsReport } from '../../lib/pageviews-report'
-import { expireBreaking, setArticlePriority } from '../../lib/article-flags'
+import { expireBreaking, expireLive, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
 import { briefingStories, markBriefed, markConfirmationSent, pendingConfirmations, subscriberCounts, subscribersForBriefing } from '../../lib/newsletter'
 import { getLearning, pacingStats, retitleArticle, runDailyLearning, setLearning } from '../../lib/learning'
@@ -952,6 +952,16 @@ const pipelineEndpoints: Endpoint[] = [
       const denied = guard(req)
       if (denied) return denied
       return json({ expired: await expireBreaking(req.payload) })
+    },
+  },
+  {
+    // Clears isLive on stories with no live update for LIVE_MAX_HOURS (ZAV-214; the worker calls this on its sweep).
+    path: '/pipeline/live/expire',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      return json({ expired: await expireLive(req.payload) })
     },
   },
   {
