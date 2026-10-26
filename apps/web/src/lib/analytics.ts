@@ -85,7 +85,7 @@ export async function recordPageview(row: {
   `)
 }
 
-export const SHARE_CHANNELS = ['whatsapp', 'facebook', 'x', 'copy', 'native'] as const
+export const SHARE_CHANNELS = ['whatsapp', 'facebook', 'x', 'copy', 'native', 'picture'] as const
 
 export async function recordShareClick(row: { path: string; channel: string; locale?: string; device: string }): Promise<void> {
   const payload = await getPayloadClient()
