@@ -183,6 +183,14 @@ async function runXPost(job: Extract<BridgeJob, { type: 'x.post' }>): Promise<un
       if (recovery === 'compose') {
         // The home page had no composer: open X's own compose page instead
         await navigateLeavingDrafts(tabId, 'https://x.com/compose/post')
+        try {
+          return unwrapTabResponse(await sendToTab<{ externalId?: string }>(tabId, message))
+        } catch (e2) {
+          // Still no composer (ZAV-222): nothing was sent, so try once more on a fresh page load
+          if (xPostRecovery(e2) !== 'compose') throw e2
+          await chrome.tabs.reload(tabId)
+          await sleep(6_000)
+        }
       } else {
         // The content script is gone (tab crashed or never injected): reload the tab so it is injected again
         await chrome.tabs.reload(tabId)
