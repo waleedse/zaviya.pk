@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server'
 
 const LOCALE_PREFIX = '/ur'
 
-/** /<locale>/<category>?page=n → /<locale>/<category>/page/n, so category pages can be cached (no searchParams). */
-function paginate(url: URL): void {
+/** /<locale>/<category|latest>?page=n and /<locale>/tag/<slug>?page=n → …/page/n, so these pages can be cached (no searchParams). */
+export function paginate(url: URL): void {
   const n = parseInt(url.searchParams.get('page') ?? '', 10)
   if (!(n > 1)) return
-  if (/^\/(en|ur)\/[a-z0-9-]+$/.test(url.pathname)) {
+  if (/^\/(en|ur)\/([a-z0-9-]+|tag\/[^/]+)$/.test(url.pathname)) {
     url.pathname = `${url.pathname}/page/${n}`
     url.searchParams.delete('page')
   }

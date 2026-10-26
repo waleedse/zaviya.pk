@@ -6,7 +6,8 @@ import { Pagination } from '@/components/layout/Pagination'
 import { PageHero } from '@/components/layout/PageHero'
 import { ListingSidebar } from '@/components/layout/ListingSidebar'
 import { categoryIcon } from '@/lib/category-icons'
-import { getCategoryFeed, getDataPage, getMostRead } from '@/lib/queries'
+import { getCategoryFeed, getDataPage, getLatestLinks, getMostRead } from '@/lib/queries'
+import { LatestList } from '@/components/article/LatestList'
 import { publicPath } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import { dataPageSlugToKey, SECTION_SEO } from '@/lib/seo'
@@ -29,7 +30,7 @@ export async function renderCategoryPage(locale: Locale, category: string, pageN
   const name = locale === 'ur' ? catMeta.ur : catMeta.en
   const d = t(locale)
   const basePath = localePath(locale, `/${category}`)
-  const mostRead = await getMostRead(locale, 6)
+  const [mostRead, latest] = await Promise.all([getMostRead(locale, 6), pageNum === 1 ? getLatestLinks(locale, category, 1) : null])
   const featured = pageNum === 1 ? feed.docs[0] : undefined
   const seconds = pageNum === 1 ? feed.docs.slice(1, 3) : []
   const rest = pageNum === 1 ? feed.docs.slice(3) : feed.docs
@@ -77,6 +78,15 @@ export async function renderCategoryPage(locale: Locale, category: string, pageN
                     <ArticleCard key={a.id} article={a} locale={locale} variant="medium" />
                   ))}
                 </div>
+              )}
+              {latest && (
+                <LatestList
+                  locale={locale}
+                  items={latest.docs}
+                  title={isUr ? `${name}: تازہ ترین` : `Latest in ${name}`}
+                  moreHref="/latest"
+                  moreLabel={isUr ? 'تمام تازہ ترین خبریں' : 'All latest news'}
+                />
               )}
               <Pagination locale={locale} page={feed.page} totalPages={feed.totalPages} basePath={basePath} />
             </div>
