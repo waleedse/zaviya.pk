@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { dataPageSlugToKey } from '@/lib/seo'
-import { getArticle, getArticleBySlug, getDuplicateReplacementHref, getRelated, getMostRead, getRatesTicker, getCategoryFeed } from '@/lib/queries'
+import { getArticle, getArticleBySlug, getDuplicateReplacementHref, getRelated, getMostRead, getRatesTicker, getCategoryFeed, getTagStoryCount } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import {
@@ -15,6 +15,7 @@ import {
   newsArticleJsonLd,
 } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/JsonLd'
+import { isThinTag } from '@/lib/tag-rules'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { ReadingProgress } from '@/components/layout/ReadingProgress'
 import { Kicker } from '@/components/article/Kicker'
@@ -101,6 +102,13 @@ export default async function ArticlePage({ params }: Props) {
     getRatesTicker(locale),
     getCategoryFeed(locale, article.category.slug, 1),
   ])
+  const tagLinkable = await Promise.all(
+    article.tags.map((tag) =>
+      getTagStoryCount(locale, tag.slug)
+        .then((n) => !isThinTag(n))
+        .catch(() => false),
+    ),
+  )
   const relatedIds = new Set([article.id, ...related.map((a) => a.id)])
   const moreFromSection = (sameSection?.docs ?? []).filter((a) => !relatedIds.has(a.id)).slice(0, 6)
   const namaz = todayForAllCities()
@@ -211,11 +219,18 @@ export default async function ArticlePage({ params }: Props) {
               ))}
               {article.tags.length > 0 && (
                 <div className="my-8 flex flex-wrap gap-2">
-                  {article.tags.map((tag) => (
-                    <Link key={tag.slug} href={localePath(locale, `/tag/${tag.slug}`)} className="chip">
-                      #{tag.name}
-                    </Link>
-                  ))}
+                  {article.tags.map((tag, i) =>
+                    // A tag page with under 3 stories is noindex: show the chip but do not send crawlers there (ZAV-221)
+                    tagLinkable[i] ? (
+                      <Link key={tag.slug} href={localePath(locale, `/tag/${tag.slug}`)} className="chip">
+                        #{tag.name}
+                      </Link>
+                    ) : (
+                      <span key={tag.slug} className="chip">
+                        #{tag.name}
+                      </span>
+                    ),
+                  )}
                 </div>
               )}
               <div className="my-8 flex flex-wrap items-center gap-3 rounded-[22px] border border-border bg-surface p-4">

@@ -45,6 +45,11 @@ export function SiteFooter({ locale }: { locale: Locale }) {
               </li>
             ))}
             <li>
+              <Link href={localePath(locale, '/latest')} className="hover:text-white">
+                {d.latest}
+              </Link>
+            </li>
+            <li>
               <Link href={localePath(locale, '/gold-rate-today-pakistan')} className="hover:text-white">
                 {d.gold}
               </Link>

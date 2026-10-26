@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { ArticleCard as Card, Locale } from '@zaviya/shared'
 import { ArticleCard } from '@/components/article/ArticleCard'
 import { AdSlot } from '@/components/ads/AdSlot'
+import { LatestList } from '@/components/article/LatestList'
 import { HomeLatest } from '@/components/home/HomeLatest'
 import { LeadCarousel } from '@/components/home/LeadCarousel'
 import { LiveRefresh } from '@/components/home/LiveRefresh'
@@ -16,7 +17,7 @@ import { TOOLS } from '@/components/home/tools'
 import { NewsletterCTA } from '@/components/marketing/NewsletterCTA'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
-import { getCategoryFeed, getFrontPagePlan, getHomeFeed, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
+import { getCategoryFeed, getFrontPagePlan, getHomeFeed, getLatestLinks, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
 import { SECTION_CATEGORIES, type FrontSection, type PinSection } from '@/lib/front-page'
 import { parseLocale } from '@/lib/locale'
 import { formatNumber } from '@/lib/format'
@@ -44,13 +45,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const locale = parseLocale((await params).locale) as Locale
   const d = t(locale)
   const isUr = locale === 'ur'
-  const [feed, plan, rates, tags, top24, upcoming] = await Promise.all([
+  const [feed, plan, rates, tags, top24, upcoming, latestLinks] = await Promise.all([
     getHomeFeed(locale),
     getFrontPagePlan(locale),
     getRatesTicker(locale),
     getTrendingTags(locale, 8),
     getTopStories(locale, 24, 12),
     getUpcoming(4).catch(() => []),
+    getLatestLinks(locale, null, 1).catch(() => null),
   ])
   // Each section draws from its own category feed, so the front block above never empties it
   const sectionSlugs = [...new Set(Object.values(SECTION_CATEGORIES).flat())]
@@ -389,6 +391,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             )}
           </div>
         ) : null,
+      )}
+      {/* Plain headline links to the 50 newest stories: a crawler reaches every new article from the homepage (ZAV-221) */}
+      {latestLinks && latestLinks.docs.length > 0 && (
+        <div className="container-wide mt-14">
+          <LatestList
+            locale={locale}
+            items={latestLinks.docs}
+            title={isUr ? 'تازہ ترین خبریں' : 'Latest news'}
+            moreHref="/latest"
+            moreLabel={isUr ? 'تمام تازہ ترین خبریں' : 'All latest news'}
+          />
+        </div>
       )}
       <div className="container-wide mt-14">
         <WhatsAppCTA locale={locale} />

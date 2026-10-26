@@ -22,6 +22,7 @@ import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './m
 import { getPayloadClient } from './payload'
 import { findReplacementHref, type FindApi } from './duplicate-redirect'
 import { getLearning } from './learning'
+import { LATEST_PAGE_SIZE } from './tag-rules'
 import { isActive, parsePlan, PIN_SECTIONS, sectionOrder, type FrontPagePlan, type FrontSection, type PinSection, type PlanSlot } from './front-page'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
@@ -467,6 +468,74 @@ export const getTagFeed = cache(
         totalPages: result.totalPages,
         totalDocs: result.totalDocs,
       },
+    }
+  },
+)
+
+/** Published stories carrying a tag: tag chips on articles link only when a tag page has enough of them (ZAV-221). */
+export const getTagStoryCount = sharedCache('getTagStoryCount', 1800, async (locale: Locale, slug: string): Promise<number> => {
+  const payload = await getPayloadClient()
+  const tag = await payload.find({ collection: 'tags', locale, where: { slug: { equals: slug } }, limit: 1, depth: 0 })
+  const id = tag.docs[0]?.id
+  if (id === undefined) return 0
+  const res = await payload.count({ collection: 'articles', locale, where: publishedAnd({ tags: { contains: id } }), overrideAccess: true })
+  return res.totalDocs
+})
+
+export interface LatestLink {
+  id: string
+  href: string
+  title: string
+  category: string
+  publishedAt: string
+}
+
+/**
+ * Plain list of the newest stories (title + link only), 50 per page, so every new article is linked from a cheap page
+ * Google crawls first. `category` limits it to one section (ZAV-221).
+ */
+export const getLatestLinks = sharedCache(
+  'getLatestLinks',
+  60,
+  async (locale: Locale, categorySlug: string | null, page: number = 1, limit: number = LATEST_PAGE_SIZE): Promise<Paginated<LatestLink>> => {
+    const empty: Paginated<LatestLink> = { docs: [], page: 1, totalPages: 1, totalDocs: 0 }
+    if (demoData() && !(await hasPublishedArticles())) {
+      const cards = mockCards(locale).filter((a) => !categorySlug || a.category.slug === categorySlug)
+      const p = paginate(cards, page, limit)
+      return { ...p, docs: p.docs.map((a) => ({ id: a.id, href: a.href, title: a.title, category: a.category.name, publishedAt: a.publishedAt })) }
+    }
+    const payload = await getPayloadClient()
+    let where = publishedWhere
+    if (categorySlug) {
+      const cat = await payload.find({ collection: 'categories', where: { slug: { equals: categorySlug } }, limit: 1, depth: 0 })
+      if (!cat.docs[0]) return empty
+      where = publishedAnd({ category: { equals: cat.docs[0].id } })
+    }
+    const result = await payload.find({
+      collection: 'articles',
+      locale,
+      where,
+      sort: '-publishedAt',
+      page,
+      limit,
+      depth: 1,
+      select: { slug: true, title: true, category: true, publishedAt: true, createdAt: true },
+      overrideAccess: true,
+    })
+    return {
+      docs: result.docs.map((d) => {
+        const cat = mapCategory((d as unknown as Article).category as Category, locale)
+        return {
+          id: String(d.id),
+          href: articleHref(locale, cat.slug, String(d.slug ?? '')),
+          title: String(d.title ?? ''),
+          category: cat.name,
+          publishedAt: (d.publishedAt ?? d.createdAt) as string,
+        }
+      }),
+      page: result.page ?? page,
+      totalPages: result.totalPages,
+      totalDocs: result.totalDocs,
     }
   },
 )
