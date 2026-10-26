@@ -69,7 +69,7 @@ export async function postTweet(
   const editorDeadline = Date.now() + 10_000
   while (!findEditor() && Date.now() < editorDeadline) await new Promise((r) => setTimeout(r, 400))
   const editor = findEditor()
-  if (!(editor instanceof HTMLElement)) throw new Error('composer_not_found')
+  if (!(editor instanceof HTMLElement)) throw new Error(`composer_not_found (${pageState()})`)
 
   editor.focus()
   document.execCommand('insertText', false, text)
@@ -113,7 +113,7 @@ export async function postTweet(
       return { externalId: first?.id }
     }
   }
-  const why = pageMessage() || 'composer still open after clicking Post twice'
+  const why = `${pageMessage() || 'composer still open after clicking Post twice'} (${pageState()})`
   await discardComposer()
   throw new Error(`post_not_sent: ${why}`)
 }
@@ -139,6 +139,23 @@ function composerOpen(): boolean {
 
 function toastText(): string {
   return (document.querySelector('[data-testid="toast"]') as HTMLElement | null)?.innerText?.trim() ?? ''
+}
+
+/**
+ * Where the page was when a post failed (ZAV-222): the failure reason in Linear and social-posts can then tell a login wall,
+ * a background tab or a changed page apart, instead of just "composer_not_found".
+ */
+export function pageState(): string {
+  const loginWall = !!document.querySelector('[data-testid="loginButton"], a[href="/login"], a[href="/i/flow/login"]')
+  const composeBtn = !!(document.querySelector('[data-testid="SideNav_NewTweet_Button"]') ?? document.querySelector('a[href="/compose/post"]'))
+  const draft = (document.querySelector('[data-testid="tweetTextarea_0"]') as HTMLElement | null)?.innerText?.length ?? 0
+  return [
+    `path=${location.pathname.slice(0, 40)}`,
+    `tab=${document.visibilityState}`,
+    `login_wall=${loginWall ? 'yes' : 'no'}`,
+    `compose_btn=${composeBtn ? 'yes' : 'no'}`,
+    `draft_chars=${draft}`,
+  ].join(' ')
 }
 
 /** What X is telling us (error toast, alert, limit notice), so a failure says why. */
