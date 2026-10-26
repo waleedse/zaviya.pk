@@ -56,8 +56,10 @@ export function parsePlan(raw: unknown): FrontPagePlan {
   if (r.pins != null) {
     if (typeof r.pins !== 'object' || Array.isArray(r.pins)) throw new Error(`pins must be an object keyed by section: ${PIN_SECTIONS.join(', ')}`)
     plan.pins = {}
-    for (const [key, list] of Object.entries(r.pins as Record<string, unknown>)) {
-      if (!PIN_SECTIONS.includes(key as PinSection)) throw new Error(`pins.${key}: unknown section (use ${PIN_SECTIONS.join(', ')})`)
+    for (const [rawKey, list] of Object.entries(r.pins as Record<string, unknown>)) {
+      // 'world-cricket' is a page section (order), not a pin list; the editor keeps writing it as a pin key
+      const key = rawKey === 'world-cricket' ? 'cricket' : rawKey
+      if (!PIN_SECTIONS.includes(key as PinSection)) throw new Error(`pins.${rawKey}: unknown section (use ${PIN_SECTIONS.join(', ')})`)
       if (!Array.isArray(list) || list.length > 4) throw new Error(`pins.${key} must be a list of up to 4 slots`)
       plan.pins[key as PinSection] = list.map((s, i) => slot(s, `pins.${key}[${i}]`))
     }

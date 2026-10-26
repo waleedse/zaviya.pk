@@ -1,4 +1,4 @@
-import type { GlobalConfig } from 'payload'
+import { APIError, type GlobalConfig } from 'payload'
 import { isAdminOrBot } from '../access'
 import { revalidateHome, revalidatePathSafe } from '../lib/revalidate'
 import { parsePlan } from '../lib/front-page'
@@ -26,7 +26,14 @@ export const FrontPage: GlobalConfig = {
   hooks: {
     beforeValidate: [
       ({ data }) => {
-        if (data && 'plan' in data) data.plan = parsePlan(data.plan)
+        if (data && 'plan' in data) {
+          try {
+            data.plan = parsePlan(data.plan)
+          } catch (e) {
+            // a plain Error becomes an opaque 500 'Something went wrong'; the editor needs the message (ZAV-217)
+            throw new APIError(e instanceof Error ? e.message : 'invalid plan', 400, undefined, true)
+          }
+        }
         return data
       },
     ],
