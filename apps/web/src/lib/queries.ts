@@ -634,7 +634,15 @@ export const getUpcoming = cache(async (limit = 5): Promise<UpcomingEvent[]> => 
   const fuel = nextFuelReview()
   const all = list.some((e) => e.kind === 'prices' && e.date === fuel.date) ? list : [...list, fuel]
   // ZAV-206: SBP policy / MPC rows link to the policy rate page unless the list already carries a link
-  const linked = all.map((e) => (!e.href && /\b(sbp|mpc|policy rate)\b/i.test(e.title) ? { ...e, href: '/sbp-policy-rate' } : e))
+  const linked = all.map((e) =>
+    e.href
+      ? e
+      : /\b(sbp|mpc|policy rate)\b/i.test(e.title)
+        ? { ...e, href: '/sbp-policy-rate' }
+        : /\b(fbr|tax return|income tax return)\b/i.test(e.title) && /\b(deadline|return|last date)\b/i.test(e.title)
+          ? { ...e, href: '/income-tax-return-deadline-pakistan' }
+          : e,
+  )
   return linked.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, limit)
 })
 
