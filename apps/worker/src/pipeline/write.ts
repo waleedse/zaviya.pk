@@ -11,7 +11,8 @@ import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
-import { opinionCue, pageFromWrongOutlet } from './story-kind.js'
+import { scrubWriterCopy } from './seo-scrub.js'
+import { opinionCue, pageFromWrongOutlet, pageUnrelatedToHeadline } from './story-kind.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
@@ -154,6 +155,11 @@ export async function enrichFromExtension(
         logger.warn({ clusterId, itemId: it.id, host: new URL(page.url).hostname, title: it.title }, 'extension page is from a different outlet than the headline, ignored')
         continue
       }
+      // ... and the right story: the same outlet's other article must not stand in for it (ZAV-234)
+      if (pageUnrelatedToHeadline(it.title, page)) {
+        logger.warn({ clusterId, itemId: it.id, pageTitle: page.title, title: it.title }, 'extension page is about a different story than the headline, ignored')
+        continue
+      }
       await payload.patchSourceItem(it.id!, { contentText: `${page.text}\n\n(Read from ${new URL(page.url).hostname})` })
       saved = true
       logger.info({ clusterId, itemId: it.id, host: new URL(page.url).hostname, chars: page.text.length }, 'source text read by extension')
@@ -255,6 +261,9 @@ export async function processWriteJob(
       logger.info({ clusterId: data.clusterId, dropped: dropped.map((f) => f.q) }, 'FAQ questions not supported by the sources dropped')
     }
   }
+
+  // ZAV-228: strip pasted search phrases ("X news", "news today", "live match") from headline, dek, slug and lede
+  if (scrubWriterCopy(en)) logger.info({ clusterId: data.clusterId, title: en.title }, 'SEO stuffing scrubbed from the English copy')
 
   logger.info({ clusterId: data.clusterId, en: en.model, ur: ur?.model, title: en.title }, 'article written')
   return {

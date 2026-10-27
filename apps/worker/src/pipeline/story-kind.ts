@@ -106,3 +106,18 @@ export function pageFromWrongOutlet(itemTitle: string, pageUrl: string): boolean
   if (!known) return false
   return !expected.includes(OUTLET_HOSTS[known]!)
 }
+
+/**
+ * True when the page the extension returned is about something else than the headline, even if the outlet matches
+ * (ZAV-234: a stale Dawn tab put Qatar/Iran text on the Multan and Riyadh clusters). A headline of three or more
+ * distinctive words must share at least one with the page title or its opening text.
+ */
+export function pageUnrelatedToHeadline(itemTitle: string, page: { title: string; text: string }): boolean {
+  const headline = itemTitle.replace(/ [-–|] [^-–|]{2,40}$/, '')
+  const words = (headline.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !STOP_WORDS.has(w))
+  if (new Set(words).size < 3) return false
+  const haystack = `${page.title} ${page.text.slice(0, 2000)}`.toLowerCase()
+  return !words.some((w) => haystack.includes(w.length > 6 ? w.slice(0, -2) : w))
+}
+
+const STOP_WORDS = new Set(['that', 'with', 'from', 'this', 'have', 'after', 'over', 'into', 'says', 'said', 'amid', 'than', 'their', 'about', 'will', 'been', 'more', 'news', 'live', 'today'])
