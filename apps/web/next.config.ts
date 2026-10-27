@@ -2,6 +2,7 @@ import { withPayload } from '@payloadcms/next/withPayload'
 import type { NextConfig } from 'next'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { HTML_CACHE_CONTROL, HTML_HEADER_SOURCE } from './src/lib/crawl-cache'
 
 const __filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(__filename)
@@ -32,6 +33,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/sitemap.xml', headers: [{ key: 'Cache-Control', value: cc }] },
       { source: '/news-sitemap.xml', headers: [{ key: 'Cache-Control', value: cc }] },
+      // ZAV-229: HTML pages (Next keeps a Cache-Control set here instead of its own s-maxage=60)
+      { source: HTML_HEADER_SOURCE, headers: [{ key: 'Cache-Control', value: HTML_CACHE_CONTROL }] },
     ]
   },
   async redirects() {
