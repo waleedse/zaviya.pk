@@ -423,11 +423,13 @@ export const getCategoryFeed = cache(
   },
 )
 
-export const getTagFeed = cache(
+export const getTagFeed = sharedCache(
+  'getTagFeed',
+  300,
   async (
     locale: Locale,
     slug: string,
-    page = 1,
+    page: number = 1,
   ): Promise<{ tag: { slug: string; name: string }; feed: Paginated<ArticleCard> } | null> => {
     const payload = await getPayloadClient()
     const tagRes = await payload.find({
@@ -435,6 +437,7 @@ export const getTagFeed = cache(
       locale,
       where: { slug: { equals: slug } },
       limit: 1,
+      depth: 0,
     })
     const tagDoc = tagRes.docs[0]
     const tagName = tagDoc

@@ -4,6 +4,7 @@ import { getPayloadClient } from '@/lib/payload'
 import { siteUrl as getSiteUrl } from '@/lib/seo'
 import { urduEnabled } from '@/lib/i18n'
 import { PK_CITIES } from '@/lib/prayer-times'
+import { sitemapArticleCutoff } from '@/lib/crawl-cache'
 
 export const revalidate = 600
 
@@ -57,7 +58,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articles = await payload.find({
     collection: 'articles',
     where: {
-      and: [{ _status: { equals: 'published' } }, { workflow: { not_equals: 'retracted' } }],
+      and: [{ _status: { equals: 'published' } }, { workflow: { not_equals: 'retracted' } },
+        // ZAV-229: only the last 7 days; older stories are reached through the hubs, tags and /latest
+        { publishedAt: { greater_than_equal: sitemapArticleCutoff() } },
+      ],
     },
     locale: 'all',
     limit: 5000,
