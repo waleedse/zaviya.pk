@@ -12,7 +12,7 @@ import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 import { scrubWriterCopy } from './seo-scrub.js'
-import { opinionCue, pageFromWrongOutlet } from './story-kind.js'
+import { opinionCue, pageFromWrongOutlet, pageUnrelatedToHeadline } from './story-kind.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
@@ -153,6 +153,11 @@ export async function enrichFromExtension(
       // The extension must have read the outlet the headline names (a stale tab once returned a Dawn editorial for a Nikkei item)
       if (pageFromWrongOutlet(it.title, page.url)) {
         logger.warn({ clusterId, itemId: it.id, host: new URL(page.url).hostname, title: it.title }, 'extension page is from a different outlet than the headline, ignored')
+        continue
+      }
+      // ... and the right story: the same outlet's other article must not stand in for it (ZAV-234)
+      if (pageUnrelatedToHeadline(it.title, page)) {
+        logger.warn({ clusterId, itemId: it.id, pageTitle: page.title, title: it.title }, 'extension page is about a different story than the headline, ignored')
         continue
       }
       await payload.patchSourceItem(it.id!, { contentText: `${page.text}\n\n(Read from ${new URL(page.url).hostname})` })

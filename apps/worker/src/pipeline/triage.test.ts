@@ -127,7 +127,7 @@ describe('processTriageJob', () => {
     d.payload.getCluster.mockResolvedValueOnce(cluster).mockResolvedValue(read)
     const patchSourceItem = vi.fn()
     ;(d.payload as Record<string, unknown>).patchSourceItem = patchSourceItem
-    const page = { url: 'https://www.dawn.com/news/1', title: 't', text: 'x'.repeat(400) }
+    const page = { url: 'https://www.dawn.com/news/1', title: 'Karachi East polio case', text: `Polio case confirmed in Karachi East. ${'x'.repeat(400)}` }
     const bridge = { isOnline: () => true, send: vi.fn().mockResolvedValue(page) }
     await processTriageJob({ clusterId: '9409' }, { ...d, pitch: true, bridge } as never)
     expect(bridge.send).toHaveBeenCalledTimes(1)

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TriageResult } from '@zaviya/shared'
-import { FOREIGN_FEATURE_REASON, opinionCue, OPINION_REASON, pageFromWrongOutlet, routeByStoryKind } from './story-kind.js'
+import { FOREIGN_FEATURE_REASON, opinionCue, OPINION_REASON, pageFromWrongOutlet, pageUnrelatedToHeadline, routeByStoryKind } from './story-kind.js'
 import { enrichFromExtension } from './write.js'
 import { processTriageJob } from './triage.js'
 
@@ -139,5 +139,17 @@ describe('triage end to end for 1429 and 1430', () => {
     const last = payload.patchCluster.mock.calls.at(-1)![1]
     expect(last.status).toBe('rejected')
     expect(payload.patchCluster.mock.calls.some((c) => c[1].triage?.codeOutcome === 'pitch')).toBe(false)
+  })
+})
+
+describe('pageUnrelatedToHeadline (ZAV-234)', () => {
+  const qatar = { title: 'Qatar, Iran hold talks in Moscow', text: 'Qatar and Iran discussed the Hormuz crisis in Moscow on Tuesday. '.repeat(10) }
+  it('flags another story from the same outlet', () => {
+    expect(pageUnrelatedToHeadline('Several killed as building collapses in Multan - Dawn', qatar)).toBe(true)
+  })
+  it('accepts the matching page and ignores short headlines', () => {
+    const multan = { title: 'Building collapse in Multan', text: 'A building collapsed in Multan on Tuesday. '.repeat(10) }
+    expect(pageUnrelatedToHeadline('Several killed as building collapses in Multan - Dawn', multan)).toBe(false)
+    expect(pageUnrelatedToHeadline('Budget talks resume', qatar)).toBe(false)
   })
 })
