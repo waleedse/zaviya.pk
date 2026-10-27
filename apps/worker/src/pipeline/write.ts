@@ -11,6 +11,7 @@ import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
+import { scrubWriterCopy } from './seo-scrub.js'
 import { opinionCue, pageFromWrongOutlet } from './story-kind.js'
 
 export interface WriteResult {
@@ -255,6 +256,9 @@ export async function processWriteJob(
       logger.info({ clusterId: data.clusterId, dropped: dropped.map((f) => f.q) }, 'FAQ questions not supported by the sources dropped')
     }
   }
+
+  // ZAV-228: strip pasted search phrases ("X news", "news today", "live match") from headline, dek, slug and lede
+  if (scrubWriterCopy(en)) logger.info({ clusterId: data.clusterId, title: en.title }, 'SEO stuffing scrubbed from the English copy')
 
   logger.info({ clusterId: data.clusterId, en: en.model, ur: ur?.model, title: en.title }, 'article written')
   return {
