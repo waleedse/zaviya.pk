@@ -104,13 +104,14 @@ export async function narrateEdition(deps: NarrateDeps, a: NarrateArgs): Promise
     audio: 'voice.wav',
     music: a.timeline.track.file,
     theme: a.timeline.theme,
+    layout: 'full',
     cta: 'مکمل خبریں زاویہ ڈاٹ پی کے پر',
     beats: [
       { image: copy(lead.image), kicker: 'زاویہ', sentences: [{ text: intro, ms: ms[0]! }] },
       ...voiced.map((v, i) => ({
         image: copy(v.story.image),
         kicker: cat(v.story.category),
-        credit: 'AI illustration',
+        credit: 'AI image',
         sentences: [{ text: v.text, ms: ms[i + 1]! }],
       })),
     ],
