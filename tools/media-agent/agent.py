@@ -82,7 +82,7 @@ def synth_sentence(text, length_scale):
     mel, _ = m["sess"].run(None, {
         "x": np.array([inter], dtype=np.int64),
         "x_lengths": np.array([len(inter)], dtype=np.int64),
-        "scales": np.array([0.667, length_scale], dtype=np.float32),
+        "scales": np.array([0.85, length_scale], dtype=np.float32),
     })
     with torch.no_grad():
         return m["vocos"].decode(torch.from_numpy(mel)).numpy().squeeze()
