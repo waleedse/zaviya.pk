@@ -10,6 +10,7 @@ import {
   checkUrduLocale,
 } from './qa-checks.js'
 import { checkKeywordUsage } from './seo.js'
+import { checkSeoStuffing } from './seo-scrub.js'
 import { qaSystemPrompt, QA_PROMPT_VERSION } from '../prompts/qa.js'
 import { logger } from '../logger.js'
 import type { PayloadClient } from '../payload-client.js'
@@ -32,6 +33,7 @@ export async function runQaChecks(
   issues.push(...checkOriginality(write.en.bodyMarkdown, sources))
   issues.push(...checkLength(write.en.bodyMarkdown, priority))
   issues.push(...checkBannedAndClickbait(write.en.title, write.en.bodyMarkdown))
+  issues.push(...checkSeoStuffing(write.en.title, write.en.dek, write.en.bodyMarkdown))
   if (write.ur) issues.push(...checkUrduLocale(write.ur.bodyMarkdown))
 
   let llmPass = true
