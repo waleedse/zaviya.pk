@@ -20,6 +20,7 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { ReadingProgress } from '@/components/layout/ReadingProgress'
 import { Kicker } from '@/components/article/Kicker'
 import { LiveBadge } from '@/components/article/LiveBadge'
+import { PreferredSourcePrompt } from '@/components/marketing/PreferredSourcePrompt'
 import { ShareBar, MobileShareBar } from '@/components/article/ShareBar'
 import { SocialEmbeds } from '@/components/article/SocialEmbeds'
 import { SectionHeader } from '@/components/home/SectionHeader'
@@ -242,7 +243,10 @@ export default async function ArticlePage({ params }: Props) {
                   </Link>
                 ) : null}
               </div>
-              <AuthorBox author={article.author} locale={locale} />
+              <PreferredSourcePrompt locale={locale} />
+              <div className="mt-6">
+                <AuthorBox author={article.author} locale={locale} />
+              </div>
             </div>
           </div>
 

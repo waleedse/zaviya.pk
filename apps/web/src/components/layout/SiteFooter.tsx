@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CATEGORIES, SITE, type Locale } from '@zaviya/shared'
 import { Logo } from '@/components/brand/Logo'
+import { PreferredSourcePrompt } from '@/components/marketing/PreferredSourcePrompt'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { localePath, t } from '@/lib/i18n'
 import { TOOLS } from '@/components/home/tools'
@@ -96,6 +97,9 @@ export function SiteFooter({ locale }: { locale: Locale }) {
             ))}
           </ul>
         </div>
+      </div>
+      <div className="container-page border-t border-white/10 py-6">
+        <PreferredSourcePrompt locale={locale} variant="footer" />
       </div>
       <div className="container-page flex flex-col gap-2 border-t border-white/10 py-6 text-xs text-slate-500 sm:flex-row sm:justify-between">
         <p>

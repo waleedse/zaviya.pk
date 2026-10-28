@@ -17,6 +17,7 @@ import { TOOLS } from '@/components/home/tools'
 import { NewsletterCTA } from '@/components/marketing/NewsletterCTA'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { NamazWidget } from '@/components/namaz/NamazWidget'
+import { PreferredSourcePrompt } from '@/components/marketing/PreferredSourcePrompt'
 import { getCategoryFeed, getFrontPagePlan, getHomeFeed, getLatestLinks, getRatesTicker, getTopStories, getTrendingTags, getUpcoming } from '@/lib/queries'
 import { SECTION_CATEGORIES, type FrontSection, type PinSection } from '@/lib/front-page'
 import { parseLocale } from '@/lib/locale'
@@ -405,6 +406,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       )}
       <div className="container-wide mt-14">
+        <PreferredSourcePrompt locale={locale} />
+      </div>
+      <div className="container-wide mt-6">
         <WhatsAppCTA locale={locale} />
       </div>
       <div className="container-wide mt-6">
