@@ -1324,6 +1324,8 @@ const pipelineEndpoints: Endpoint[] = [
           queues: z.record(
             z.object({
               waiting: z.number(),
+              // kept so the watchdog can tell scheduled (delayed) jobs from stuck ones
+              delayed: z.number().optional(),
               active: z.number(),
               failed: z.number(),
             }),
