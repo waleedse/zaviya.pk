@@ -39,7 +39,7 @@ export interface ControlRoomData {
     killSwitch: boolean
     paused: boolean
     integrations: { ollama?: boolean; gemini?: boolean; extension?: boolean; telegram?: boolean }
-    queues: Record<string, { waiting: number; active: number; failed: number }>
+    queues: Record<string, { waiting: number; delayed?: number; active: number; failed: number }>
     trends: { name: string; traffic?: string }[]
     xTrends: { name: string; traffic?: string }[]
     pendingCommands: number
