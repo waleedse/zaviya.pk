@@ -23,6 +23,7 @@ import { getPayloadClient } from './payload'
 import { findReplacementHref, type FindApi } from './duplicate-redirect'
 import { getLearning } from './learning'
 import { LATEST_PAGE_SIZE } from './tag-rules'
+import { groupStoryDigests, type StoryDigest } from './web-stories'
 import { isActive, parsePlan, PIN_SECTIONS, sectionOrder, type FrontPagePlan, type FrontSection, type PinSection, type PlanSlot } from './front-page'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
@@ -745,6 +746,27 @@ export const getTopStories = sharedCache('getTopStories', 60, async (locale: Loc
       String(b.publishedAt).localeCompare(String(a.publishedAt)),
   )
   return mapArticleCards(ranked.slice(0, limit) as unknown as Article[], locale)
+})
+
+/**
+ * Web Stories (ZAV-242): published articles of the last `days` days, grouped by Pakistan calendar day. Each day carries its top
+ * stories (priority, then a hero image, then newest) and up to 3 breaking ones. One cached read feeds the story page, the index and the sitemap.
+ */
+export const getStoryDigests = sharedCache('getStoryDigests', 300, async (days: number): Promise<StoryDigest[]> => {
+  const payload = await getPayloadClient()
+  const since = new Date(Date.now() - days * 24 * 3_600_000).toISOString()
+  const result = await payload.find({
+    collection: 'articles',
+    locale: 'en',
+    where: { ...publishedAnd({ publishedAt: { greater_than: since } }) },
+    sort: '-publishedAt',
+    limit: 400,
+    depth: 2,
+    select: CARD_SELECT,
+    overrideAccess: true,
+  })
+  const cards = await mapArticleCards(result.docs as unknown as Article[], 'en')
+  return groupStoryDigests(cards)
 })
 
 export const getLive = sharedCache('getLive', 60, async (locale: Locale): Promise<ArticleCard[]> => {
