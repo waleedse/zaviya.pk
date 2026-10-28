@@ -1,4 +1,5 @@
 import { Newspaper } from 'lucide-react'
+import { PreferredSourcePrompt } from '@/components/marketing/PreferredSourcePrompt'
 import { PageHero } from '@/components/layout/PageHero'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { localePath, t } from '@/lib/i18n'
@@ -87,6 +88,9 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
                 </ul>
               </>
             ) : null}
+          </div>
+          <div className="mt-8">
+            <PreferredSourcePrompt locale={locale} />
           </div>
         </div>
       </div>

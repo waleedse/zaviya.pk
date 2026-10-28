@@ -85,13 +85,18 @@ export async function recordPageview(row: {
   `)
 }
 
-export const SHARE_CHANNELS = ['whatsapp', 'facebook', 'x', 'copy', 'native', 'picture'] as const
+export const SHARE_CHANNELS = ['whatsapp', 'facebook', 'x', 'copy', 'native', 'picture', 'preferred_source'] as const
+
+/** Share buttons log as '<channel>-share'; the preferred-source prompt (ZAV-241) logs as 'preferred_source_click'. */
+export function shareSource(channel: string): string {
+  return channel === 'preferred_source' ? 'preferred_source_click' : channel + '-share'
+}
 
 export async function recordShareClick(row: { path: string; channel: string; locale?: string; device: string }): Promise<void> {
   const payload = await getPayloadClient()
   await payload.db.drizzle.execute(sql`
     INSERT INTO zaviya_share_clicks (path, channel, source, locale, device)
-    VALUES (${row.path.slice(0, 500)}, ${row.channel}, ${row.channel + '-share'}, ${row.locale ?? null}, ${row.device})
+    VALUES (${row.path.slice(0, 500)}, ${row.channel}, ${shareSource(row.channel)}, ${row.locale ?? null}, ${row.device})
   `)
 }
 
