@@ -1,8 +1,8 @@
-import type { ArticleFull } from '@zaviya/shared'
+import type { ArticleCard, ArticleFull } from '@zaviya/shared'
 import { SITE } from '@zaviya/shared'
 import { absoluteUrl } from '@/lib/seo'
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -18,7 +18,7 @@ export function canBuildWebStory(article: ArticleFull): boolean {
 export const STORY_POSTER_WIDTH = 720
 export const STORY_POSTER_HEIGHT = 960
 
-export function storyPosterUrl(article: ArticleFull): string {
+export function storyPosterUrl(article: Pick<ArticleCard, 'title' | 'image' | 'category'>): string {
   if (article.image?.url) return absoluteUrl(`/api/story-poster?src=${encodeURIComponent(article.image.url)}`)
   const q = new URLSearchParams({
     title: article.title,

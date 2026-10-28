@@ -5,6 +5,8 @@ import { siteUrl as getSiteUrl } from '@/lib/seo'
 import { urduEnabled } from '@/lib/i18n'
 import { PK_CITIES } from '@/lib/prayer-times'
 import { sitemapArticleCutoff } from '@/lib/crawl-cache'
+import { getStoryDigests } from '@/lib/queries'
+import { dailyStorySlug, DIGEST_MIN, WEB_STORY_DAYS, webStoriesPath } from '@/lib/web-stories'
 
 export const revalidate = 600
 
@@ -44,6 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/aqi-today-pakistan`, changeFrequency: 'hourly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/riyal-dirham-rate-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/latest`, changeFrequency: 'hourly', priority: 0.8 })
+  entries.push({ url: `${siteUrl}/web-stories`, changeFrequency: 'hourly', priority: 0.6 })
   entries.push({ url: `${siteUrl}/widgets`, changeFrequency: 'monthly', priority: 0.6 })
 
   entries.push({ url: `${siteUrl}/about`, changeFrequency: 'monthly', priority: 0.7 })
@@ -105,6 +108,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         },
       })
     }
+  }
+
+  // Web Stories (ZAV-242): the daily digests and the breaking stories of the last 7 days
+  for (const day of await getStoryDigests(WEB_STORY_DAYS)) {
+    if (day.top.length >= DIGEST_MIN) entries.push({ url: `${siteUrl}${webStoriesPath(dailyStorySlug(day.date))}`, changeFrequency: 'daily', priority: 0.6 })
+    for (const a of day.breaking) entries.push({ url: `${siteUrl}${webStoriesPath(a.slug)}`, lastModified: a.updatedAt ?? a.publishedAt, changeFrequency: 'daily', priority: 0.6 })
   }
 
   // lastmod of hubs = newest article change (a lastmod of "now" on every fetch is ignored by Google)
