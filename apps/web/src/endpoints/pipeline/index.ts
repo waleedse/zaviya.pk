@@ -1249,7 +1249,9 @@ const pipelineEndpoints: Endpoint[] = [
             FROM (SELECT * FROM source_items si WHERE si.cluster_id = c.id ORDER BY si.published_at DESC LIMIT 4) i
           ), '[]'::json) AS items
         FROM story_clusters c
-        WHERE c.status = 'triaged' AND c.triage->>'codeOutcome' = 'pitch'
+        WHERE c.status = 'triaged'
+          AND (c.triage->>'codeOutcome' = 'pitch'
+            OR (c.triage->>'codeOutcome' = 'defer' AND c.triage->>'deferReason' LIKE 'Daily publish cap%'))
           AND c.updated_at > now() - interval '24 hours'
         ORDER BY c.updated_at DESC
         LIMIT 60

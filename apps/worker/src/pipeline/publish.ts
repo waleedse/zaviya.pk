@@ -210,7 +210,7 @@ export async function gateFallback(deps: { payload: PayloadClient; socialQueue: 
 export const QUOTA_CATEGORIES: string[] = ['ai', 'education-jobs']
 const QUOTA_WINDOW_MS = 4 * 60 * 60_000
 
-async function categoryOverdue(payload: PayloadClient, category: string, now = Date.now()): Promise<boolean> {
+export async function categoryOverdue(payload: PayloadClient, category: string, now = Date.now()): Promise<boolean> {
   const res = await payload.request<{ docs: { publishedAt?: string }[] }>(
     'GET',
     `/api/articles?where[_status][equals]=published&where[category.slug][equals]=${category}&sort=-publishedAt&limit=1&depth=0`,

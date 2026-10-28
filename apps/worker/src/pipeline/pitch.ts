@@ -65,6 +65,18 @@ export function bestPitch(pitches: Pitch[]): Pitch | undefined {
   )[0]
 }
 
+/**
+ * ZAV-237: a cluster triage deferred for pacing (daily cap, interval, window) sits as triaged/defer until its retry.
+ * The editor's write decision (or the floor) is stronger than pacing, so it must not be refused as "not a pitch".
+ */
+export function isPacingDefer(triage: Record<string, unknown>, status?: string): boolean {
+  return (
+    status === 'triaged' &&
+    triage.codeOutcome === 'defer' &&
+    /^(Daily publish cap|Minimum interval|Outside publish window)/.test(String(triage.deferReason ?? ''))
+  )
+}
+
 export async function decidePitch(
   clusterId: string,
   action: 'write' | 'reject',
@@ -73,7 +85,7 @@ export async function decidePitch(
 ): Promise<boolean> {
   const cluster = await deps.payload.getCluster(clusterId)
   const triage = (cluster.triage ?? {}) as Record<string, unknown>
-  if (triage.codeOutcome !== 'pitch') return false
+  if (triage.codeOutcome !== 'pitch' && !(action === 'write' && isPacingDefer(triage, cluster.status))) return false
   if (action === 'write' && cluster.items?.length && !hasFreshSource(cluster.items)) {
     await deps.payload.patchCluster(clusterId, { status: 'rejected', triage: { ...triage, codeOutcome: 'editor_reject', editorNote: 'stale sources' } })
     logger.warn({ clusterId }, 'pitch refused: no source from the last 18 hours')

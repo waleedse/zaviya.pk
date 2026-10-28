@@ -9,6 +9,7 @@ import { logger } from '../logger.js'
 import { hasFreshSource, pitchSummary, shouldPitch } from './pitch.js'
 import { enrichFromExtension } from './write.js'
 import type { BridgeServer } from '../bridge/server.js'
+import { categoryOverdue, QUOTA_CATEGORIES } from './publish.js'
 import { findSameStory } from './same-story.js'
 import { opinionCue, routeByStoryKind } from './story-kind.js'
 
@@ -177,12 +178,18 @@ export async function processTriageJob(
     }
   }
 
+  // ZAV-237: the 4 h Jobs/AI floor is not held back by the daily cap (publish.ts already skips the pacing queue for it)
+  const quotaOverdue = QUOTA_CATEGORIES.includes(triage.category)
+    ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
+    : false
+
   const decision = applyTriageRules(triage, {
     maxTier: cluster.maxTier,
     distinctSources: cluster.distinctSources,
     settings,
     lastPublishedAt: settings.lastPublishedAt,
     articlesPublishedToday: settings.articlesPublishedToday,
+    quotaOverdue,
   })
 
   if (decision.outcome === 'defer') {

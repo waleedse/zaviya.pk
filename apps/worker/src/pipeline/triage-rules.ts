@@ -11,6 +11,8 @@ export interface TriageContext {
   now?: Date
   lastPublishedAt?: string | null
   articlesPublishedToday?: number
+  /** ZAV-237: the story's desk (ai, education-jobs) has had no story for 4 h; the daily cap must not hold it back. */
+  quotaOverdue?: boolean
 }
 
 export interface TriageDecision {
@@ -150,7 +152,7 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
   const dailyCap = ctx.settings.dailyCaps?.articles ?? ctx.settings.dailyCaps?.publish ?? 999
   const publishedToday = ctx.articlesPublishedToday ?? 0
   const wouldPublish = triage.decision !== 'reject' && weightedScore >= publishThreshold && triage.decision === 'publish'
-  if (wouldPublish && !isBreaking && publishedToday >= dailyCap) {
+  if (wouldPublish && !isBreaking && !ctx.quotaOverdue && publishedToday >= dailyCap) {
     return {
       outcome: 'defer',
       reason: `Daily publish cap reached (${dailyCap})`,
