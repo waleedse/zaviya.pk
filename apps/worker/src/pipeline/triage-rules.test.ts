@@ -76,6 +76,12 @@ describe('applyTriageRules', () => {
     expect(d.retryInMs).toBeLessThan(11 * 60_000)
   })
 
+  it('ZAV-237: the daily cap holds a normal story but not an overdue Jobs/AI desk', () => {
+    const ctx = { maxTier: 1 as const, distinctSources: 3, settings: { dailyCaps: { articles: 120 } }, articlesPublishedToday: 130 }
+    expect(applyTriageRules(baseTriage, ctx).outcome).toBe('defer')
+    expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, { ...ctx, quotaOverdue: true }).outcome).toBe('publish')
+  })
+
   it('does not block on "unverified" when credible sources exist', () => {
     const d = applyTriageRules({ ...baseTriage, sensitivityFlags: ['unverified'] }, { maxTier: 2, distinctSources: 1, settings: {} })
     expect(d.outcome).toBe('publish')

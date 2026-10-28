@@ -69,6 +69,24 @@ describe('decidePitch', () => {
     expect(writeQueue.add).not.toHaveBeenCalled()
   })
 
+  it('ZAV-237: write also clears a cluster deferred by the daily cap', async () => {
+    const payload = {
+      getCluster: vi.fn(async () => ({ status: 'triaged', items: [], triage: { codeOutcome: 'defer', deferReason: 'Daily publish cap reached (120)', category: 'education-jobs' } })),
+      patchCluster: vi.fn(async () => ({})),
+      request: vi.fn(),
+    }
+    const writeQueue = { add: vi.fn(async () => ({})) }
+    expect(await decidePitch('16143', 'write', { payload, writeQueue, redis: fakeRedis() } as never)).toBe(true)
+    expect(payload.patchCluster).toHaveBeenCalledWith('16143', { status: 'writing', triage: expect.objectContaining({ codeOutcome: 'publish', editorApproved: true }) })
+    expect(writeQueue.add).toHaveBeenCalled()
+  })
+
+  it('ZAV-237: a headline-only defer is still not writable', async () => {
+    const payload = fakePayload({ codeOutcome: 'defer', deferReason: 'waiting for the article text' })
+    const writeQueue = { add: vi.fn() }
+    expect(await decidePitch('1', 'write', { payload, writeQueue, redis: fakeRedis() } as never)).toBe(false)
+  })
+
   it('ignores a story that is not a waiting pitch (decided twice, or already written)', async () => {
     const payload = fakePayload({ codeOutcome: 'publish', editorApproved: true })
     const writeQueue = { add: vi.fn() }
