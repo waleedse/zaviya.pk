@@ -22,13 +22,29 @@ export type ClusterMatchResult = {
  * one cluster. Rejected clusters stop absorbing sooner: the editor already said no to that story.
  */
 export const MAX_CLUSTER_AGE_HOURS = 72
-export const MAX_REJECTED_CLUSTER_AGE_HOURS = 18
+export const MAX_REJECTED_CLUSTER_AGE_HOURS = 6
 
 export function clusterMatchCutoffs(now: number): { anyFirstSeen: string; rejectedFirstSeen: string } {
   return {
     anyFirstSeen: new Date(now - MAX_CLUSTER_AGE_HOURS * 3600_000).toISOString(),
     rejectedFirstSeen: new Date(now - MAX_REJECTED_CLUSTER_AGE_HOURS * 3600_000).toISOString(),
   }
+}
+
+/**
+ * Same rule as the SQL filter in runClusterMatch, kept as a pure function so it can be tested.
+ * An editor-rejected cluster only absorbs early stragglers (first sighting within
+ * MAX_REJECTED_CLUSTER_AGE_HOURS). A later verdict/new development (ZAV-252: ATC sentence landing
+ * in a cluster rejected as 'soft politics') then starts a fresh cluster and is pitched on its own.
+ */
+export function clusterAcceptsItems(
+  cluster: { status?: string | null; firstSeenAt: string },
+  now: number,
+): boolean {
+  const c = clusterMatchCutoffs(now)
+  if (cluster.firstSeenAt < c.anyFirstSeen) return false
+  if (cluster.status === 'rejected' && cluster.firstSeenAt < c.rejectedFirstSeen) return false
+  return true
 }
 
 /** maxTier = best (most trusted) source tier in cluster — numerically minimum (1 beats 3). */
