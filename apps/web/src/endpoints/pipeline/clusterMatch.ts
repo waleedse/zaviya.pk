@@ -16,6 +16,21 @@ export type ClusterMatchResult = {
   similarity: number
 }
 
+/**
+ * A cluster stops absorbing new items once it is old (by first sighting, not last), otherwise a
+ * recurring story (daily fuel rates) keeps refreshing lastSeenAt and swallows every new day into
+ * one cluster. Rejected clusters stop absorbing sooner: the editor already said no to that story.
+ */
+export const MAX_CLUSTER_AGE_HOURS = 72
+export const MAX_REJECTED_CLUSTER_AGE_HOURS = 18
+
+export function clusterMatchCutoffs(now: number): { anyFirstSeen: string; rejectedFirstSeen: string } {
+  return {
+    anyFirstSeen: new Date(now - MAX_CLUSTER_AGE_HOURS * 3600_000).toISOString(),
+    rejectedFirstSeen: new Date(now - MAX_REJECTED_CLUSTER_AGE_HOURS * 3600_000).toISOString(),
+  }
+}
+
 /** maxTier = best (most trusted) source tier in cluster — numerically minimum (1 beats 3). */
 export async function refreshClusterStats(payload: Payload, clusterId: string): Promise<void> {
   const items = await payload.find({
@@ -78,6 +93,7 @@ export async function runClusterMatch(
   `)
 
   const windowStart = new Date(Date.now() - windowHours * 3600_000).toISOString()
+  const cutoffs = clusterMatchCutoffs(Date.now())
 
   const matchResult = await drizzle.execute(sql`
     SELECT
@@ -89,6 +105,8 @@ export async function runClusterMatch(
       AND si.embedding IS NOT NULL
       AND si.cluster_id IS NOT NULL
       AND sc.last_seen_at >= ${windowStart}
+      AND sc.first_seen_at >= ${cutoffs.anyFirstSeen}
+      AND (sc.status IS DISTINCT FROM 'rejected' OR sc.first_seen_at >= ${cutoffs.rejectedFirstSeen})
     ORDER BY si.embedding <=> ${vectorLiteral}::vector
     LIMIT 1
   `)
