@@ -1253,6 +1253,11 @@ const pipelineEndpoints: Endpoint[] = [
           AND (c.triage->>'codeOutcome' = 'pitch'
             OR (c.triage->>'codeOutcome' = 'defer' AND c.triage->>'deferReason' LIKE 'Daily publish cap%'))
           AND c.updated_at > now() - interval '24 hours'
+          -- the editor already decided: the worker applies it on its next heartbeat (about a minute), so do not show it again
+          AND NOT EXISTS (
+            SELECT 1 FROM zaviya_commands zc
+            WHERE zc.kind = 'pitch' AND zc.payload->>'clusterId' = c.id::text AND zc.created_at > now() - interval '5 minutes'
+          )
         ORDER BY c.updated_at DESC
         LIMIT 60
       `)) as unknown as {
@@ -1289,7 +1294,8 @@ const pipelineEndpoints: Endpoint[] = [
       await req.payload.db.drizzle.execute(
         sql`INSERT INTO zaviya_commands (kind, payload, created_by) VALUES ('pitch', ${JSON.stringify({ clusterId: id, action: parsed.data.action, note: parsed.data.note ?? '' })}::jsonb, 'agent:editor')`,
       )
-      return json({ ok: true, clusterId: id, action: parsed.data.action })
+      // queued, not applied yet: the worker picks the command up on its next heartbeat (about a minute)
+      return json({ ok: true, queued: true, clusterId: id, action: parsed.data.action })
     },
   },
   {
