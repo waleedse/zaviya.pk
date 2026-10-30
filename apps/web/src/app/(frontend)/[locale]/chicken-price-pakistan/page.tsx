@@ -160,6 +160,9 @@ export default async function ChickenPricePage({ params }: { params: Promise<{ l
           <p className="mt-3 text-sm">
             <Link href={localePath(locale, '/petrol-price-today-pakistan')} className="font-semibold underline">
               {isUr ? 'آج کا پیٹرول ریٹ' : 'Petrol price today'}
+            </Link>{' · '}
+            <Link href={localePath(locale, '/gold-rate-today-pakistan')} className="font-semibold underline">
+              {isUr ? 'آج کا سونے کا ریٹ' : 'Gold rate today'}
             </Link>
           </p>
         </section>

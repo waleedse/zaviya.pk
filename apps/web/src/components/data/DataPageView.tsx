@@ -102,6 +102,14 @@ export default function DataPageView({ locale, page, slug }: { locale: Locale; p
             </p>
           )}
 
+          {(page.key === 'gold' || page.key === 'petrol') && (
+            <p className="mt-4 text-sm">
+              <Link href={localePath(locale, '/chicken-price-pakistan')} className="font-semibold underline">
+                {isUr ? 'مرغی کا ریٹ: ہفتہ وار پی بی ایس اوسط' : 'Chicken price in Pakistan: weekly PBS average'}
+              </Link>
+            </p>
+          )}
+
           {page.key === 'petrol' && (
             <p className="mt-4 text-sm">
               <Link href={localePath(locale, '/fuel-relief-9771-pakistan')} className="font-semibold underline">
