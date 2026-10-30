@@ -145,7 +145,12 @@ export default async function SbpPolicyRatePage({ params }: { params: Promise<{ 
           <p className="mt-2 text-fg-muted">
             {isUr
               ? 'بہت سے کار، گھر اور کاروباری قرضے KIBOR جمع بینک کا مارجن کی بنیاد پر چلتے ہیں۔ پالیسی ریٹ بڑھنے سے KIBOR عموماً بڑھتا ہے اور متغیر شرح والے قرض کی قسط بڑھ سکتی ہے۔ مقررہ شرح والے قرض پر فوری فرق نہیں پڑتا۔ اپنی قسط کا درست حساب بینک سے لیں۔'
-              : 'Many car, home and business loans are priced as KIBOR plus the bank’s margin. When the policy rate rises, KIBOR usually follows, and a floating-rate loan can cost more at its next repricing; a fixed-rate loan does not change straight away. Ask your bank for the exact instalment: we do not estimate EMIs.'}
+              : 'Many car, home and business loans are priced as KIBOR plus the bank’s margin. When the policy rate rises, KIBOR usually follows, and a floating-rate loan can cost more at its next repricing; a fixed-rate loan does not change straight away. Ask your bank for the exact instalment.'}
+          </p>
+          <p className="mt-2">
+            <Link href={localePath(locale, '/loan-emi-calculator-pakistan')} className="underline">
+              {isUr ? 'لون EMI کیلکولیٹر' : 'Loan EMI calculator (car, home, personal)'}
+            </Link>
           </p>
         </section>
 
