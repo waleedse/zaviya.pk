@@ -6,7 +6,7 @@ describe('loan EMI maths', () => {
     // 1,000,000 at 12% for 12 months: 88,848.79
     expect(emi(1_000_000, 12, 12)).toBeCloseTo(88_848.79, 1)
     // 3,000,000 at 15% for 60 months: 71,364.31
-    expect(emi(3_000_000, 15, 60)).toBeCloseTo(71_364.31, 0)
+    expect(emi(3_000_000, 15, 60)).toBeCloseTo(71_369.79, 0)
   })
   it('handles zero rate and bad input', () => {
     expect(emi(120_000, 0, 12)).toBe(10_000)
