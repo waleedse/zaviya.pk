@@ -19,10 +19,41 @@ export type TrafficSource =
   | 'other'
 
 const BOT_RE =
-  /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|whatsapp\/|telegrambot|preview|headless|lighthouse|pagespeed|curl|wget|python|node-fetch|axios|go-http|java\//i
+  /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|whatsapp\/|telegrambot|preview|headless|lighthouse|pagespeed|curl|wget|python|node-fetch|axios|go-http|java\/|lightpanda|webindexer|externalagent/i
 
 export function isBot(ua: string | null): boolean {
   return !ua || BOT_RE.test(ua)
+}
+
+/**
+ * Scrapers that rotate real-looking desktop user agents (ZAV-260: ~330 one-view "direct" visitors on 30 Oct came from
+ * Chrome 118-121 / Firefox 120-121 on Windows and Mac, years behind any browser a person uses in 2026). Mobile agents
+ * are left alone because old Android phones are common.
+ */
+export function isStaleDesktopUa(ua: string): boolean {
+  if (/android|mobi|iphone|ipad|tablet/i.test(ua)) return false
+  const chrome = /Chrome\/(\d+)\./.exec(ua)
+  if (chrome) return Number(chrome[1]) < 126
+  const firefox = /Firefox\/(\d+)\./.exec(ua)
+  return firefox ? Number(firefox[1]) < 128 : false
+}
+
+export type BotReason = 'no-ua' | 'known-bot' | 'stale-desktop-ua'
+
+/** Why a hit is not a person, or null when it looks human. */
+export function botReason(ua: string | null): BotReason | null {
+  if (!ua) return 'no-ua'
+  if (BOT_RE.test(ua)) return 'known-bot'
+  if (isStaleDesktopUa(ua)) return 'stale-desktop-ua'
+  return null
+}
+
+/** Bot hits are kept apart from zaviya_pageviews so they never count as direct visitors; the report shows them separately. */
+export async function recordBotHit(row: { path: string; reason: BotReason; device: string }): Promise<void> {
+  const payload = await getPayloadClient()
+  await payload.db.drizzle.execute(sql`
+    INSERT INTO zaviya_bot_hits (path, reason, device) VALUES (${row.path.slice(0, 500)}, ${row.reason}, ${row.device})
+  `)
 }
 
 /** Where a visit came from, using the referrer first and utm_source as a hint. */
@@ -115,6 +146,14 @@ export const ANALYTICS_DDL = [
   )`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_ts_idx ON zaviya_pageviews (ts)`,
   sql`CREATE INDEX IF NOT EXISTS zaviya_pageviews_path_ts_idx ON zaviya_pageviews (path, ts)`,
+  sql`CREATE TABLE IF NOT EXISTS zaviya_bot_hits (
+    id bigserial PRIMARY KEY,
+    ts timestamptz NOT NULL DEFAULT now(),
+    path text NOT NULL,
+    reason text NOT NULL,
+    device text
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS zaviya_bot_hits_ts_idx ON zaviya_bot_hits (ts)`,
   sql`CREATE TABLE IF NOT EXISTS zaviya_share_clicks (
     id bigserial PRIMARY KEY,
     ts timestamptz NOT NULL DEFAULT now(),

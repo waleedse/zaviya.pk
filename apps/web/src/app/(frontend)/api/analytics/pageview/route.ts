@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { classifySource, deviceFromUa, isBot, recordPageview, visitorId } from '@/lib/analytics'
+import { botReason, classifySource, deviceFromUa, isBot, recordBotHit, recordPageview, visitorId } from '@/lib/analytics'
 import { isMetaIp } from '@/lib/ip-ranges'
 import { siteUrl } from '@/lib/seo'
 
@@ -20,6 +20,13 @@ const NOT_HUMAN = () => NextResponse.json({ human: false })
  */
 export async function POST(request: Request) {
   const ua = request.headers.get('user-agent')
+  const reason = botReason(ua)
+  if (reason === 'stale-desktop-ua') {
+    // Suspected scraper with a spoofed browser agent: count it apart from visitors, never as direct (ZAV-260)
+    const parsedBot = bodySchema.safeParse(await request.json().catch(() => null))
+    if (parsedBot.success) await recordBotHit({ path: parsedBot.data.path, reason, device: deviceFromUa(ua ?? '') }).catch(() => undefined)
+    return NOT_HUMAN()
+  }
   if (isBot(ua)) return NOT_HUMAN()
   const ip = (request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim()
   if (isMetaIp(ip)) {
