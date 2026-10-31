@@ -7,12 +7,21 @@ export const STUCK_PAGE_SIZE = 300
 export const STUCK_MAX_PAGES = 10
 export const STUCK_RESULT_LIMIT = 25
 
+/** A cluster with no triage object that sits in 'writing' this long is looked at too (ZAV-259); older ones are left to rot, not flooded onto the writer. */
+export const NO_TRIAGE_MAX_AGE_MIN = 6 * 60
+
 const ageMin = (c: StuckCandidate, now: number) => (now - new Date(String(c.updatedAt)).getTime()) / 60_000
 
 /** True when this cluster is stuck and should be handed back to the writer. */
 export function isStuckApproved(c: StuckCandidate, now: number, writingAgeMin: number, publishAgeMin: number): boolean {
   const triage = (c.triage ?? {}) as { editorApproved?: boolean; codeOutcome?: string }
-  if (c.status === 'writing') return triage.editorApproved === true && ageMin(c, now) >= writingAgeMin
+  if (c.status === 'writing') {
+    const age = ageMin(c, now)
+    if (triage.editorApproved === true) return age >= writingAgeMin
+    // ZAV-259: forced into 'writing' by hand without a triage object: nothing else ever looks at it again
+    const noTriage = !c.triage || (typeof c.triage === 'object' && Object.keys(c.triage as object).length === 0)
+    return noTriage && age >= writingAgeMin && age <= NO_TRIAGE_MAX_AGE_MIN
+  }
   if (triage.editorApproved === true) return true
   return c.status === 'triaged' && triage.codeOutcome === 'publish' && ageMin(c, now) >= publishAgeMin
 }
