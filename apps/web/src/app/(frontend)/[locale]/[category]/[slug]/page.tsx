@@ -40,6 +40,7 @@ import { todayForAllCities } from '@/lib/prayer-times'
 import { formatNumber } from '@/lib/format'
 import { Eye, TrendingUp } from 'lucide-react'
 import { AdSlot } from '@/components/ads/AdSlot'
+import { FollowBox } from '@/components/marketing/FollowBox'
 import { formatDateTime } from '@/lib/format'
 import { canBuildWebStory, webStoryPath } from '@/lib/web-story'
 import type { Locale } from '@zaviya/shared'
@@ -252,6 +253,7 @@ export default async function ArticlePage({ params }: Props) {
                 ) : null}
               </div>
               <PreferredSourcePrompt locale={locale} />
+              <FollowBox locale={locale} source="article" />
               <div className="mt-6">
                 <AuthorBox author={article.author} locale={locale} />
               </div>
