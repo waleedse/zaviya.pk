@@ -60,3 +60,19 @@ export async function getCityAqi(fetchFn: typeof fetch = fetch): Promise<CityAqi
     return []
   }
 }
+
+/** A reading older than this is never shown as today's number (ZAV-262). */
+export const AQI_MAX_AGE_HOURS = 6
+
+/** True when the reading's Pakistan-time stamp (e.g. 2026-10-31T09:00) is more than 6 h before `now`, or cannot be read. */
+export function isAqiStale(time: string, now: Date = new Date()): boolean {
+  const at = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) ? Date.parse(`${time}:00+05:00`) : NaN
+  if (Number.isNaN(at)) return true
+  return now.getTime() - at > AQI_MAX_AGE_HOURS * 3600 * 1000
+}
+
+/** Stories about smog / air quality get a link to /aqi-pakistan. */
+export function isSmogStory(a: { title?: string | null; tags?: { slug?: string | null; name?: string | null }[] | null }): boolean {
+  const re = /\b(smog|aqi|air quality|air pollution)\b|اسموگ/i
+  return re.test(a.title ?? '') || (a.tags ?? []).some((t) => re.test(`${t.slug ?? ''} ${t.name ?? ''}`.replace(/-/g, ' ')))
+}

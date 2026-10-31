@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Locale } from '@zaviya/shared'
 import { LatestList } from '@/components/article/LatestList'
@@ -25,6 +26,11 @@ export async function renderLatestPage(locale: Locale, pageNum: number) {
         stats={feed.totalDocs ? [{ label: isUr ? 'خبریں' : 'stories', value: feed.totalDocs }] : undefined}
       />
       <div className="container-wide pt-8">
+        <p className="mb-4 text-sm">
+          <Link href={localePath(locale, '/aqi-pakistan')} className="font-semibold underline">
+            {isUr ? 'اسموگ کا موسم: آج لاہور اور پاکستان کا AQI' : 'Smog season: Lahore and Pakistan AQI today'}
+          </Link>
+        </p>
         <LatestList locale={locale} items={feed.docs} title={isUr ? 'تازہ ترین خبریں' : 'Latest news'} />
         <Pagination locale={locale} page={feed.page} totalPages={feed.totalPages} basePath={localePath(locale, '/latest')} />
       </div>
