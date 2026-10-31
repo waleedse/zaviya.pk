@@ -87,6 +87,16 @@ describe('decidePitch', () => {
     expect(await decidePitch('1', 'write', { payload, writeQueue, redis: fakeRedis() } as never)).toBe(false)
   })
 
+  it('ZAV-267: write on an untriaged story moves its triage to the front instead of dropping the command', async () => {
+    const payload = { getCluster: vi.fn(async () => ({ status: 'new', items: [], triage: {} })), patchCluster: vi.fn(), request: vi.fn() }
+    const writeQueue = { add: vi.fn() }
+    const triageQueue = { add: vi.fn(async () => ({})) }
+    expect(await decidePitch('20321', 'write', { payload, writeQueue, redis: fakeRedis(), triageQueue } as never)).toBe(true)
+    expect(triageQueue.add).toHaveBeenCalledWith('triage', { clusterId: '20321' }, expect.objectContaining({ priority: 1 }))
+    expect(writeQueue.add).not.toHaveBeenCalled()
+    expect(payload.patchCluster).not.toHaveBeenCalled()
+  })
+
   it('ignores a story that is not a waiting pitch (decided twice, or already written)', async () => {
     const payload = fakePayload({ codeOutcome: 'publish', editorApproved: true })
     const writeQueue = { add: vi.fn() }

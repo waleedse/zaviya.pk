@@ -80,11 +80,18 @@ export function isPacingDefer(triage: Record<string, unknown>, status?: string):
 export async function decidePitch(
   clusterId: string,
   action: 'write' | 'reject',
-  deps: { payload: PayloadClient; writeQueue: Pick<Queue, 'add'>; redis: Redis },
+  deps: { payload: PayloadClient; writeQueue: Pick<Queue, 'add'>; redis: Redis; triageQueue?: Pick<Queue, 'add'> },
   note = '',
 ): Promise<boolean> {
   const cluster = await deps.payload.getCluster(clusterId)
   const triage = (cluster.triage ?? {}) as Record<string, unknown>
+  // ZAV-267: a story the editor wants written that has not been triaged yet has no pitch to approve. Jump it to the
+  // front of the triage queue (it then reaches the editor as a pitch) instead of dropping the command silently.
+  if (action === 'write' && cluster.status === 'new' && !triage.codeOutcome && deps.triageQueue) {
+    await deps.triageQueue.add('triage', { clusterId }, { priority: 1, jobId: `triage-editor-${clusterId}-${Math.floor(Date.now() / 600_000)}`, removeOnComplete: true })
+    logger.info({ clusterId }, 'editor asked to write an untriaged story: triage moved to the front')
+    return true
+  }
   if (triage.codeOutcome !== 'pitch' && !(action === 'write' && isPacingDefer(triage, cluster.status))) return false
   if (action === 'write' && cluster.items?.length && !hasFreshSource(cluster.items)) {
     await deps.payload.patchCluster(clusterId, { status: 'rejected', triage: { ...triage, codeOutcome: 'editor_reject', editorNote: 'stale sources' } })
