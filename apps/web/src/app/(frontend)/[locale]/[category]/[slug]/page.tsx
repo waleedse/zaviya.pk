@@ -33,6 +33,7 @@ import { AuthorBox } from '@/components/article/AuthorBox'
 import { ArticleCard } from '@/components/article/ArticleCard'
 import { ArticleToolbar } from '@/components/article/ArticleToolbar'
 import { AuthorAvatar } from '@/components/article/AuthorBox'
+import { isSmogStory } from '@/lib/aqi'
 import { NextPrayerCard } from '@/components/namaz/NextPrayerCard'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { todayForAllCities } from '@/lib/prayer-times'
@@ -218,6 +219,13 @@ export default async function ArticlePage({ params }: Props) {
                   <strong>{d.corrections}:</strong> {c.note}
                 </p>
               ))}
+              {isSmogStory(article) && (
+                <p className="my-6 rounded-2xl bg-surface-2 p-4 text-sm">
+                  <Link href={localePath(locale, '/aqi-pakistan')} className="font-bold underline">
+                    {isUr ? 'آج لاہور اور دیگر شہروں کا AQI دیکھیں' : 'Check today\'s AQI for Lahore and other cities'}
+                  </Link>
+                </p>
+              )}
               {article.tags.length > 0 && (
                 <div className="my-8 flex flex-wrap gap-2">
                   {article.tags.map((tag, i) =>

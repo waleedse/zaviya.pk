@@ -4,7 +4,7 @@ import { JsonLd } from '@/components/seo/JsonLd'
 import { parseLocale } from '@/lib/locale'
 import { localePath } from '@/lib/i18n'
 import { breadcrumbJsonLd, buildPageMetadata, faqJsonLd } from '@/lib/seo'
-import { aqiBand, getCityAqi } from '@/lib/aqi'
+import { aqiBand, getCityAqi, isAqiStale } from '@/lib/aqi'
 
 export const revalidate = 1800
 
@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       locale === 'ur'
         ? 'لاہور، کراچی، اسلام آباد اور دیگر شہروں کا آج کا AQI اور PM2.5، اسموگ سے بچاؤ کے مشورے۔'
         : 'Air quality index (AQI) and PM2.5 today for Lahore, Karachi, Islamabad and other Pakistani cities, with what each level means and how to protect yourself from smog.',
-    enPath: '/aqi-today-pakistan',
-    urPath: '/ur/aqi-today-pakistan',
+    enPath: '/aqi-pakistan',
+    urPath: '/ur/aqi-pakistan',
     absoluteTitle: true,
   })
 }
@@ -29,16 +29,20 @@ export default async function AqiPage({ params }: { params: Promise<{ locale: st
   const locale = parseLocale((await params).locale)
   const isUr = locale === 'ur'
   const cities = await getCityAqi()
-  const lahore = cities.find((c) => c.slug === 'lahore')
+  const now = new Date()
+  // Stale-source guard (ZAV-262): a reading older than 6 h is never shown as today's number
+  const fresh = cities.filter((c) => !isAqiStale(c.time, now))
+  const lahore = fresh.find((c) => c.slug === 'lahore')
   const lb = lahore ? aqiBand(lahore.aqi) : null
+  const notUpdated = cities.length > 0 && fresh.length === 0
 
   const faqs = isUr
     ? [
-        { q: 'آج لاہور کا AQI کتنا ہے؟', a: lahore && lb ? `${timeLabel(lahore.time)} پر لاہور کا AQI ${lahore.aqi} (${lb.ur}) اور PM2.5 ${lahore.pm25} µg/m³ ہے۔` : 'اعداد و شمار فی الحال دستیاب نہیں، کچھ دیر بعد دیکھیں۔' },
+        { q: 'آج لاہور کا AQI کتنا ہے؟', a: lahore && lb ? `${timeLabel(lahore.time)} پر لاہور کا AQI ${lahore.aqi} (${lb.ur}) اور PM2.5 ${lahore.pm25} µg/m³ ہے۔` : notUpdated ? 'ماخذ اپ ڈیٹ نہیں ہوا، اس لیے ہم پرانا عدد نہیں دکھا رہے۔' : 'اعداد و شمار فی الحال دستیاب نہیں، کچھ دیر بعد دیکھیں۔' },
         { q: 'AQI کتنا ہو تو ماسک پہننا چاہیے؟', a: '100 سے اوپر حساس افراد، اور 150 سے اوپر سب کو باہر N95 ماسک پہننا چاہیے۔' },
       ]
     : [
-        { q: 'What is the AQI in Lahore today?', a: lahore && lb ? `At ${timeLabel(lahore.time)} the AQI in Lahore is ${lahore.aqi} (${lb.en}) with PM2.5 at ${lahore.pm25} µg/m³.` : 'Air quality data is temporarily unavailable. Please check again shortly.' },
+        { q: 'What is the AQI in Lahore today?', a: lahore && lb ? `At ${timeLabel(lahore.time)} the AQI in Lahore is ${lahore.aqi} (${lb.en}) with PM2.5 at ${lahore.pm25} µg/m³.` : notUpdated ? 'Source not updated: the latest reading is more than 6 hours old, so we are not showing it as today\'s number.' : 'Air quality data is temporarily unavailable. Please check again shortly.' },
         { q: 'AQI kitna ho to mask pehanna chahiye?', a: 'Above 100 sensitive people, and above 150 everyone, should wear an N95 mask outdoors.' },
         { q: 'Where does this data come from?', a: 'These are modelled estimates from the Open-Meteo air quality service (CAMS atmospheric data), refreshed about every 30 minutes. They can differ from a street-level monitor, so use them as a guide.' },
         { q: 'What does AQI mean?', a: 'The Air Quality Index turns pollutant levels into one number on the US EPA scale: 0-50 good, 51-100 moderate, 101-150 unhealthy for sensitive groups, 151-200 unhealthy, 201-300 very unhealthy, above 300 hazardous.' },
@@ -50,7 +54,7 @@ export default async function AqiPage({ params }: { params: Promise<{ locale: st
         data={[
           breadcrumbJsonLd([
             { name: isUr ? 'ہوم' : 'Home', url: localePath(locale, '/') },
-            { name: isUr ? 'آج کا AQI' : 'AQI today', url: localePath(locale, '/aqi-today-pakistan') },
+            { name: isUr ? 'آج کا AQI' : 'AQI today', url: localePath(locale, '/aqi-pakistan') },
           ]),
           faqJsonLd(faqs),
         ]}
@@ -78,13 +82,17 @@ export default async function AqiPage({ params }: { params: Promise<{ locale: st
               <p className="mt-2 text-sm text-fg-muted">{timeLabel(lahore.time)}</p>
             </div>
           ) : (
-            <p className="text-lg text-fg-muted">{isUr ? 'اعداد و شمار فی الحال دستیاب نہیں۔ کچھ دیر بعد دیکھیں۔' : 'Air quality data is temporarily unavailable. Please check again shortly.'}</p>
+            <p className="text-lg text-fg-muted">
+              {notUpdated
+                ? isUr ? 'ماخذ اپ ڈیٹ نہیں ہوا۔ 6 گھنٹے سے پرانا عدد ہم آج کے طور پر نہیں دکھاتے۔' : 'Source not updated. We do not show a reading older than 6 hours as today\'s number.'
+                : isUr ? 'اعداد و شمار فی الحال دستیاب نہیں۔ کچھ دیر بعد دیکھیں۔' : 'Air quality data is temporarily unavailable. Please check again shortly.'}
+            </p>
           )}
         </div>
       </section>
 
       <div className="container-wide mt-8 max-w-[860px] space-y-8">
-        {cities.length > 0 && (
+        {fresh.length > 0 && (
           <section>
             <h2 className="font-display text-xl font-bold">{isUr ? 'شہروں کا AQI' : 'AQI by city'}</h2>
             <div className="mt-3 overflow-x-auto">
@@ -98,7 +106,7 @@ export default async function AqiPage({ params }: { params: Promise<{ locale: st
                   </tr>
                 </thead>
                 <tbody>
-                  {[...cities].sort((a, b) => b.aqi - a.aqi).map((c) => {
+                  {[...fresh].sort((a, b) => b.aqi - a.aqi).map((c) => {
                     const b = aqiBand(c.aqi)
                     return (
                       <tr key={c.slug} className="border-b border-border">
