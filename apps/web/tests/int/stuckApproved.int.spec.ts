@@ -12,6 +12,15 @@ describe('isStuckApproved (ZAV-107)', () => {
     expect(isStuckApproved({ id: 1, status: 'writing', updatedAt: ago(10), triage: { editorApproved: true } }, now, 45, 30)).toBe(false)
     expect(isStuckApproved({ id: 2, status: 'writing', updatedAt: ago(900), triage: {} }, now, 45, 30)).toBe(false)
   })
+  it('ZAV-261: an approved cluster with releaseCount 0 is stuck once idle for the writing age (15)', () => {
+    expect(isStuckApproved({ id: 18312, status: 'writing', updatedAt: ago(20), triage: { editorApproved: true, releaseCount: 0 } }, now, 15, 30)).toBe(true)
+    expect(isStuckApproved({ id: 18312, status: 'writing', updatedAt: ago(10), triage: { editorApproved: true, releaseCount: 0 } }, now, 15, 30)).toBe(false)
+  })
+  it('ZAV-259: a recent writing cluster with triage null is stuck; an ancient one is not', () => {
+    expect(isStuckApproved({ id: 18718, status: 'writing', updatedAt: ago(60), triage: null }, now, 15, 30)).toBe(true)
+    expect(isStuckApproved({ id: 18718, status: 'writing', updatedAt: ago(5), triage: null }, now, 15, 30)).toBe(false)
+    expect(isStuckApproved({ id: 18718, status: 'writing', updatedAt: ago(400), triage: null }, now, 15, 30)).toBe(false)
+  })
   it('a plain publish decision waits for the publish idle time', () => {
     expect(isStuckApproved({ id: 3, status: 'triaged', updatedAt: ago(20), triage: { codeOutcome: 'publish' } }, now, 45, 30)).toBe(false)
     expect(isStuckApproved({ id: 3, status: 'triaged', updatedAt: ago(40), triage: { codeOutcome: 'publish' } }, now, 45, 30)).toBe(true)

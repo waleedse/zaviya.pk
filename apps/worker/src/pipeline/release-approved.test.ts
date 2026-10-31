@@ -33,6 +33,14 @@ describe('releaseStuckApproved (ZAV-107)', () => {
     expect(opts.jobId).toBe(`write-release-12025-${Math.floor(T / 300_000)}`)
   })
 
+  it('ZAV-259: releases a writing cluster whose triage is null with a synthesised publish triage', async () => {
+    const d = setup({ status: 'writing', triage: {} })
+    d.payload.getCluster.mockResolvedValue({ id: '12025', status: 'writing', triage: null, items: fresh, article: null })
+    expect(await releaseStuckApproved(d as never, T)).toBe(1)
+    expect(d.payload.patchCluster.mock.calls[0]![1]).toMatchObject({ status: 'writing', triage: { codeOutcome: 'publish', releaseCount: 1 } })
+    expect(d.writeQueue.add).toHaveBeenCalled()
+  })
+
   it('also releases an in_review cluster the editor approved (QA failed earlier)', async () => {
     const d = setup({ status: 'in_review' })
     expect(await releaseStuckApproved(d as never, T)).toBe(1)

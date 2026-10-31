@@ -5,8 +5,12 @@ import { freshForApproved } from './pitch.js'
 
 /** An approved cluster idle in triaged/in_review this long went back there after a skipped or failed write (ZAV-107). */
 export const APPROVED_IDLE_MIN = 5
-/** A cluster 'writing' this long with no job in any queue lost its job; a live write takes well under this. */
-export const APPROVED_WRITING_MIN = 45
+/**
+ * A cluster 'writing' this long with no job in any queue lost its job; a live write takes well under this.
+ * ZAV-261: was 45. Every editor nudge (a PATCH to 'writing') restarts the idle clock, so with hourly nudges the
+ * diesel cluster 18312 never aged out. The job check (clusterHasJob) already prevents twin writes.
+ */
+export const APPROVED_WRITING_MIN = 15
 /** A plain publish decision left in 'triaged' (no editor approval) waits this long before it is released. */
 export const PUBLISH_IDLE_MIN = 30
 /** After this many releases the cluster is closed with a visible reason instead of looping. */
