@@ -2,10 +2,10 @@
 
 **Goal**: one Urdu-voiced explainer video (45–60 s, 1080×1920) every 3 hours' round, chosen from everything trending in
 Pakistan and the world ("how the PHP bug affects ordinary people", "how petrol price is set"). Real photos where we
-may use them, honest AI illustrations and animated diagrams where we may not, an Urdu female voice, Urdu captions.
+may use them, honest AI illustrations and animated diagrams where we may not, an Urdu male voice, Urdu captions.
 It extends the existing video service (`apps/worker/src/video`, `packages/video`); nothing in the news worker changes.
 
-Decided with Waleed: voice = `AhsanTalal/urdu-matcha-tts-female` at length-scale 0.9 (the "fast" sample); local model,
+Decided with Waleed: voice = `AhsanTalal/urdu-matcha-tts` (male, since 1 Nov 2026; was `-female`) at length-scale 0.9 (the "fast" sample); local model,
 no per-minute cost; the editor recommends topics and can veto; a ranked backlog so good leftovers get picked next round;
 no greeting ("salam") at the start of the narration.
 

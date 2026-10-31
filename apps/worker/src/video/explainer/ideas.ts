@@ -54,6 +54,14 @@ export function isSensitive(text: string): boolean {
   return SENSITIVE.test(text)
 }
 
+// Pakistani viewers watch what is about them: places, money in rupees, our cricket, daily-life costs.
+// Foreign gadget and AI-lab news got zero views in Oct 2026, so these ideas rank first.
+const PAKISTAN = /\b(pakistan\w*|lahore|karachi|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|punjab|sindh|balochistan|khyber|kp|gilgit|azad kashmir|rs\.?|rupees?|pkr|psx|petrol|diesel|load ?shedding|smog|aqi|babar|rizwan|shaheen|fakhar|pcb|psl|jazz|zong|telenor|ufone|easypaisa|jazzcash|daraz|wapda|lesco|k-?electric)\b/i
+
+export function isPakistan(text: string): boolean {
+  return PAKISTAN.test(text)
+}
+
 export function ideaId(title: string): string {
   const norm = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
   return createHash('sha1').update(norm).digest('hex').slice(0, 12)
@@ -89,6 +97,7 @@ export function scoreIdea(idea: Idea, now: number): number {
   }
   // a round that failed on this idea moves it back, so the next round tries another one
   s -= (idea.failures ?? 0) * 25
+  if (isPakistan(`${idea.title} ${idea.angle}`)) s += 30
   if (idea.decision === 'boost') s += 40
   if (idea.decision === 'ok') s += 10
   return s
