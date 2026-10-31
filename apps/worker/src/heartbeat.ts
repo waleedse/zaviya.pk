@@ -49,7 +49,7 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
     case 'pitch': {
       if (clusterId) {
         const action = cmd.payload?.action === 'reject' ? 'reject' : 'write'
-        const done = await decidePitch(clusterId, action, { payload: runtime.payload, writeQueue: runtime.queues.write, redis: runtime.redis }, cmd.payload?.note ?? '')
+        const done = await decidePitch(clusterId, action, { payload: runtime.payload, writeQueue: runtime.queues.write, redis: runtime.redis, triageQueue: runtime.queues.triage }, cmd.payload?.note ?? '')
         if (!done) logger.warn({ clusterId }, 'pitch command for a story that is not waiting')
       }
       break
