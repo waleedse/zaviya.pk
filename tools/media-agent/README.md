@@ -9,4 +9,4 @@ It connects OUT to the media hub on the server; nothing on the Mac is exposed.
 - Log: `~/zaviya-media-agent/agent.log`.
 - The Mac must be on and awake (the agent runs under `caffeinate -i`; a closed lid still sleeps it). If it is off, the server falls back
   (server-side voice, a paid image API) or skips that video; nothing waits forever.
-- Voice: `AhsanTalal/urdu-matcha-tts-female`, length scale 0.9. Pictures: SDXS-512 (fast) and Z-Image Turbo Q4 (good, about 5 minutes for 512x512).
+- Voice: `AhsanTalal/urdu-matcha-tts` (male; set `TTS_REPO=AhsanTalal/urdu-matcha-tts-female` for the old female voice), length scale 0.9. Pictures: SDXS-512 (fast) and Z-Image Turbo Q4 (good, about 5 minutes for 512x512).

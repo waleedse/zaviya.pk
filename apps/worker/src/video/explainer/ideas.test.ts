@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EVERGREEN } from './evergreen.js'
-import { DAY, discoverIdeas, isGovernment, HOUR, IdeaStore, ideaId, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
+import { DAY, discoverIdeas, isGovernment, HOUR, IdeaStore, ideaId, isPakistan, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
 
 const NOW = Date.UTC(2026, 9, 24, 8)
 const idea = (over: Partial<Idea> = {}): Idea => ({ id: ideaId(over.title ?? 'x'), title: 'Some topic about rockets', angle: 'a', origin: 'evergreen', sources: [], tags: [], baseScore: 16, createdAt: NOW, risk: 'low', status: 'backlog', ...over })
@@ -18,6 +18,15 @@ describe('scoring', () => {
   it('lets the editor boost and lets waiting evergreen ideas creep up', () => {
     expect(scoreIdea(idea({ decision: 'boost' }), NOW)).toBeGreaterThan(scoreIdea(idea(), NOW) + 30)
     expect(scoreIdea(idea({ createdAt: NOW - 5 * DAY }), NOW)).toBeGreaterThan(scoreIdea(idea(), NOW))
+  })
+
+  it('ranks Pakistani topics above foreign gadget news, even against a boost', () => {
+    expect(isPakistan('What AQI numbers mean when Lahore hits 294')).toBe(true)
+    expect(isPakistan('Redmi 17 5G price in Rs and PTA')).toBe(true)
+    expect(isPakistan('Apple HomeView: $299 smart display')).toBe(false)
+    expect(isPakistan('Skip spelling')).toBe(false)
+    const local = scoreIdea(idea({ title: 'Why Lahore smog peaks in November', decision: 'boost' }), NOW)
+    expect(local).toBeGreaterThan(scoreIdea(idea({ title: 'Galaxy Z Fold 8 charging', decision: 'boost' }), NOW) + 20)
   })
 
   it('moves an idea back after a failed round', () => {

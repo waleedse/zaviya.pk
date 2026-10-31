@@ -2,7 +2,7 @@
 """Zaviya media agent: runs on Waleed's Mac, makes Urdu voice and pictures with local models for the video service.
 
 It only connects OUT to the media hub (HTTPS long poll): claim a job, make the file, upload it.
-  tts   -> Urdu female voice, Matcha-TTS (AhsanTalal/urdu-matcha-tts-female) + Vocos vocoder, CPU
+  tts   -> Urdu male voice, Matcha-TTS (AhsanTalal/urdu-matcha-tts; TTS_REPO=AhsanTalal/urdu-matcha-tts-female for the old one) + Vocos vocoder, CPU
   image -> quality "fast": SDXS-512 (seconds); quality "good": Z-Image Turbo Q4 via stable-diffusion.cpp (minutes)
 
 Config in ~/zaviya-media-agent/.env : HUB_URL, MEDIA_AGENT_TOKEN, AGENT_NAME (optional)
@@ -53,7 +53,7 @@ def tts_model():
             from vocos import Vocos
 
             torch.set_num_threads(int(os.environ.get("TTS_THREADS", "4")))
-            repo = "AhsanTalal/urdu-matcha-tts-female"
+            repo = os.environ.get("TTS_REPO", "AhsanTalal/urdu-matcha-tts")
             vocab = json.load(open(hf_hub_download(repo, "vocab.json"), encoding="utf-8"))
             sess = ort.InferenceSession(hf_hub_download(repo, "matcha_tts.onnx"), providers=["CPUExecutionProvider"])
             vrepo = "BSC-LT/vocos-mel-22khz"
