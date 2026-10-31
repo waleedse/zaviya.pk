@@ -1,4 +1,4 @@
-import type { WorkerEnv } from '../config.js'
+import { fluxCreds, type WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { Queue } from 'bullmq'
 import type { WriteResult } from './write.js'
@@ -170,8 +170,7 @@ export async function processMediaJob(
     }).catch(() => null))
   const flux = async () =>
     generateHeroViaWorkersAI(brief, {
-      accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
-      token: deps.env.CLOUDFLARE_AI_TOKEN,
+      ...fluxCreds(deps.env),
       clusterId: data.clusterId,
       scene: await scene(),
     })
@@ -183,7 +182,7 @@ export async function processMediaJob(
         logger.info({ clusterId: data.clusterId, account }, 'hero image from Gemini')
         return b
       }
-      // Laptop in use or locked: no other account will do better, go straight to FLUX
+      // Laptop in use or locked: no other account will do better, go straight to FLUX (or hold the story when FLUX is off)
       if (/gemini_user_/.test(lastGeminiError)) break
     }
     return null

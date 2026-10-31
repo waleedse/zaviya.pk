@@ -1,5 +1,5 @@
 import type { Queue } from 'bullmq'
-import type { WorkerEnv } from '../config.js'
+import { fluxCreds, type WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { logger } from '../logger.js'
@@ -83,8 +83,7 @@ export async function processHeroBackfill(
   const scene = await describeReferenceScene(data.sourceUrls ?? [], { geminiApiKey: deps.env.GEMINI_API_KEY, clusterId }).catch(() => null)
   const blob =
     (await generateHeroViaWorkersAI(brief, {
-      accountId: deps.env.CLOUDFLARE_ACCOUNT_ID,
-      token: deps.env.CLOUDFLARE_AI_TOKEN,
+      ...fluxCreds(deps.env),
       clusterId,
       scene,
     })) ?? (await generateHeroViaExtension(fluxPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0]))
