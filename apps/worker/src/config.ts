@@ -86,6 +86,8 @@ const envSchema = z.object({
   /** Cloudflare Workers AI (FLUX) for hero images: account id (same as R2) + API token */
   CLOUDFLARE_ACCOUNT_ID: optionalStr,
   CLOUDFLARE_AI_TOKEN: optionalStr,
+  /** FLUX pictures on Workers AI (paid per image). Off: only Gemini makes hero and explainer images; embeddings stay on Workers AI */
+  FLUX_IMAGES: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** Gemini attempts before the FLUX fallback is used */
   GEMINI_IMAGE_TRIES_BEFORE_FALLBACK: z.coerce.number().min(1).default(3),
   HERO_IMAGE_MAX_TRIES: z.coerce.number().min(1).default(8),
@@ -166,6 +168,11 @@ export function subscriptionChain(env: WorkerEnv) {
     })
   }
   return chain
+}
+
+/** Workers AI credentials for FLUX pictures, or none when FLUX_IMAGES is off (generateHeroViaWorkersAI then returns null). */
+export function fluxCreds(env: Pick<WorkerEnv, 'FLUX_IMAGES' | 'CLOUDFLARE_ACCOUNT_ID' | 'CLOUDFLARE_AI_TOKEN'>): { accountId?: string; token?: string } {
+  return env.FLUX_IMAGES ? { accountId: env.CLOUDFLARE_ACCOUNT_ID, token: env.CLOUDFLARE_AI_TOKEN } : {}
 }
 
 /** Embeddings on Cloudflare Workers AI when its credentials are set (Gemini's free tier is 1,000/day). */

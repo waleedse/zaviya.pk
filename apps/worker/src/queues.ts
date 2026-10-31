@@ -1,6 +1,6 @@
 import { DelayedError, Queue, Worker, type ConnectionOptions } from 'bullmq'
 import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
-import { embedder, subscriptionChain, type WorkerEnv } from './config.js'
+import { embedder, fluxCreds, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
@@ -326,7 +326,7 @@ export async function createWorkerRuntime(
     startExplainerImageWorker({
       hubUrl: env.VIDEO_HUB_URL,
       token: env.MEDIA_AGENT_TOKEN,
-      deps: { bridge, geminiAccount: env.GEMINI_WEB_ACCOUNT, accountId: env.CLOUDFLARE_ACCOUNT_ID, aiToken: env.CLOUDFLARE_AI_TOKEN },
+      deps: { bridge, geminiAccount: env.GEMINI_WEB_ACCOUNT, accountId: fluxCreds(env).accountId, aiToken: fluxCreds(env).token },
     })
   }
 
