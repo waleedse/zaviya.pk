@@ -42,6 +42,8 @@ import { Eye, TrendingUp } from 'lucide-react'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { FollowBox } from '@/components/marketing/FollowBox'
 import { formatDateTime } from '@/lib/format'
+import { archiveDateLabel, archivePath, isServedArchiveDate } from '@/lib/archive'
+import { pktDate } from '@/lib/web-stories'
 import { canBuildWebStory, webStoryPath } from '@/lib/web-story'
 import type { Locale } from '@zaviya/shared'
 
@@ -326,6 +328,13 @@ export default async function ArticlePage({ params }: Props) {
               ))}
             </div>
           </section>
+        )}
+        {isServedArchiveDate(pktDate(article.publishedAt)) && (
+          <p className="mt-10 text-sm">
+            <Link href={localePath(locale, archivePath(pktDate(article.publishedAt)))} className="font-bold text-accent hover:underline">
+              {isUr ? 'مزید خبریں' : 'More from'} {archiveDateLabel(pktDate(article.publishedAt), locale)}
+            </Link>
+          </p>
         )}
       </article>
       <MobileShareBar locale={locale} title={article.title} path={publicPath} />

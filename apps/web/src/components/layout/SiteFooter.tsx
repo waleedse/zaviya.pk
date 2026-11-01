@@ -5,6 +5,7 @@ import { PreferredSourcePrompt } from '@/components/marketing/PreferredSourcePro
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { localePath, t } from '@/lib/i18n'
 import { TOOLS } from '@/components/home/tools'
+import { archiveDateLabel, archivePath, recentArchiveDates } from '@/lib/archive'
 
 const POLICIES: { slug: string; en: string; ur: string }[] = [
   { slug: 'about', en: 'About us', ur: 'ہمارے بارے میں' },
@@ -18,6 +19,7 @@ const POLICIES: { slug: string; en: string; ur: string }[] = [
 export function SiteFooter({ locale }: { locale: Locale }) {
   const d = t(locale)
   const isUr = locale === 'ur'
+  const [today, yesterday] = recentArchiveDates(new Date(), 2)
   return (
     <footer className="mt-20 bg-ink pb-24 text-slate-300 md:pb-10 dark:border-t dark:border-border">
       <div className="container-page grid gap-10 py-14 md:grid-cols-12">
@@ -48,6 +50,18 @@ export function SiteFooter({ locale }: { locale: Locale }) {
             <li>
               <Link href={localePath(locale, '/latest')} className="hover:text-white">
                 {d.latest}
+              </Link>
+            </li>
+            {[today, yesterday].map((day) => (
+              <li key={day}>
+                <Link href={localePath(locale, archivePath(day))} className="hover:text-white">
+                  {isUr ? 'خبریں' : 'News'} {archiveDateLabel(day, locale)}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link href={localePath(locale, archivePath())} className="hover:text-white">
+                {isUr ? 'خبروں کا آرکائیو' : 'News archive'}
               </Link>
             </li>
             <li>

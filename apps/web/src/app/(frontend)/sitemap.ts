@@ -5,7 +5,8 @@ import { siteUrl as getSiteUrl } from '@/lib/seo'
 import { urduEnabled } from '@/lib/i18n'
 import { PK_CITIES } from '@/lib/prayer-times'
 import { sitemapArticleCutoff } from '@/lib/crawl-cache'
-import { getStoryDigests } from '@/lib/queries'
+import { getArchiveDays, getStoryDigests } from '@/lib/queries'
+import { archivePath } from '@/lib/archive'
 import { dailyStorySlug, DIGEST_MIN, WEB_STORY_DAYS, webStoriesPath } from '@/lib/web-stories'
 
 export const revalidate = 600
@@ -117,6 +118,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const day of await getStoryDigests(WEB_STORY_DAYS)) {
     if (day.top.length >= DIGEST_MIN) entries.push({ url: `${siteUrl}${webStoriesPath(dailyStorySlug(day.date))}`, changeFrequency: 'daily', priority: 0.6 })
     for (const a of day.breaking) entries.push({ url: `${siteUrl}${webStoriesPath(a.slug)}`, lastModified: a.updatedAt ?? a.publishedAt, changeFrequency: 'daily', priority: 0.6 })
+  }
+
+  // Daily archive hubs (ZAV-281): lastmod = last publish of that day
+  entries.push({ url: `${siteUrl}${archivePath()}`, changeFrequency: 'hourly', priority: 0.6 })
+  for (const day of await getArchiveDays()) {
+    entries.push({ url: `${siteUrl}${archivePath(day.date)}`, lastModified: day.lastPublishedAt, changeFrequency: 'daily', priority: 0.5 })
   }
 
   // lastmod of hubs = newest article change (a lastmod of "now" on every fetch is ignored by Google)
