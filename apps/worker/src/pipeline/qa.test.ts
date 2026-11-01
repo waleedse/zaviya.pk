@@ -14,7 +14,7 @@ const routerWith = (contents: string[]) => {
 
 describe('runQaChecks LLM step (ZAV-280)', () => {
   it('an empty reply is retried once and then used', async () => {
-    const { router, chat } = routerWith(['', JSON.stringify({ unsupportedClaims: [], styleIssues: [] })])
+    const { router, chat } = routerWith(['', JSON.stringify({ unsupportedClaims: [], styleIssues: [], pass: true })])
     const res = await runQaChecks(write, ['The government cut petrol prices on Sunday.'], 'normal', router)
     expect(chat).toHaveBeenCalledTimes(2)
     expect(res.llmSkipped).toBeUndefined()
