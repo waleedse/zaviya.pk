@@ -23,7 +23,8 @@ import { getPayloadClient } from './payload'
 import { findReplacementHref, type FindApi } from './duplicate-redirect'
 import { getLearning } from './learning'
 import { LATEST_PAGE_SIZE } from './tag-rules'
-import { groupStoryDigests, type StoryDigest } from './web-stories'
+import { groupStoryDigests, pktDate, type StoryDigest } from './web-stories'
+import { ARCHIVE_DAYS, archiveDayRange } from './archive'
 import { isActive, parsePlan, PIN_SECTIONS, sectionOrder, type FrontPagePlan, type FrontSection, type PinSection, type PlanSlot } from './front-page'
 import type { Where } from 'payload'
 import type { Media, Article, Category, Author, Tag, DataPage, DataPoint } from '../payload-types'
@@ -543,6 +544,67 @@ export const getLatestLinks = sharedCache(
     }
   },
 )
+
+/** Every published story of one Pakistan day, newest first, title + link only (ZAV-281). */
+export const getArchiveDay = sharedCache('getArchiveDay', 300, async (locale: Locale, date: string): Promise<LatestLink[]> => {
+  if (demoData() && !(await hasPublishedArticles())) return []
+  const { start, end } = archiveDayRange(date)
+  const payload = await getPayloadClient()
+  const result = await payload.find({
+    collection: 'articles',
+    locale,
+    where: publishedAnd({ publishedAt: { greater_than_equal: start } }, { publishedAt: { less_than: end } }),
+    sort: '-publishedAt',
+    limit: 1000,
+    depth: 1,
+    select: { slug: true, title: true, category: true, publishedAt: true, createdAt: true },
+    overrideAccess: true,
+  })
+  return result.docs.map((d) => {
+    const cat = mapCategory((d as unknown as Article).category as Category, locale)
+    return {
+      id: String(d.id),
+      href: articleHref(locale, cat.slug, String(d.slug ?? '')),
+      title: String(d.title ?? ''),
+      category: cat.name,
+      publishedAt: (d.publishedAt ?? d.createdAt) as string,
+    }
+  })
+})
+
+export interface ArchiveDaySummary {
+  date: string
+  count: number
+  /** newest publish time that day (sitemap lastmod) */
+  lastPublishedAt: string
+}
+
+/** Days with stories among the last ARCHIVE_DAYS Pakistan days: story count and last publish time (ZAV-281). */
+export const getArchiveDays = sharedCache('getArchiveDays', 300, async (): Promise<ArchiveDaySummary[]> => {
+  if (demoData() && !(await hasPublishedArticles())) return []
+  const payload = await getPayloadClient()
+  const since = archiveDayRange(pktDate(new Date(Date.now() - (ARCHIVE_DAYS - 1) * 86_400_000))).start
+  const result = await payload.find({
+    collection: 'articles',
+    locale: 'en',
+    where: publishedAnd({ publishedAt: { greater_than_equal: since } }),
+    sort: '-publishedAt',
+    limit: 20000,
+    depth: 0,
+    select: { publishedAt: true },
+    overrideAccess: true,
+  })
+  const byDay = new Map<string, ArchiveDaySummary>()
+  for (const d of result.docs) {
+    const at = d.publishedAt as string | undefined
+    if (!at) continue
+    const day = pktDate(at)
+    const cur = byDay.get(day)
+    if (cur) cur.count += 1
+    else byDay.set(day, { date: day, count: 1, lastPublishedAt: at })
+  }
+  return [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date))
+})
 
 export const getAuthor = cache(async (locale: Locale, slug: string, page = 1): Promise<AuthorFull | null> => {
   const payload = await getPayloadClient()

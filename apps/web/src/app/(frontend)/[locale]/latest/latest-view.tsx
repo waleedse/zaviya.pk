@@ -7,6 +7,7 @@ import { PageHero } from '@/components/layout/PageHero'
 import { getLatestLinks } from '@/lib/queries'
 import { localePath, t } from '@/lib/i18n'
 import { Newspaper } from 'lucide-react'
+import { archiveDateLabel, archivePath, recentArchiveDates } from '@/lib/archive'
 
 /** /latest (page 1) and /latest/page/[n]: every published story, newest first, 50 headlines per page (ZAV-221). */
 export async function renderLatestPage(locale: Locale, pageNum: number) {
@@ -14,6 +15,7 @@ export async function renderLatestPage(locale: Locale, pageNum: number) {
   if (pageNum > 1 && feed.docs.length === 0) notFound()
   const d = t(locale)
   const isUr = locale === 'ur'
+  const [today, yesterday] = recentArchiveDates(new Date(), 2)
   return (
     <div className="pb-8">
       <PageHero
@@ -29,6 +31,17 @@ export async function renderLatestPage(locale: Locale, pageNum: number) {
         <p className="mb-4 text-sm">
           <Link href={localePath(locale, '/aqi-pakistan')} className="font-semibold underline">
             {isUr ? 'اسموگ کا موسم: آج لاہور اور پاکستان کا AQI' : 'Smog season: Lahore and Pakistan AQI today'}
+          </Link>
+        </p>
+        <p className="mb-4 text-sm">
+          <span className="font-semibold">{isUr ? 'دن کے حساب سے آرکائیو:' : 'Archive by day:'}</span>{' '}
+          {[today, yesterday].map((day) => (
+            <Link key={day} href={localePath(locale, archivePath(day))} className="mr-3 underline">
+              {archiveDateLabel(day, locale)}
+            </Link>
+          ))}
+          <Link href={localePath(locale, archivePath())} className="font-semibold underline">
+            {isUr ? 'تمام دن' : 'All days'}
           </Link>
         </p>
         <LatestList locale={locale} items={feed.docs} title={isUr ? 'تازہ ترین خبریں' : 'Latest news'} />
