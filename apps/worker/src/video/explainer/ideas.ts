@@ -56,7 +56,7 @@ export function isSensitive(text: string): boolean {
 
 // Pakistani viewers watch what is about them: places, money in rupees, our cricket, daily-life costs.
 // Foreign gadget and AI-lab news got zero views in Oct 2026, so these ideas rank first.
-const PAKISTAN = /\b(pakistan\w*|lahore|karachi|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|punjab|sindh|balochistan|khyber|kp|gilgit|azad kashmir|rs\.?|rupees?|pkr|psx|petrol|diesel|load ?shedding|smog|aqi|babar|rizwan|shaheen|fakhar|pcb|psl|jazz|zong|telenor|ufone|easypaisa|jazzcash|daraz|wapda|lesco|k-?electric)\b/i
+const PAKISTAN = /\b(pakistan\w*|lahore|karachi|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|punjab|sindh|balochistan|khyber|kp|gilgit|azad kashmir|rs\.?|rupees?|pkr|psx|petrol|diesel|load ?shedding|smog|aqi|babar|rizwan|shaheen|fakhar|pcb|psl|pia|jazz|zong|telenor|ufone|easypaisa|jazzcash|daraz|wapda|lesco|k-?electric)\b/i
 
 export function isPakistan(text: string): boolean {
   return PAKISTAN.test(text)
