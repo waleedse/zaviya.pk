@@ -5,6 +5,7 @@ import type { ClusterDetail, PayloadClient } from '../payload-client.js'
 import { TRENDS_KEY } from '../queues-keys.js'
 import { X_TRENDS_KEY } from '../ingest/discovery.js'
 import { logger } from '../logger.js'
+import { chatJson } from './json-tolerant.js'
 
 /**
  * Keyword research before writing: what Pakistanis actually type into Google
@@ -99,7 +100,7 @@ export async function researchSeo(
 ): Promise<SeoResearch | null> {
   const summary = storySummary(cluster)
   try {
-    const seedsRes = await deps.router.chat('seo', {
+    const seeds = SeedQueriesSchema.parse(await chatJson(() => deps.router.chat('seo', {
       messages: [
         {
           role: 'system',
@@ -111,8 +112,7 @@ export async function researchSeo(
       format: zodToJsonSchema(SeedQueriesSchema, { target: 'openApi3' }) as Record<string, unknown>,
       temperature: 0.2,
       maxTokens: 600,
-    })
-    const seeds = SeedQueriesSchema.parse(JSON.parse(seedsRes.content))
+    }), 'seo-seeds', (i) => logger.warn({ ...i, seoLlmRetry: true }, 'SEO LLM reply unusable, retrying once')))
 
     const suggestions: Record<string, string[]> = {}
     await Promise.all([
@@ -130,7 +130,7 @@ export async function researchSeo(
         ? { ...existingCheck.closest, similarity: existingCheck.maxSimilarity }
         : undefined
 
-    const planRes = await deps.router.chat('seo', {
+    const plan = SeoPlanSchema.parse(await chatJson(() => deps.router.chat('seo', {
       messages: [
         {
           role: 'system',
@@ -153,8 +153,7 @@ export async function researchSeo(
       format: zodToJsonSchema(SeoPlanSchema, { target: 'openApi3' }) as Record<string, unknown>,
       temperature: 0.2,
       maxTokens: 1200,
-    })
-    const plan = SeoPlanSchema.parse(JSON.parse(planRes.content))
+    }), 'seo-plan', (i) => logger.warn({ ...i, seoLlmRetry: true }, 'SEO LLM reply unusable, retrying once')))
     // Small models sometimes return the whole headline as the "keyword": fall back to a real search phrase.
     if (plan.primaryKeyword.split(/\s+/).length > 6) {
       const firstSeed = seeds.en[0] ?? ''
@@ -162,7 +161,7 @@ export async function researchSeo(
     }
     return { plan, suggestions, matchedTrends, existing }
   } catch (e) {
-    logger.warn({ err: e instanceof Error ? e.message : e, clusterId: cluster.id }, 'SEO research skipped')
+    logger.warn({ err: e instanceof Error ? e.message : e, clusterId: cluster.id, seoSkipped: true }, 'SEO research skipped')
     return null
   }
 }

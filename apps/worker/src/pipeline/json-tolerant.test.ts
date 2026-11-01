@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseModelJson } from './json-tolerant.js'
+import { chatJson, EmptyModelReplyError, parseModelJson } from './json-tolerant.js'
 
 describe('parseModelJson', () => {
   it('parses plain and fenced JSON', () => {
@@ -17,5 +17,23 @@ describe('parseModelJson', () => {
   })
   it('throws when there is no object', () => {
     expect(() => parseModelJson('no json')).toThrow()
+  })
+})
+
+describe('chatJson (ZAV-280)', () => {
+  it('retries once after an empty reply', async () => {
+    const replies = ['', '{"a":1}']
+    const seen: string[] = []
+    const out = await chatJson(async () => ({ content: replies.shift()! }), 'qa', (i) => seen.push(i.reason))
+    expect(out).toEqual({ a: 1 })
+    expect(seen).toEqual(['empty'])
+  })
+  it('throws a labelled error when the reply stays empty', async () => {
+    let calls = 0
+    await expect(chatJson(async () => (calls++, { content: '  ' }), 'qa')).rejects.toBeInstanceOf(EmptyModelReplyError)
+    expect(calls).toBe(2)
+  })
+  it('throws a labelled error for prose with no JSON', async () => {
+    await expect(chatJson(async () => ({ content: 'sorry, cannot' }), 'seo-plan')).rejects.toThrow(/seo-plan: model reply is not valid JSON/)
   })
 })
