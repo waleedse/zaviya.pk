@@ -187,8 +187,9 @@ async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof p
             slug: en.slug,
             dek: en.dek,
             keyPoints: en.keyPoints.map((p) => ({ point: p })),
-            body: await markdownToLexical(req, en.bodyMarkdown),
-            whatItMeans: await markdownToLexical(req, en.whatItMeans),
+            // A blank body or whatItMeans on an update keeps the saved text (ZAV-278).
+            ...(en.bodyMarkdown.trim() ? { body: await markdownToLexical(req, en.bodyMarkdown) } : {}),
+            ...(en.whatItMeans.trim() ? { whatItMeans: await markdownToLexical(req, en.whatItMeans) } : {}),
             faqs: en.faqs,
             seo: en.metaDescription ? { metaDescription: en.metaDescription } : undefined,
           } as Partial<Article>

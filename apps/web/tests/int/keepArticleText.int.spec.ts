@@ -19,6 +19,10 @@ describe('keepArticleText', () => {
     expect(out.dek).toBe('Dek')
     expect(out.keyPoints).toBe(saved.keyPoints)
   })
+  it('keeps the body when an edit sends an empty Lexical document', () => {
+    const out = run({ body: { root: { children: [] } } }, saved)
+    expect(out.body).toBe(saved.body)
+  })
   it('lets an edit replace the text', () => {
     expect(run({ dek: 'Better' }, saved).dek).toBe('Better')
   })

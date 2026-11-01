@@ -117,6 +117,9 @@ const KEEP_TEXT_FIELDS = ['dek', 'keyPoints', 'body', 'whatItMeans', 'faqs'] as 
 const hasContent = (v: unknown): boolean => {
   if (v === null || v === undefined || v === '') return false
   if (Array.isArray(v)) return v.length > 0
+  // A Lexical document with no blocks is an empty body (ZAV-278: a blank-markdown write wiped article 2824).
+  const root = (v as { root?: { children?: unknown } }).root
+  if (root && Array.isArray(root.children)) return root.children.length > 0
   return true
 }
 
