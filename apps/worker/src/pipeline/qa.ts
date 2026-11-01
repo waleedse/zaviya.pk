@@ -13,6 +13,7 @@ import { checkKeywordUsage } from './seo.js'
 import { checkSeoStuffing } from './seo-scrub.js'
 import { qaSystemPrompt, QA_PROMPT_VERSION } from '../prompts/qa.js'
 import { logger } from '../logger.js'
+import { chatJson, EmptyModelReplyError } from './json-tolerant.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { Priority } from '@zaviya/shared'
 
@@ -20,6 +21,8 @@ export interface QaJobResult {
   pass: boolean
   issues: string[]
   qaScore: number
+  /** The model step of QA did not run (empty or bad reply after one retry, or the call failed); the rule checks still ran. */
+  llmSkipped?: 'empty_reply' | 'bad_json' | 'error'
 }
 
 export async function runQaChecks(
@@ -37,21 +40,27 @@ export async function runQaChecks(
   if (write.ur) issues.push(...checkUrduLocale(write.ur.bodyMarkdown))
 
   let llmPass = true
+  let llmSkipped: QaJobResult['llmSkipped']
   try {
     const format = zodToJsonSchema(QAResultSchema, { target: 'openApi3' }) as Record<string, unknown>
-    const res = await router.chat('qa', {
-      messages: [
-        { role: 'system', content: qaSystemPrompt() },
-        {
-          role: 'user',
-          // English article vs the full sources: truncated sources made true facts look "unsupported".
-          content: `Sources:\n${sources.map((x) => x.slice(0, 6000)).slice(0, 6).join('\n---\n')}\n\nARTICLE:\n${write.en.bodyMarkdown}`,
-        },
-      ],
-      format,
-      maxTokens: 800,
-    })
-    const qa = QAResultSchema.parse(JSON.parse(res.content))
+    const raw = await chatJson(
+      () =>
+        router.chat('qa', {
+          messages: [
+            { role: 'system', content: qaSystemPrompt() },
+            {
+              role: 'user',
+              // English article vs the full sources: truncated sources made true facts look "unsupported".
+              content: `Sources:\n${sources.map((x) => x.slice(0, 6000)).slice(0, 6).join('\n---\n')}\n\nARTICLE:\n${write.en.bodyMarkdown}`,
+            },
+          ],
+          format,
+          maxTokens: 800,
+        }),
+      'qa',
+      (info) => logger.warn({ ...info, qaLlmRetry: true }, 'QA LLM reply unusable, retrying once'),
+    )
+    const qa = QAResultSchema.parse(raw)
     // Only invented facts block publishing; a small model's style opinions are logged, not enforced.
     llmPass = qa.unsupportedClaims.length === 0
     if (qa.unsupportedClaims.length) {
@@ -59,7 +68,9 @@ export async function runQaChecks(
     }
     if (qa.styleIssues.length) logger.info({ styleIssues: qa.styleIssues.slice(0, 3) }, 'QA style notes (non-blocking)')
   } catch (e) {
-    logger.warn({ err: e }, 'QA LLM skipped')
+    llmSkipped = e instanceof EmptyModelReplyError ? 'empty_reply' : /not valid JSON/.test(String(e instanceof Error ? e.message : e)) ? 'bad_json' : 'error'
+    // qaLlmSkipped + reason: grep/count these to see how often the model step of QA did not run (ZAV-280)
+    logger.warn({ err: e instanceof Error ? e.message : e, qaLlmSkipped: true, reason: llmSkipped }, 'QA LLM skipped')
   }
 
   // Missing keywords are only reported; stuffing and broken capitalisation must be fixed before publishing.
@@ -69,7 +80,7 @@ export async function runQaChecks(
   issues.push(...seoIssues)
   const qaScore = Math.max(0, 1 - issues.length * 0.1)
   void QA_PROMPT_VERSION
-  return { pass, issues, qaScore }
+  return { pass, issues, qaScore, ...(llmSkipped ? { llmSkipped } : {}) }
 }
 
 export async function processQaJob(

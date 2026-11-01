@@ -28,3 +28,37 @@ export function parseModelJson(text: string): unknown {
     throw first
   }
 }
+
+export class EmptyModelReplyError extends Error {
+  constructor(public readonly task: string, public readonly model?: string) {
+    super(`${task}: model returned an empty reply`)
+    this.name = 'EmptyModelReplyError'
+  }
+}
+
+/**
+ * Ask a model for JSON and parse the reply. An empty or unparseable reply is retried once (ZAV-280: "Unexpected end of JSON input"
+ * silently skipped QA/SEO); a second failure throws a labelled error ("empty reply" vs "bad JSON") instead of a bare SyntaxError.
+ */
+export async function chatJson(
+  ask: () => Promise<{ content: string; model?: string }>,
+  task: string,
+  onRetry?: (info: { task: string; reason: 'empty' | 'bad_json'; model?: string }) => void,
+): Promise<unknown> {
+  let last: Error | undefined
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await ask()
+    if (!res.content || !res.content.trim()) {
+      last = new EmptyModelReplyError(task, res.model)
+      onRetry?.({ task, reason: 'empty', model: res.model })
+      continue
+    }
+    try {
+      return parseModelJson(res.content)
+    } catch (e) {
+      last = new Error(`${task}: model reply is not valid JSON (${e instanceof Error ? e.message : String(e)}; ${res.content.length} chars)`)
+      onRetry?.({ task, reason: 'bad_json', model: res.model })
+    }
+  }
+  throw last
+}
