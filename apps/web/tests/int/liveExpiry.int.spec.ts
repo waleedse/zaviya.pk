@@ -5,10 +5,10 @@ import { expireLive, lastLiveActivity } from '../../src/lib/article-flags'
 const NOW = Date.parse('2026-10-26T12:00:00Z')
 const h = (n: number) => new Date(NOW - n * 3_600_000).toISOString()
 
-function fake(docs: unknown[]) {
+function fake(docs: unknown[], liveSet: { entityId: string; at: string }[] = []) {
   const update = vi.fn().mockResolvedValue({})
   const create = vi.fn().mockResolvedValue({})
-  const find = vi.fn().mockResolvedValue({ docs })
+  const find = vi.fn().mockImplementation(async ({ collection }: { collection: string }) => ({ docs: collection === 'audit-log' ? liveSet : docs }))
   return { payload: { find, update, create } as unknown as Payload, update, create }
 }
 
@@ -17,6 +17,19 @@ describe('live expiry (ZAV-214)', () => {
     expect(lastLiveActivity({ publishedAt: h(10), updates: [{ at: h(5) }, { at: h(1) }] })).toBe(NOW - 3_600_000)
     expect(lastLiveActivity({ publishedAt: h(10), updates: [] })).toBe(NOW - 10 * 3_600_000)
     expect(lastLiveActivity({})).toBe(0)
+    expect(lastLiveActivity({ publishedAt: h(10), liveSetAt: h(2) })).toBe(NOW - 2 * 3_600_000)
+  })
+
+  it('keeps a story an editor switched to LIVE within the window (ZAV-297)', async () => {
+    const { payload, update } = fake(
+      [
+        { id: 2973, publishedAt: h(30), updates: [] },
+        { id: 2804, publishedAt: h(30), updates: [] },
+      ],
+      [{ entityId: '2973', at: h(1) }],
+    )
+    expect(await expireLive(payload, NOW)).toEqual([2804])
+    expect(update).toHaveBeenCalledTimes(1)
   })
 
   it('clears isLive only on stale live stories, writing nothing else', async () => {
