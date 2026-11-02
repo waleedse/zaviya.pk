@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { botReason, classifySource, deviceFromUa, isBot, recordBotHit, recordPageview, visitorId } from '@/lib/analytics'
 import { isMetaIp } from '@/lib/ip-ranges'
-import { BURST_SETTLE_MS, ipPrefix, isMetaPreviewCandidate, metaBursts } from '@/lib/meta-preview'
+import { BURST_SETTLE_MS, ipPrefix, isMetaPreviewCandidate, metaBursts, metaDrops } from '@/lib/meta-preview'
 import { siteUrl } from '@/lib/seo'
 
 const bodySchema = z.object({
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
   if (metaIp) {
     console.info(`[analytics] skipped a Meta crawler view (${country ?? '?'})`)
     if (source === 'facebook') metaBursts.note(path) // it is part of a burst that its non-Meta-IP siblings join
+    metaDrops.note(path)
     await recordBotHit({ path, reason: 'meta-ip', device }).catch(() => undefined)
     return NOT_HUMAN()
   }
@@ -58,8 +59,14 @@ export async function POST(request: Request) {
     // ZAV-290: Meta also opens links from addresses outside its network. Wait for the rest of the burst, then judge.
     metaBursts.note(path)
     await new Promise((resolve) => setTimeout(resolve, BURST_SETTLE_MS))
-    if (metaBursts.isBurst(path)) {
-      console.info(`[analytics] skipped a Meta preview burst view (${country}, ${ipPrefix(ip)}, ${metaBursts.count(path)} hits)`)
+    // A lone follower of a burst whose other hits were dropped (Meta IPs or earlier burst members) never reaches the
+    // threshold on its own; real Facebook readers are PK, so a facebook+US hit right after a Meta drop is Meta too.
+    const burst = metaBursts.isBurst(path)
+    if (burst || metaDrops.hasRecent(path)) {
+      metaDrops.note(path)
+      console.info(
+        `[analytics] skipped a Meta preview ${burst ? 'burst' : 'follower'} view (${country}, ${ipPrefix(ip)}, ${metaBursts.count(path)} hits)`,
+      )
       await recordBotHit({ path, reason: 'meta-preview', device }).catch(() => undefined)
       return NOT_HUMAN()
     }

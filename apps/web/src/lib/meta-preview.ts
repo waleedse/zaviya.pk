@@ -39,6 +39,37 @@ export function createBurstTracker(windowMs = BURST_WINDOW_MS, minHits = BURST_M
   }
 }
 
+/** How long after a Meta drop on a path a lone facebook+US follower is still treated as another Meta fetcher. */
+export const DROP_MEMORY_MS = 60_000
+
+export interface DropTracker {
+  /** Remember that a Meta hit (meta-ip or meta-preview) was dropped on this path. */
+  note(path: string, at?: number): void
+  /** True when a Meta drop happened on this path within the memory window ending at `at`. */
+  hasRecent(path: string, at?: number): boolean
+}
+
+/**
+ * ZAV-290 follow-up: a burst sometimes leaves exactly one non-Meta-IP follower that never reaches the burst threshold
+ * (the Meta-IP hits are dropped early and the follower arrives seconds to ~30 s later). A facebook+US hit on a path
+ * where we just dropped a Meta hit is that follower, not a reader.
+ */
+export function createDropTracker(memoryMs = DROP_MEMORY_MS): DropTracker {
+  const last = new Map<string, number>()
+  return {
+    note(path, at = Date.now()) {
+      last.set(path, Math.max(at, last.get(path) ?? 0))
+      if (last.size > MAX_PATHS) {
+        for (const [p, t] of last) if (at - t > memoryMs) last.delete(p)
+      }
+    },
+    hasRecent(path, at = Date.now()) {
+      const t = last.get(path)
+      return t !== undefined && at - t <= memoryMs && t - at <= memoryMs
+    },
+  }
+}
+
 /** A hit that could be a Meta preview browser: it claims to come from Facebook and from the US (real readers are PK). */
 export function isMetaPreviewCandidate(source: TrafficSource, country: string | null | undefined): boolean {
   return source === 'facebook' && country?.toUpperCase() === 'US'
@@ -52,3 +83,5 @@ export function ipPrefix(ip: string): string {
 }
 
 export const metaBursts = createBurstTracker()
+
+export const metaDrops = createDropTracker()
