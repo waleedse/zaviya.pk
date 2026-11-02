@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { Locale } from '@zaviya/shared'
 import { t } from '@/lib/i18n'
 import { absoluteUrl } from '@/lib/seo'
+import { shareLine, shareText } from '@/lib/share-text'
 import { cn } from '@/lib/utils'
 
 const WA_PATH =
@@ -33,9 +34,9 @@ function useShare(title: string, path: string, locale: Locale) {
   return {
     canShare,
     copied,
-    wa: `https://wa.me/?text=${encodeURIComponent(`${title}\n${utm('whatsapp')}`)}`,
+    wa: `https://wa.me/?text=${encodeURIComponent(shareText(title, utm('whatsapp')))}`,
     fb: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(utm('facebook'))}`,
-    x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(utm('x'))}&text=${encodeURIComponent(title)}`,
+    x: `https://twitter.com/intent/tweet?url=${encodeURIComponent(utm('x'))}&text=${encodeURIComponent(shareLine(title))}`,
     copy: async () => {
       trackShare('copy', path)
       await navigator.clipboard.writeText(url)
@@ -44,7 +45,7 @@ function useShare(title: string, path: string, locale: Locale) {
     },
     native: () => {
       trackShare('native', path)
-      return navigator.share?.({ title, url }).catch(() => undefined)
+      return navigator.share?.({ title, text: shareLine(title), url }).catch(() => undefined)
     },
     track: (channel: ShareChannel) => trackShare(channel, path),
     picture: () => sharePicture(locale, title, path, url),
@@ -66,7 +67,7 @@ async function sharePicture(locale: Locale, title: string, path: string, url: st
     const blob = await res.blob()
     const file = new File([blob], 'zaviya-news.png', { type: 'image/png' })
     if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title, text: `${title}\n${url}` })
+      await navigator.share({ files: [file], title, text: shareText(title, url) })
       return
     }
     const href = URL.createObjectURL(blob)
