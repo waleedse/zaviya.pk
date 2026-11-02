@@ -162,8 +162,8 @@ async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof p
   const sharedData: Partial<Article> = {
     category: Number(categoryId),
     priority: body.priority,
-    isBreaking: body.isBreaking ?? false,
-    isLive: body.isLive ?? false,
+    // An update that does not mention the flags keeps them (ZAV-297: isLive used to reset to false on every re-save)
+    ...(articleId ? { isBreaking: body.isBreaking, isLive: body.isLive } : { isBreaking: body.isBreaking ?? false, isLive: body.isLive ?? false }),
     workflow,
     sources: body.sources,
     embeds: body.embeds ?? [],

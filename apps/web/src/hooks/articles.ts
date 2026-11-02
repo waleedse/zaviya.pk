@@ -79,8 +79,32 @@ export const articleAuditLog: CollectionAfterChangeHook = async ({ doc, operatio
   return doc
 }
 
+/**
+ * Records when a story is switched to LIVE (ZAV-297). The 4 h live expiry counts from this moment, so an editor who
+ * sets isLive on an older developing story is not undone by the next sweep.
+ */
+export const logLiveSet: CollectionAfterChangeHook = async ({ doc, previousDoc, req }) => {
+  if (!doc.isLive || previousDoc?.isLive) return doc
+  await req.payload
+    .create({
+      collection: 'audit-log',
+      data: {
+        entity: 'articles',
+        entityId: String(doc.id),
+        action: 'live-set',
+        actor: req.user ? `user:${req.user.id}` : 'system',
+        at: new Date().toISOString(),
+      },
+      req,
+      overrideAccess: true,
+    })
+    .catch((err) => req.payload.logger.warn({ err }, 'live-set audit log write failed'))
+  return doc
+}
+
 export const articleAfterChangeHooks: CollectionAfterChangeHook[] = [
   articleAuditLog,
+  logLiveSet,
   revalidateArticleHook,
   pingIndexNowOnFirstPublish,
 ]

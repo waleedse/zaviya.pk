@@ -73,10 +73,30 @@ export async function expireBreaking(payload: Payload, now = Date.now(), maxHour
 /** A live story with no live update (or, without updates, no publication) for this long is over (ZAV-214). */
 export const LIVE_MAX_HOURS = 4
 
-/** The last time a live story moved: its newest live update, else its publish time. */
-export function lastLiveActivity(a: { publishedAt?: string | null; updates?: { at?: string | null }[] | null }): number {
-  const times = [a.publishedAt, ...(a.updates ?? []).map((u) => u.at)].map((t) => (t ? Date.parse(t) : NaN)).filter((t) => !Number.isNaN(t))
+/** The last time a live story moved: its newest live update, the moment an editor set LIVE (ZAV-297), else its publish time. */
+export function lastLiveActivity(a: {
+  publishedAt?: string | null
+  updates?: { at?: string | null }[] | null
+  liveSetAt?: string | null
+}): number {
+  const times = [a.publishedAt, a.liveSetAt, ...(a.updates ?? []).map((u) => u.at)].map((t) => (t ? Date.parse(t) : NaN)).filter((t) => !Number.isNaN(t))
   return times.length ? Math.max(...times) : 0
+}
+
+/** When each article was last switched to LIVE (audit-log `live-set`, written by the articles afterChange hook; ZAV-297). */
+async function latestLiveSet(payload: Payload, ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (!ids.length) return out
+  const res = await payload.find({
+    collection: 'audit-log',
+    where: { and: [{ action: { equals: 'live-set' } }, { entityId: { in: ids } }] },
+    sort: 'at',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+  })
+  for (const r of res.docs) out.set(String(r.entityId), String(r.at))
+  return out
 }
 
 /**
@@ -92,9 +112,10 @@ export async function expireLive(payload: Payload, now = Date.now(), maxHours = 
     limit: 100,
     overrideAccess: true,
   })
+  const liveSet = await latestLiveSet(payload, res.docs.map((a) => String(a.id)))
   const done: number[] = []
   for (const a of res.docs) {
-    if (now - lastLiveActivity(a) < maxHours * 3_600_000) continue
+    if (now - lastLiveActivity({ ...a, liveSetAt: liveSet.get(String(a.id)) }) < maxHours * 3_600_000) continue
     await payload.update({ collection: 'articles', id: a.id, locale: 'en', data: { isLive: false }, overrideAccess: true })
     await payload
       .create({
