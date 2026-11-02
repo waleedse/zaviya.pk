@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifySource } from '../../src/lib/analytics'
 import { isMetaIp } from '../../src/lib/ip-ranges'
-import { BURST_MIN_HITS, createBurstTracker, ipPrefix, isMetaPreviewCandidate } from '../../src/lib/meta-preview'
+import { BURST_MIN_HITS, DROP_MEMORY_MS, createBurstTracker, createDropTracker, ipPrefix, isMetaPreviewCandidate } from '../../src/lib/meta-preview'
 
 describe('Meta preview burst (ZAV-290)', () => {
   const path = '/pakistan/iesco-power-suspension-schedule-tuesday-feeders'
@@ -62,5 +62,57 @@ describe('Meta preview burst (ZAV-290)', () => {
     expect(isMetaIp('57.145.16.20')).toBe(true)
     expect(isMetaIp('2a03:2880:f388::1')).toBe(true)
     expect(isMetaIp('39.32.10.20')).toBe(false)
+  })
+
+  describe('lone facebook+US follower after a Meta drop (2 Nov leaks)', () => {
+    // judge() mirrors the route: a facebook+US hit is dropped on a burst or when a Meta drop happened on the path within 60 s
+    const judge = (b: ReturnType<typeof createBurstTracker>, d: ReturnType<typeof createDropTracker>, p: string, country: string, at: number) => {
+      if (!isMetaPreviewCandidate('facebook', country)) return 'kept'
+      b.note(p, at)
+      if (b.isBurst(p, at) || d.hasRecent(p, at)) {
+        d.note(p, at)
+        return 'dropped'
+      }
+      return 'kept'
+    }
+    const t0 = Date.parse('2026-11-02T06:37:59Z')
+
+    it('drops the follower 5 s after two meta-ip drops and a meta-preview drop (11:37:59 - 11:38:05 PKT)', () => {
+      const b = createBurstTracker()
+      const d = createDropTracker()
+      const p = '/education-jobs/pmf-opens-17-paramedical-diploma-courses-punjab'
+      d.note(p, t0)
+      d.note(p, t0 + 100)
+      d.note(p, t0 + 1_000) // the meta-preview drop
+      expect(judge(b, d, p, 'US', t0 + 6_000)).toBe('dropped')
+    })
+
+    it('drops the follower 3 s after one meta-ip drop (13:01:20 - 13:01:23 PKT)', () => {
+      const b = createBurstTracker()
+      const d = createDropTracker()
+      const p = '/pakistan/peeda-act-probe-ex-auqaf-secretary-bukhari-neela-gumbad'
+      d.note(p, t0)
+      expect(judge(b, d, p, 'US', t0 + 3_000)).toBe('dropped')
+    })
+
+    it('drops the follower 29 s after one meta-ip drop (21:30:36 - 21:31:05 PKT) but not after the memory expires', () => {
+      const b = createBurstTracker()
+      const d = createDropTracker()
+      const p = '/world/pakistan-assumes-g-24-chairmanship-aurangzeb-priorities'
+      d.note(p, t0)
+      expect(judge(b, d, p, 'US', t0 + 29_000)).toBe('dropped')
+      const d2 = createDropTracker()
+      d2.note(p, t0)
+      expect(judge(createBurstTracker(), d2, p, 'US', t0 + DROP_MEMORY_MS + 1)).toBe('kept')
+    })
+
+    it('keeps PK readers and other countries, and US hits on a path with no recent Meta drop', () => {
+      const b = createBurstTracker()
+      const d = createDropTracker()
+      d.note('/a', t0)
+      expect(judge(b, d, '/a', 'PK', t0 + 3_000)).toBe('kept')
+      expect(judge(b, d, '/a', 'GB', t0 + 3_000)).toBe('kept')
+      expect(judge(b, d, '/b', 'US', t0 + 3_000)).toBe('kept')
+    })
   })
 })
