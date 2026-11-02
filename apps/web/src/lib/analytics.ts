@@ -38,7 +38,7 @@ export function isStaleDesktopUa(ua: string): boolean {
   return firefox ? Number(firefox[1]) < 128 : false
 }
 
-export type BotReason = 'no-ua' | 'known-bot' | 'stale-desktop-ua'
+export type BotReason = 'no-ua' | 'known-bot' | 'stale-desktop-ua' | 'meta-ip' | 'meta-preview'
 
 /** Why a hit is not a person, or null when it looks human. */
 export function botReason(ua: string | null): BotReason | null {
