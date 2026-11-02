@@ -135,6 +135,14 @@ async function uploadGeneratedPng(
 }
 
 const IMAGE_RETRY_DELAY_MS = 15 * 60_000
+/** Breaking news must not wait hours for an image: fewer, quicker retries before the branded card goes out (ZAV-299). */
+const BREAKING_IMAGE_MAX_TRIES = 2
+const BREAKING_IMAGE_RETRY_DELAY_MS = 5 * 60_000
+
+/** Tries before a story goes out with the branded card instead of an illustration */
+export function heroMaxTries(priority: Priority, max: number): number {
+  return priority === 'breaking' ? Math.min(BREAKING_IMAGE_MAX_TRIES, max) : max
+}
 
 export async function processMediaJob(
   data: { clusterId: string; write: WriteResult; qaScore: number; priority: Priority; imageTries?: number; articleId?: string },
@@ -195,16 +203,19 @@ export async function processMediaJob(
       : fluxFirst
         ? ((await flux()) ?? (await gemini()))
         : ((await gemini()) ?? (await flux()))
-  // No real illustration yet: hold the story and try again later instead of publishing a text card.
+  // No illustration yet: hold the story and retry. A story is never dropped for a missing image (ZAV-299): after the
+  // last try it goes out with the branded Zaviya card as its hero, and a backfill job swaps in the Gemini image later.
+  // Source-site photos are never reused (copyright), so there is no og:image step.
+  const heroFallback = !blob
   if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
     const tries = (data.imageTries ?? 0) + 1
-    if (deps.mediaQueue && tries < deps.env.HERO_IMAGE_MAX_TRIES) {
-      await deps.mediaQueue.add('media', { ...data, imageTries: tries }, { delay: IMAGE_RETRY_DELAY_MS, priority: 5 })
-      logger.info({ clusterId: data.clusterId, tries, retryInMin: IMAGE_RETRY_DELAY_MS / 60_000 }, 'no hero image yet: holding story, will retry')
-    } else {
-      logger.warn({ clusterId: data.clusterId, tries, title: data.write.en.title }, 'no hero image after all retries: story NOT published')
+    if (deps.mediaQueue && tries < heroMaxTries(data.priority, deps.env.HERO_IMAGE_MAX_TRIES)) {
+      const delay = data.priority === 'breaking' ? BREAKING_IMAGE_RETRY_DELAY_MS : IMAGE_RETRY_DELAY_MS
+      await deps.mediaQueue.add('media', { ...data, imageTries: tries }, { delay, priority: 5 })
+      logger.info({ clusterId: data.clusterId, tries, retryInMin: delay / 60_000 }, 'no hero image yet: holding story, will retry')
+      return
     }
-    return
+    logger.warn({ clusterId: data.clusterId, tries, title: data.write.en.title }, 'no hero image after all retries: publishing with the branded card, Gemini image follows')
   }
 
   if (blob) {
@@ -288,6 +299,7 @@ export async function processMediaJob(
     if (!heroMediaId && ogEn?.id) {
       heroMediaId = ogEn.id
     }
+    logger.info({ clusterId: data.clusterId, heroPath: blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
 
     for (const u of [portraitEn?.url, portraitUr?.url, ogEn?.url]) {
       if (u && !socialMediaUrls.includes(u)) socialMediaUrls.push(u)
@@ -305,6 +317,7 @@ export async function processMediaJob(
       socialMediaUrls,
       qaScore: data.qaScore,
       priority: data.priority,
+      ...(heroFallback ? { heroFallback: true } : {}),
       ...(data.articleId ? { articleId: data.articleId } : {}),
     },
     { priority: data.priority === 'breaking' || data.articleId ? 1 : 5 },
