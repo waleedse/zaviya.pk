@@ -10,6 +10,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
 import { effectiveIntervalMin } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
+import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
 const HOST_NAMES: Record<string, string> = {
@@ -189,7 +190,7 @@ export async function finishGated(
     logger.info({ articleId }, 'editor approved: making the image, then publishing')
     return true
   }
-  await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue })
+  await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue, mediaQueue: deps.mediaQueue })
   return true
 }
 
@@ -245,8 +246,10 @@ export async function processPublishJob(
     priority: Priority
     triage?: TriageResult
     articleId?: string
+    /** The hero is the branded card, not an illustration: queue a backfill that swaps in the Gemini image later (ZAV-299) */
+    heroFallback?: boolean
   },
-  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; gate?: { redis: Redis }; redis?: Redis },
+  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; mediaQueue?: Pick<Queue, 'add'>; gate?: { redis: Redis }; redis?: Redis },
 ): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
@@ -366,7 +369,23 @@ export async function processPublishJob(
   }
 
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })
-  logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId) }, 'published')
+  logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId), heroFallback: Boolean(data.heroFallback) }, 'published')
+
+  // Published with the branded card: the story stays online, the real hero replaces the card in place (same article and slug)
+  if (data.heroFallback && deps.mediaQueue) {
+    await deps.mediaQueue
+      .add(
+        HERO_BACKFILL_JOB,
+        {
+          articleId: String(res.id),
+          title: data.write.en.title,
+          brief: data.write.en.imageBrief || data.write.en.title,
+          sourceUrls: cluster.items.map((i) => i.url),
+        } satisfies HeroBackfillData,
+        { priority: 7, delay: 15 * 60_000 },
+      )
+      .catch((e) => logger.warn({ err: e, articleId: res.id }, 'hero backfill not queued'))
+  }
 
   // The Urdu headline the writer made for the social card is the voice line of the voiced news video (the site stores no Urdu title)
   const headlineUr = data.write.en.card?.headlineUr?.trim()

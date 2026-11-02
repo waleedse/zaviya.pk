@@ -310,11 +310,12 @@ export async function createWorkerRuntime(
           socialMediaUrls?: string[]
           qaScore: number
           priority: Priority
+          heroFallback?: boolean
         }
         const cluster = await payload.getCluster(d.clusterId)
         await processPublishJob(
           { ...d, triage: cluster.triage as TriageResult | undefined },
-          { payload, socialQueue: queues.social, publishQueue: queues.publish, gate: env.EDITOR_GATE ? { redis } : undefined, redis },
+          { payload, socialQueue: queues.social, publishQueue: queues.publish, mediaQueue: queues.media, gate: env.EDITOR_GATE ? { redis } : undefined, redis },
         )
       },
       { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
