@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
 import { SITE, type Locale } from '@zaviya/shared'
 import { getArticleBySlug } from './queries'
+import { SHARE_DOMAIN } from './share-text'
 
 /** 4:5 portrait: the size WhatsApp status, Facebook and Instagram feeds show without cropping (ZAV-223). */
 export const SHARE_CARD_WIDTH = 1080
@@ -182,7 +183,7 @@ export async function shareCardResponse(locale: Locale, file: string): Promise<R
               <div style={{ display: 'flex', fontSize: 26, fontWeight: 400 }}>{isUr ? rtl('مزید خبروں کے لیے فالو کریں') : 'Follow Zaviya News'}</div>
             </div>
           </div>
-          <div style={{ display: 'flex', fontSize: 38, fontWeight: 700, fontFamily: 'Inter', direction: 'ltr' }}>zaviya.pk</div>
+          <div style={{ display: 'flex', fontSize: 38, fontWeight: 700, fontFamily: 'Inter', direction: 'ltr' }}>{SHARE_DOMAIN}</div>
         </div>
       </div>
     ),
