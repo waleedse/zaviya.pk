@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { botReason, classifySource, deviceFromUa, isBot, recordBotHit, recordPageview, visitorId } from '@/lib/analytics'
 import { isMetaIp } from '@/lib/ip-ranges'
+import { BURST_SETTLE_MS, ipPrefix, isMetaPreviewCandidate, metaBursts } from '@/lib/meta-preview'
 import { siteUrl } from '@/lib/seo'
 
 const bodySchema = z.object({
@@ -29,22 +30,40 @@ export async function POST(request: Request) {
   }
   if (isBot(ua)) return NOT_HUMAN()
   const ip = (request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for') ?? '').split(',')[0]!.trim()
-  if (isMetaIp(ip)) {
-    console.info(`[analytics] skipped a Meta crawler view (${request.headers.get('cf-ipcountry') ?? '?'})`)
-    return NOT_HUMAN()
-  }
+  const metaIp = isMetaIp(ip)
 
   let json: unknown
   try {
     json = await request.json()
   } catch {
-    return new NextResponse(null, { status: 400 })
+    return metaIp ? NOT_HUMAN() : new NextResponse(null, { status: 400 })
   }
   const parsed = bodySchema.safeParse(json)
-  if (!parsed.success) return new NextResponse(null, { status: 400 })
+  if (!parsed.success) return metaIp ? NOT_HUMAN() : new NextResponse(null, { status: 400 })
 
   const { path, locale, referrer, utmSource } = parsed.data
+  const device = deviceFromUa(ua ?? '')
+  const source = classifySource(referrer, utmSource, new URL(siteUrl()).hostname)
+  const country = request.headers.get('cf-ipcountry') ?? undefined
+
+  if (metaIp) {
+    console.info(`[analytics] skipped a Meta crawler view (${country ?? '?'})`)
+    if (source === 'facebook') metaBursts.note(path) // it is part of a burst that its non-Meta-IP siblings join
+    await recordBotHit({ path, reason: 'meta-ip', device }).catch(() => undefined)
+    return NOT_HUMAN()
+  }
   if (path.startsWith('/admin') || path.startsWith('/api')) return NextResponse.json({ human: true })
+
+  if (isMetaPreviewCandidate(source, country)) {
+    // ZAV-290: Meta also opens links from addresses outside its network. Wait for the rest of the burst, then judge.
+    metaBursts.note(path)
+    await new Promise((resolve) => setTimeout(resolve, BURST_SETTLE_MS))
+    if (metaBursts.isBurst(path)) {
+      console.info(`[analytics] skipped a Meta preview burst view (${country}, ${ipPrefix(ip)}, ${metaBursts.count(path)} hits)`)
+      await recordBotHit({ path, reason: 'meta-preview', device }).catch(() => undefined)
+      return NOT_HUMAN()
+    }
+  }
 
   let refHost: string | undefined
   try {
@@ -57,10 +76,10 @@ export async function POST(request: Request) {
     await recordPageview({
       path,
       locale,
-      source: classifySource(referrer, utmSource, new URL(siteUrl()).hostname),
+      source,
       refHost,
-      device: deviceFromUa(ua ?? ''),
-      country: request.headers.get('cf-ipcountry') ?? undefined,
+      device,
+      country,
       visitor: visitorId(ip, ua ?? ''),
     })
   } catch (e) {

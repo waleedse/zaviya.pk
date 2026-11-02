@@ -455,3 +455,20 @@ BRIDGE_PORT=8787  BRIDGE_TOKEN=
 - Subscribers live in `zaviya_newsletter_subscribers` (raw SQL table created on web boot, no Payload migration; drop it to undo). Web: `/api/newsletter/{subscribe,confirm,unsubscribe}`, `/subscribe`, the form on the home page.
 - Sending (phase 2) is the worker's `newsletter` job on the `data` queue, every 10 minutes: confirmation mail to pending addresses, then the "Zaviya Morning Briefing" (top 5 of the last 30 h, breaking/high first) from 07:30 to 11:30 Asia/Karachi, at most 200 mails an hour, one per subscriber per day (`last_briefing_on`). The worker reads and marks rows through `/api/pipeline/newsletter/{pending,confirm-sent,briefing,briefed}` (bot key).
 - Off by default: needs `NEWSLETTER_SEND=true` and `NEWS_MAIL_PASSWORD` (user `NEWS_MAIL_USER`, default `news@zaviya.pk`, host `MAIL_HOST`) in `worker.env`, then a worker restart. Mails carry `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
+
+## Analytics: Meta link-preview browsers (ZAV-290)
+
+Meta opens every link Zaviya posts in a real browser (JS runs, normal UA, country US, referrer `www.facebook.com` / `m.facebook.com`). `POST /api/analytics/pageview` drops them in two steps and logs each drop to `zaviya_bot_hits`:
+
+- `meta-ip`: the client IP (`cf-connecting-ip`) is in Meta's AS32934 list (`apps/web/src/lib/meta-ranges.ts`, regenerate with `apps/web/scripts/update-meta-ranges.mjs`).
+- `meta-preview`: not a Meta IP, but a facebook-sourced hit from country US that is part of a burst (3+ such hits, Meta-IP ones included, on one path within 5 s). Suspect hits wait 2 s so the whole burst has arrived. The log line carries the /24 prefix so new Meta networks can be added to the list.
+
+Historical rows are never deleted. To see how many existing `zaviya_pageviews` rows look like preview hits (read-only):
+
+```sql
+SELECT count(*) AS suspect_rows FROM zaviya_pageviews p
+WHERE p.source = 'facebook' AND p.country = 'US'
+  AND (SELECT count(*) FROM zaviya_pageviews q
+       WHERE q.path = p.path AND q.source = 'facebook' AND q.country = 'US'
+         AND q.ts BETWEEN p.ts - interval '5 seconds' AND p.ts + interval '5 seconds') >= 3;
+```
