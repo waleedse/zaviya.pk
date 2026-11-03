@@ -1,6 +1,7 @@
 import type { TriageResult } from '@zaviya/shared'
 import { SITE } from '@zaviya/shared'
 import type { PipelineSettings } from '../payload-client.js'
+import { applyGlobalTopic, type GlobalTopic } from './global-news.js'
 
 export type TriageOutcome = 'publish' | 'review' | 'reject' | 'defer'
 
@@ -13,6 +14,10 @@ export interface TriageContext {
   articlesPublishedToday?: number
   /** ZAV-237: the story's desk (ai, education-jobs) has had no story for 4 h; the daily cap must not hold it back. */
   quotaOverdue?: boolean
+  /** ZAV-301: the cluster is about a major world story Pakistanis follow (US-Iran, US elections, Gulf, crypto hack...): relevance is floored */
+  globalTopic?: GlobalTopic | null
+  /** ZAV-301: a Google Trends PK item is in the cluster; a lone tier-3 trend hit on a major world story goes to review, not reject */
+  trendsHit?: boolean
 }
 
 export interface TriageDecision {
@@ -93,9 +98,10 @@ function minutesSince(iso: string, now: Date): number {
 
 /** Code rules from ARCHITECTURE §6.3 — pure, testable. */
 export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): TriageDecision {
-  const triage = GLOBAL_DESKS.has(rawTriage.category)
+  const deskTriage = GLOBAL_DESKS.has(rawTriage.category)
     ? { ...rawTriage, pakistanRelevance: Math.max(rawTriage.pakistanRelevance, GLOBAL_DESK_RELEVANCE) }
     : rawTriage
+  const triage = applyGlobalTopic(deskTriage, ctx.globalTopic ?? null)
   const now = ctx.now ?? new Date()
   const weightedScore = computeWeightedScore(triage, ctx.settings)
   const publishThreshold = ctx.settings.thresholds?.publish ?? DEFAULT_PUBLISH
@@ -131,10 +137,12 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
   }
 
   if (ctx.maxTier === 3 && ctx.distinctSources < 2) {
-    if (triage.newsworthiness > 0.85) {
+    if (triage.newsworthiness > 0.85 || (ctx.globalTopic && ctx.trendsHit)) {
       return {
         outcome: 'review',
-        reason: 'Tier-3 only source but high newsworthiness — needs human review',
+        reason: ctx.globalTopic && ctx.trendsHit && triage.newsworthiness <= 0.85
+          ? `Trending world story (${ctx.globalTopic}) seen only on Google Trends — a readable outlet must back it before it is written`
+          : 'Tier-3 only source but high newsworthiness — needs human review',
         weightedScore,
         modelDecision: triage.decision,
       }

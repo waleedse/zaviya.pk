@@ -9,7 +9,7 @@ import {
   parseJson,
   requireBotOrAdmin,
 } from './helpers'
-import { runClusterMatch } from './clusterMatch'
+import { refreshClusterStats, runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { pageviewsReport } from '../../lib/pageviews-report'
 import { expireBreaking, expireLive, setArticlePriority } from '../../lib/article-flags'
@@ -1137,6 +1137,144 @@ const pipelineEndpoints: Endpoint[] = [
         publishAgeMin,
       )
       const clusters = found.map((c) => ({ id: String(c.id), status: String(c.status), updatedAt: String(c.updatedAt), triage: (c.triage ?? {}) as Record<string, unknown> }))
+      return json({ clusters })
+    },
+  },
+  {
+    // ZAV-301: recent items of tier 1-2 outlets that carry real article text, without the text itself. When a cluster
+    // is headline-only (a Google News link) the worker looks here for another outlet's report of the same story.
+    path: '/pipeline/readable-items',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const hours = Math.max(1, Math.min(Number(new URL(req.url ?? 'http://x').searchParams.get('hours')) || 24, 72))
+      const since = new Date(Date.now() - hours * 3_600_000).toISOString()
+      const res = await req.payload.db.drizzle.execute(sql`
+        SELECT si.id, si.title, si.url, si.cluster_id, si.published_at, length(si.content_text) AS chars,
+               s.id AS source_id, s.name AS source_name, s.trust_tier
+        FROM source_items si
+        INNER JOIN sources s ON s.id = si.source_id
+        WHERE si.published_at >= ${since}
+          AND s.trust_tier <= 2
+          AND length(coalesce(si.content_text, '')) >= 500
+          AND si.external_id NOT LIKE 'peer:%'
+        ORDER BY si.published_at DESC
+        LIMIT 600
+      `)
+      const rows = res.rows as {
+        id: number | string
+        title: string
+        url: string
+        cluster_id: number | string | null
+        published_at: string | Date
+        chars: number | string
+        source_id: number | string
+        source_name: string
+        trust_tier: number | string
+      }[]
+      return json({
+        items: rows.map((r) => ({
+          id: String(r.id),
+          title: r.title,
+          url: r.url,
+          clusterId: r.cluster_id == null ? null : String(r.cluster_id),
+          publishedAt: new Date(r.published_at).toISOString(),
+          chars: Number(r.chars),
+          source: { id: String(r.source_id), name: r.source_name, trustTier: Number(r.trust_tier) },
+        })),
+      })
+    },
+  },
+  {
+    // ZAV-301: copy another outlet's readable item into a headline-only cluster as one more source (the original stays
+    // in its own cluster). Idempotent: one copy per (item, cluster).
+    path: '/pipeline/clusters/:id/attach-item',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const clusterId = String(req.routeParams?.id ?? '')
+      const parsed = await parseJson(req, z.object({ sourceItemId: z.string() }))
+      if ('error' in parsed) return parsed.error
+      const orig = await req.payload.findByID({ collection: 'source-items', id: parsed.data.sourceItemId, depth: 0, overrideAccess: true })
+      if (!orig.contentText || orig.contentText.length < 500) return badRequest('source item has no readable text')
+      const externalId = `peer:${orig.id}:${clusterId}`
+      const dup = await req.payload.find({
+        collection: 'source-items',
+        where: { and: [{ source: { equals: orig.source } }, { externalId: { equals: externalId } }] },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      if (dup.docs[0]) return json({ ok: true, id: String(dup.docs[0].id) })
+      const doc = await req.payload.create({
+        collection: 'source-items',
+        data: {
+          source: typeof orig.source === 'object' && orig.source ? (orig.source as { id: number }).id : (orig.source as number),
+          externalId,
+          url: orig.url,
+          title: orig.title,
+          summary: orig.summary ?? undefined,
+          contentText: orig.contentText,
+          publishedAt: orig.publishedAt,
+          lang: orig.lang ?? undefined,
+          hash: orig.hash ?? undefined,
+          cluster: Number(clusterId),
+        },
+        overrideAccess: true,
+        req,
+      })
+      await refreshClusterStats(req.payload, clusterId)
+      return json({ ok: true, id: String(doc.id) })
+    },
+  },
+  {
+    // ZAV-301: clusters that sit in 'in_review' with no article for `minAgeMin` minutes (and no older than 72 h), with
+    // their latest review-queue row. The worker's review drain decides them by plain rules; nobody answers Telegram.
+    path: '/pipeline/review-backlog',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const minAgeMin = Math.max(1, Math.min(Number(new URL(req.url ?? 'http://x').searchParams.get('minAgeMin')) || 30, 24 * 60))
+      const now = Date.now()
+      const res = await req.payload.find({
+        collection: 'story-clusters',
+        where: {
+          and: [
+            { status: { equals: 'in_review' } },
+            { article: { exists: false } },
+            { updatedAt: { less_than: new Date(now - minAgeMin * 60_000).toISOString() } },
+            { updatedAt: { greater_than: new Date(now - 72 * 3_600_000).toISOString() } },
+          ],
+        },
+        sort: '-updatedAt',
+        limit: 150,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const clusters = []
+      for (const c of res.docs) {
+        const rq = await req.payload.find({
+          collection: 'review-queue',
+          where: { cluster: { equals: c.id } },
+          sort: '-createdAt',
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+        const r = rq.docs[0]
+        clusters.push({
+          id: String(c.id),
+          headline: String(c.headline ?? ''),
+          updatedAt: String(c.updatedAt),
+          distinctSources: Number(c.distinctSources ?? 1),
+          maxTier: Number(c.maxTier ?? 3),
+          triage: (c.triage ?? {}) as Record<string, unknown>,
+          review: r ? { id: String(r.id), reason: String(r.reason ?? ''), flags: Array.isArray(r.flags) ? (r.flags as string[]) : [], decision: (r.decision as string | null | undefined) ?? null } : null,
+        })
+      }
       return json({ clusters })
     },
   },

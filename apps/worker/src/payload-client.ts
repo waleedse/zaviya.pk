@@ -111,6 +111,26 @@ export interface PipelineSettings {
   articlesPublishedToday?: number
 }
 
+export interface ReadableItem {
+  id: string
+  title: string
+  url: string
+  clusterId: string | null
+  publishedAt: string
+  chars: number
+  source: { id: string; name: string; trustTier: number }
+}
+
+export interface ReviewBacklogCluster {
+  id: string
+  headline: string
+  updatedAt: string
+  distinctSources: number
+  maxTier: number
+  triage: Record<string, unknown>
+  review: { id: string; reason: string; flags: string[]; decision: string | null } | null
+}
+
 export class PayloadClient {
   constructor(
     private readonly baseUrl: string,
@@ -244,6 +264,21 @@ export class PayloadClient {
       '/api/pipeline/internal-links',
       { keywords, locale, limit },
     )
+  }
+
+  /** ZAV-301: recent source items with real article text (tier 1-2), without the text: candidates to back a headline-only cluster */
+  readableItems(hours = 24) {
+    return this.request<{ items: ReadableItem[] }>('GET', `/api/pipeline/readable-items?hours=${hours}`)
+  }
+
+  /** ZAV-301: copy a readable item of another outlet into a cluster as one more source */
+  attachItem(clusterId: string, sourceItemId: string) {
+    return this.request<{ ok: true; id: string }>('POST', `/api/pipeline/clusters/${clusterId}/attach-item`, { sourceItemId })
+  }
+
+  /** ZAV-301: in_review clusters (no article yet) idle for `minAgeMin` minutes, with their latest review-queue row */
+  reviewBacklog(minAgeMin: number) {
+    return this.request<{ clusters: ReviewBacklogCluster[] }>('GET', `/api/pipeline/review-backlog?minAgeMin=${minAgeMin}`)
   }
 
   /** Clusters deferred by the triage rules and untouched for `minAgeMin` minutes (ZAV-144) */

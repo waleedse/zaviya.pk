@@ -55,11 +55,12 @@ export type KindVerdict = { action: 'ok'; triage: TriageResult } | { action: 're
  * What the story kind means for the pipeline. Opinion is closed. A feature about an event abroad runs only with a
  * Pakistan angle, and then in World. Any other story about an event abroad leaves the Pakistan section for World.
  */
-export function routeByStoryKind(triage: TriageResult, items: KindItem[]): KindVerdict {
+export function routeByStoryKind(triage: TriageResult, items: KindItem[], opts: { globalTopic?: string | null } = {}): KindVerdict {
   const cue = triage.storyKind === 'opinion' ? OPINION_REASON : opinionCue(items)
   if (cue) return { action: 'reject', reason: cue }
   if (triage.eventRegion === 'abroad') {
-    if (triage.storyKind === 'feature' && triage.pakistanRelevance < FOREIGN_FEATURE_MIN_RELEVANCE) {
+    // ZAV-301: an explainer on a major world story (US midterms, Hormuz) is traffic Pakistan follows; only opinion is closed above
+    if (triage.storyKind === 'feature' && triage.pakistanRelevance < FOREIGN_FEATURE_MIN_RELEVANCE && !opts.globalTopic) {
       return { action: 'reject', reason: FOREIGN_FEATURE_REASON }
     }
     if (triage.category === 'pakistan') return { action: 'ok', triage: { ...triage, category: 'world' } }

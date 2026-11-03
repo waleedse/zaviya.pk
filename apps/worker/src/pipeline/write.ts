@@ -2,7 +2,7 @@ import { PageReadResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { WriterOutputSchema, type WriterOutput } from '@zaviya/shared'
 import { isQuotaExhausted, zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
-import type { PayloadClient } from '../payload-client.js'
+import type { ClusterItem, PayloadClient } from '../payload-client.js'
 import { writeEnSystemPrompt, WRITE_EN_PROMPT_VERSION } from '../prompts/write_en.js'
 import { writeUrSystemPrompt, WRITE_UR_PROMPT_VERSION } from '../prompts/write_ur.js'
 import { parseModelJson } from './json-tolerant.js'
@@ -13,6 +13,7 @@ import type { Redis } from 'ioredis'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 import { scrubWriterCopy } from './seo-scrub.js'
 import { opinionCue, pageFromWrongOutlet, pageUnrelatedToHeadline } from './story-kind.js'
+import { globalTopicBrief } from './global-news.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
@@ -181,7 +182,15 @@ export function sourceTextChars(items: { title: string; summary?: string; conten
 
 export async function processWriteJob(
   data: { clusterId: string; feedback?: string[] },
-  deps: { router: LLMRouter; payload: PayloadClient; env: WorkerEnv; redis?: Redis; bridge?: Pick<BridgeServer, 'isOnline' | 'send'> },
+  deps: {
+    router: LLMRouter
+    payload: PayloadClient
+    env: WorkerEnv
+    redis?: Redis
+    bridge?: Pick<BridgeServer, 'isOnline' | 'send'>
+    /** ZAV-301: finds readable text for a headline-only cluster (publisher RSS, another outlet's report) before the write is skipped */
+    recoverText?: (cluster: { id: string; headline?: string; items: ClusterItem[] }) => Promise<boolean>
+  },
 ): Promise<WriteResult | null> {
   let cluster = await deps.payload.getCluster(data.clusterId)
   // Hybrid sourcing: when the sources carry only headlines (blocked outlets, Google News links),
@@ -198,6 +207,20 @@ export async function processWriteJob(
     logger.info({ clusterId: data.clusterId, reason: opinion }, 'write skipped: the source is opinion')
     return null
   }
+  // ZAV-301: before giving up on a headline-only cluster, read the outlet's own feed or attach another outlet's report
+  if (sourceTextChars(cluster.items) < deps.env.MIN_SOURCE_CHARS && deps.recoverText) {
+    try {
+      if (await deps.recoverText({ id: data.clusterId, headline: cluster.headline, items: cluster.items })) cluster = await deps.payload.getCluster(data.clusterId)
+    } catch (e) {
+      logger.warn({ clusterId: data.clusterId, err: e instanceof Error ? e.message : e }, 'readable-text recovery failed')
+    }
+    const late = opinionCue(cluster.items)
+    if (late) {
+      await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { ...((cluster.triage ?? {}) as Record<string, unknown>), codeOutcome: 'reject', deferReason: late } })
+      logger.info({ clusterId: data.clusterId, reason: late }, 'write skipped: the recovered source is opinion')
+      return null
+    }
+  }
   // Headline-only items (Google News links, blocked outlets) give the writer nothing to report.
   // Without real source text it writes "about the headline" instead of the news: skip until an
   // outlet with readable text joins the cluster (a new item re-triggers triage).
@@ -212,6 +235,7 @@ export async function processWriteJob(
   const urlLog = new Set<string>()
   for (const it of cluster.items) urlLog.add(it.url)
 
+  const globalBrief = globalTopicBrief((cluster.triage as { globalTopic?: unknown } | undefined)?.globalTopic)
   const sourcesBlock = wrapSources(cluster.items)
   const feedbackBlock = data.feedback?.length
     ? `\n\nA previous draft failed editorial QA. Fix every issue below:\n${data.feedback.map((f) => `- ${f}`).join('\n')}`
@@ -226,7 +250,7 @@ export async function processWriteJob(
     en = await runLocaleWrite('write_en', {
       ...deps,
       system: writeEnSystemPrompt(),
-      userContent: `Write the English article for this cluster.\n\n${seo ? `${seoBrief(seo.plan, 'en')}\n\n` : ''}${sourcesBlock}${linksEn}${feedbackBlock}`,
+      userContent: `Write the English article for this cluster.\n\n${globalBrief ? `${globalBrief}\n\n` : ''}${seo ? `${seoBrief(seo.plan, 'en')}\n\n` : ''}${sourcesBlock}${linksEn}${feedbackBlock}`,
       urlLog,
       locale: 'en',
     })
