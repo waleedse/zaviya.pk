@@ -12,6 +12,8 @@ import type { BridgeServer } from '../bridge/server.js'
 import { categoryOverdue, QUOTA_CATEGORIES } from './publish.js'
 import { findSameStory } from './same-story.js'
 import { opinionCue, routeByStoryKind } from './story-kind.js'
+import { majorGlobalTopic } from './global-news.js'
+import { isTrendingCluster } from './readable.js'
 
 class ReasonLoopError extends Error {
   constructor() {
@@ -24,6 +26,9 @@ export const HEADLINE_ONLY_WAITING = 'headline only: waiting for the extension t
 /** With the extension offline a headline-only cluster is retried hourly while the newest source is under 4 h old (ZAV-163). */
 export const HEADLINE_ONLY_RETRY_MIN = 60
 export const HEADLINE_ONLY_WAIT_H = 4
+/** ZAV-301: a trending story (several outlets, Google Trends hit, major world story) is retried every 20 min for 8 h instead of being closed */
+export const HEADLINE_ONLY_TRENDING_RETRY_MIN = 20
+export const HEADLINE_ONLY_TRENDING_WAIT_H = 8
 
 function newestSourceMs(items: { publishedAt?: string }[]): number {
   const times = items.map((i) => (i.publishedAt ? Date.parse(i.publishedAt) : NaN)).filter(Number.isFinite)
@@ -86,6 +91,8 @@ export async function processTriageJob(
     bridge?: Pick<BridgeServer, 'isOnline' | 'send'>
     /** Pitch normal stories to the editor instead of writing them at once */
     pitch?: boolean
+    /** ZAV-301: finds readable text for a headline-only cluster (publisher RSS, another outlet's report); true when it saved something */
+    recoverText?: (cluster: { id: string; headline?: string; items: import('../payload-client.js').ClusterItem[] }) => Promise<boolean>
     notifyReview?: (args: { clusterId: string; reviewId: string; summary: string }) => Promise<void>
   },
 ): Promise<void> {
@@ -142,8 +149,13 @@ export async function processTriageJob(
     return
   }
 
+  // ZAV-301: a major world story Pakistanis follow (US-Iran, US elections, Gulf, crypto hack...) is news, with a "what it means for Pakistan" angle
+  const headlines = [cluster.headline, ...cluster.items.map((i) => i.title)]
+  const globalTopic = majorGlobalTopic(...headlines)
+  const trendsHit = cluster.items.some((i) => /^google trends/i.test(i.source?.name ?? ''))
+
   // Opinion is not news and a feature about an event abroad is not Pakistan news (ZAV-155)
-  const kind = routeByStoryKind(triage, cluster.items)
+  const kind = routeByStoryKind(triage, cluster.items, { globalTopic })
   if (kind.action === 'reject') {
     await deps.payload.patchCluster(data.clusterId, {
       status: 'rejected',
@@ -153,6 +165,8 @@ export async function processTriageJob(
     return
   }
   triage = kind.triage
+  // The tag is stored with the triage: the writer adds the "what it means for Pakistan" angle, the drain recomputes the score with the floor
+  if (globalTopic) triage = { ...triage, globalTopic } as TriageResult
 
   // Same event as an article we already hold (ZAV-134): add it to that article as a live update, never a
   // second article. Nothing already published is touched; a miss here only falls back to the old path.
@@ -190,6 +204,8 @@ export async function processTriageJob(
     lastPublishedAt: settings.lastPublishedAt,
     articlesPublishedToday: settings.articlesPublishedToday,
     quotaOverdue,
+    globalTopic,
+    trendsHit,
   })
 
   if (decision.outcome === 'defer') {
@@ -258,6 +274,10 @@ export async function processTriageJob(
     // ZAV-149: a pitch carries the lede. Headline-only sources (Dawn via Google News) are read through the extension.
     let items = cluster.items
     try {
+      // ZAV-301: before the extension (often offline) or a reject, look for the text at the outlet's own feed and at another outlet
+      if (!pitchSummary(items) && deps.recoverText && (await deps.recoverText({ id: data.clusterId, headline: cluster.headline, items }))) {
+        items = (await deps.payload.getCluster(data.clusterId)).items
+      }
       if (!pitchSummary(items) && deps.bridge?.isOnline() && (await enrichFromExtension(items, deps.payload, deps.bridge, data.clusterId, 1))) {
         items = (await deps.payload.getCluster(data.clusterId)).items
       }
@@ -279,9 +299,13 @@ export async function processTriageJob(
     // approved and then withdrawn, from a headline alone. The worker closes it itself with a note.
     if (!lede) {
       const ageH = (Date.now() - newestSourceMs(items)) / 3_600_000
-      if (!deps.bridge?.isOnline() && ageH < HEADLINE_ONLY_WAIT_H && deps.triageQueue) {
-        // The extension is offline, so the page could not even be tried: look again later instead of binning it
-        await deps.triageQueue.add('triage', { clusterId: data.clusterId }, { delay: HEADLINE_ONLY_RETRY_MIN * 60_000, priority: 4, jobId: `triage-body-${data.clusterId}-${Math.floor(Date.now() / (HEADLINE_ONLY_RETRY_MIN * 60_000))}`, removeOnComplete: true })
+      // ZAV-301: a trending story is never binned for a missing body while it is fresh; other outlets may publish it any minute
+      const trending = isTrendingCluster(cluster, globalTopic ?? null)
+      const waitH = trending ? HEADLINE_ONLY_TRENDING_WAIT_H : HEADLINE_ONLY_WAIT_H
+      const retryMin = trending ? HEADLINE_ONLY_TRENDING_RETRY_MIN : HEADLINE_ONLY_RETRY_MIN
+      if ((trending || !deps.bridge?.isOnline()) && ageH < waitH && deps.triageQueue) {
+        // The extension is offline (or the story is trending), so look again later instead of binning it
+        await deps.triageQueue.add('triage', { clusterId: data.clusterId }, { delay: retryMin * 60_000, priority: 4, jobId: `triage-body-${data.clusterId}-${Math.floor(Date.now() / (retryMin * 60_000))}`, removeOnComplete: true })
         await deps.payload.patchCluster(data.clusterId, {
           status: 'triaged',
           triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'defer', deferReason: HEADLINE_ONLY_WAITING },
@@ -296,6 +320,14 @@ export async function processTriageJob(
       logger.info({ clusterId: data.clusterId }, 'rejected: headline-only, no article body could be read')
       return
     }
+    // ZAV-301: a major world story with a readable body goes straight to the writer; the editor's hourly pitch round is too slow for it
+    if (globalTopic) {
+      const approved = { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'publish', editorApproved: true, editorApprovedAt: new Date().toISOString(), editorNote: `world story (${globalTopic}): written without a pitch round` }
+      await deps.payload.patchCluster(data.clusterId, { status: 'writing', triage: approved })
+      await deps.writeQueue.add('write', { clusterId: data.clusterId, triage: approved, promptVersion: TRIAGE_PROMPT_VERSION }, { priority: triage.suggestedPriority === 'high' ? 2 : 3 })
+      logger.info({ clusterId: data.clusterId, globalTopic }, 'world story: written without a pitch round')
+      return
+    }
     await deps.payload.patchCluster(data.clusterId, {
       status: 'triaged',
       triage: { ...triage, weightedScore: decision.weightedScore, codeOutcome: 'pitch', pitchedAt: new Date().toISOString(), pitchSummary: lede },
@@ -304,10 +336,12 @@ export async function processTriageJob(
     return
   }
 
-  await deps.payload.patchCluster(data.clusterId, { status: 'writing' })
+  // ZAV-301: a major world story does not wait at the editor gate either
+  const jobTriage = globalTopic ? { ...triage, editorApproved: true, editorApprovedAt: new Date().toISOString() } : triage
+  await deps.payload.patchCluster(data.clusterId, globalTopic ? { status: 'writing', triage: { ...jobTriage, weightedScore: decision.weightedScore, codeOutcome: 'publish' } } : { status: 'writing' })
   await deps.writeQueue.add(
     'write',
-    { clusterId: data.clusterId, triage, promptVersion: TRIAGE_PROMPT_VERSION },
+    { clusterId: data.clusterId, triage: jobTriage, promptVersion: TRIAGE_PROMPT_VERSION },
     { priority: triage.suggestedPriority === 'breaking' ? 1 : triage.suggestedPriority === 'high' ? 3 : 5 },
   )
 }

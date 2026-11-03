@@ -42,6 +42,8 @@ import type { WriteResult } from './pipeline/write.js'
 
 import { TRENDS_KEY } from './queues-keys.js'
 import { releaseStuckApproved } from './pipeline/release-approved.js'
+import { drainReviewQueue } from './pipeline/review-drain.js'
+import { recoverReadableText } from './pipeline/readable.js'
 export { TRENDS_KEY }
 
 export const QUEUE_NAMES = [
@@ -218,6 +220,13 @@ export async function createWorkerRuntime(
               await releaseStuckNewClusters({ payload, triageQueue: queues.triage, minSources: env.TRIAGE_MIN_SOURCES })
               // ZAV-107: approved clusters that never reached the writer
               await releaseStuckApproved({ payload, writeQueue: queues.write, chain: [queues.write, queues.qa, queues.media, queues.publish] })
+              // ZAV-301: nobody answers the review queue (no Telegram): decide what has waited 30 min by plain rules
+              try {
+                const drained = await drainReviewQueue({ payload, writeQueue: queues.write })
+                if (drained.written || drained.rejected) logger.info(drained, 'review queue drained')
+              } catch (e) {
+                logger.warn({ err: e instanceof Error ? e.message : e }, 'review drain failed')
+              }
             })()
           : processTriageJob(job.data, {
               router,
@@ -226,6 +235,7 @@ export async function createWorkerRuntime(
               triageQueue: queues.triage,
               notifyReview,
               bridge,
+              recoverText: (c) => recoverReadableText(c, { payload }),
               autoApprove: env.AUTO_APPROVE,
               pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
             }),
@@ -249,7 +259,7 @@ export async function createWorkerRuntime(
         }
         let result: WriteResult | null
         try {
-          result = await processWriteJob({ clusterId, feedback }, { router, payload, env, redis, bridge })
+          result = await processWriteJob({ clusterId, feedback }, { router, payload, env, redis, bridge, recoverText: (c) => recoverReadableText(c, { payload }) })
         } catch (e) {
           // Every model (cloud and local) unavailable: try again when the quota resets.
           if (isQuotaExhausted(e)) {
