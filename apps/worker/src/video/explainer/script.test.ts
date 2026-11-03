@@ -74,6 +74,17 @@ describe('writeExplainerScript', () => {
     expect(r.script.beats).toHaveLength(9)
   })
 
+  it('adds the trending-story rules to the brief only for a trending idea', async () => {
+    const seen: string[] = []
+    const sourced = { ...good(), beats: good().beats.map((b, i) => (i === 0 ? longBeat('کمپنی کے مطابق ') : b)) }
+    const router = { chat: async (_t: string, opts: { messages: { content: string }[] }) => (seen.push(opts.messages[1]!.content), { content: JSON.stringify(opts.messages[1]!.content.includes('x.test') ? sourced : good()), provider: 'test', model: 'm' }) }
+    await writeExplainerScript({ router: router as never, fetchText: async () => 'Binance said it moved funds after the hack.' }, { ...idea, title: 'How a hack hit Binance', sources: ['https://x.test/a'], trending: true })
+    await writeExplainerScript({ router: router as never }, idea)
+    expect(seen[0]).toMatch(/^TRENDING STORY: .*neutral/)
+    expect(seen[0]).toMatch(/Pakistani political parties/)
+    expect(seen[1]).not.toMatch(/TRENDING STORY/)
+  })
+
   it('gives up after three failed tries', async () => {
     const router = { chat: async () => ({ content: '{"nope":1}', provider: 'test', model: 'm' }) }
     await expect(writeExplainerScript({ router: router as never }, idea)).rejects.toThrow(/did not pass/)

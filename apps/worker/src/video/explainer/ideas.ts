@@ -22,6 +22,8 @@ export interface Idea {
   createdAt: number
   /** when the news hook ends; undefined = evergreen */
   hookUntil?: number
+  /** a big trending story (a Google Trends PK hit, or several outlets per the editor): with an editor ok or boost it may be about government, elections, war and the like */
+  trending?: boolean
   risk: Risk
   status: 'backlog' | 'made' | 'expired'
   decision?: Decision
@@ -35,11 +37,12 @@ export const HOUR = 3_600_000
 export const DAY = 24 * HOUR
 
 const SENSITIVE =
-  /\b(terror\w*|blast|bomb\w*|killed|kills?|dead|death|martyr\w*|murder\w*|rape\w*|harass\w*|abduct\w*|kidnap\w*|massacre|shooting|attack\w*|militan\w*|court|verdict|convict\w*|acquit\w*|arrest\w*|accused|bail|blasphem\w*|sectarian|election\w*|rigging|ISPR|army|military|PTI|PMLN|PML-N|PPP|Imran|Nawaz|Sharif|Zardari|Bilawal|protest\w*|riot\w*|war|ceasefire|strike on|missile|drone|minister\w*|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|diplomat\w*|summit|delegation|envoy|opposition|coalition|ruling|treaty|sanction\w*)\b/i
+  /\b(terror\w*|blast|bomb\w*|killed|kills?|dead|death|martyr\w*|murder\w*|rape\w*|harass\w*|abduct\w*|kidnap\w*|massacre|shooting|attack\w*|militan\w*|court|verdict|convict\w*|acquit\w*|arrest\w*|accused|bail|blasphem\w*|sectarian|election\w*|rigging|ISPR|army|military|PTI|PMLN|PML-N|PPP|Imran|Nawaz|Sharif|Zardari|Bilawal|protest\w*|riot\w*|war|ceasefire|strikes|air ?strikes?|strike on|strike against|invasion|invad\w*|hostages?|nuclear|hormuz|missile|drone|minister\w*|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|diplomat\w*|summit|delegation|envoy|opposition|coalition|ruling|treaty|sanction\w*)\b/i
 
 /**
- * Government and public-administration topics are never made (Waleed, 24 Oct): ministers, budgets, taxes, courts, regulators, the
- * IMF, public jobs and the like. Unlike SENSITIVE, an editor's ok or boost does not lift this.
+ * Government and public-administration topics are not made as a rule (Waleed, 24 Oct): ministers, budgets, taxes, courts, regulators,
+ * the IMF, public jobs and the like. Waleed, 4 Nov: a big trending story (a Trends hit, or several outlets) may be explained neutrally
+ * and with sources when the editor says ok or boost, so the rule yields to `idea.trending` plus that decision (see `blockedReason`).
  */
 const GOVERNMENT =
   /\b(govt|government\w*|minister\w*|ministry|cabinet|parliament\w*|senat\w*|assembly|governor|president|premier|prime minister|PM|federal|provincial|budget|tax(?:es|ation)?|FBR|SBP|State Bank|OGRA|NEPRA|PTA|NADRA|policy|policies|ordinance|laws?|court\w*|supreme|judge\w*|election\w*|ECP|IMF|World Bank|subsid\w*|privati[sz]\w*|DISCOs?|regulator\w*|authority|commission|PPSC|FPSC|NTS|vacanc\w*|scholarship\w*|levy|levies|duty|duties|tariff\w*|army|military|ISPR|police|FIA|NAB|PML-?N|PTI|PPP|visas?|immigra\w+|passports?|embass\w+|consulate|residency|work permit|merit list|admissions?|HED|HEC|department|board|bureau|council|ministerial|public sector|civil servants?|pension\w*|salary increase|bill passed|IRIS|KTBA|customs|import duty|export policy)\b/i
@@ -48,6 +51,36 @@ const NAMED_ACT = /\b[A-Z][a-z]+ Act\b|\bAct,? \d{4}\b/
 
 export function isGovernment(text: string): boolean {
   return GOVERNMENT.test(text) || NAMED_ACT.test(text)
+}
+
+/**
+ * Never made, whatever the editor says or however much it trends: legal and ban risk in Pakistan. Blasphemy, minors, sectarian
+ * content, and Pakistani party-political or army content. Neutral, sourced explainers of foreign politics and war (US election,
+ * Iran-US, Israel-Gaza) and of big hacks and finance events are not in this list.
+ */
+const HARD_BLOCK_WORDS =
+  /\b(blasphem\w*|toheen\w*|sacrilege|sectarian|sectarianism|ahmadi\w*|qadiani\w*|takfir\w*|shia|shi'?ite|sunni|minors?|underage|under-age|juvenile|child (?:abuse|rape|marriage|labou?r|victims?)|schoolgirls?|schoolboys?|army chief|pakistan army|field marshal|imran khan|nawaz sharif|shehbaz sharif|maryam nawaz|zardari|bilawal|asim munir|sohail afridi)\b/i
+// party and army acronyms are matched in capitals only (a lower-case "isi" or "ppp" is not the party)
+const HARD_BLOCK_ACRONYMS = /\b(PTI|PML-?N|PML-?Q|PPP|MQM|TLP|JUI-?F?|ANP|ISPR|ISI)\b/
+
+export function isHardBlocked(text: string): boolean {
+  return HARD_BLOCK_WORDS.test(text) || HARD_BLOCK_ACRONYMS.test(text)
+}
+
+/** An editor ok or boost: a second pair of eyes has seen the idea (nobody previews videos unless Telegram is set up). */
+const approved = (idea: Pick<Idea, 'decision'>) => idea.decision === 'ok' || idea.decision === 'boost'
+
+/**
+ * Why an idea may not be made now, or null. Hard blocks never lift. Government topics lift only for a trending idea with an
+ * editor ok or boost. `listing` skips the approval gates, for the editor's backlog view (it must see what waits for its ok).
+ */
+export function blockedReason(idea: Pick<Idea, 'title' | 'angle' | 'trending' | 'decision' | 'risk'>, listing = false): string | null {
+  const text = `${idea.title} ${idea.angle}`
+  if (isHardBlocked(text)) return 'blasphemy, minors, sectarian and Pakistani party-political or army topics are never made'
+  if (isGovernment(text) && !idea.trending) return 'government and public-administration topics are made only as a big trending story (trending: true, 2+ sources)'
+  if (!listing && isGovernment(text) && !approved(idea)) return 'a trending government, election or war topic needs the editor ok or boost'
+  if (!listing && idea.risk === 'needs-veto' && !approved(idea)) return 'sensitive: needs the editor ok or boost'
+  return null
 }
 
 export function isSensitive(text: string): boolean {
@@ -80,12 +113,11 @@ export function similar(a: string, b: string): number {
   return hit / Math.min(x.size, y.size)
 }
 
-/** Higher is better. Excluded ideas (vetoed, expired, made, needs-veto without approval) return -Infinity. */
-export function scoreIdea(idea: Idea, now: number): number {
+/** Higher is better. Excluded ideas (vetoed, expired, made, hard-blocked, sensitive or government without an editor ok) return -Infinity. */
+export function scoreIdea(idea: Idea, now: number, opts: { listing?: boolean } = {}): number {
   if (idea.status !== 'backlog' || idea.decision === 'veto') return -Infinity
-  if (isGovernment(`${idea.title} ${idea.angle}`)) return -Infinity
+  if (blockedReason(idea, opts.listing)) return -Infinity
   if (idea.hookUntil !== undefined && now > idea.hookUntil) return -Infinity
-  if (idea.risk === 'needs-veto' && idea.decision !== 'ok' && idea.decision !== 'boost') return -Infinity
   let s = idea.baseScore
   if (idea.hookUntil !== undefined) {
     // news ideas fade as the hook ages
@@ -147,10 +179,12 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
   // 1. stories of the last 36 h worth explaining
   for (const a of articles) {
     const age = now - Date.parse(a.publishedAt)
-    if (!(age >= 0 && age <= 36 * HOUR) || !EXPLAINABLE.has(a.category) || a.isBreaking) continue
+    if (!(age >= 0 && age <= 36 * HOUR) || !EXPLAINABLE.has(a.category)) continue
     const text = `${a.title} ${a.dek ?? ''}`
-    if (isGovernment(text)) continue
+    if (isHardBlocked(text)) continue
     const trending = trends.some((t) => t.trim().length >= 4 && similar(t, a.title) >= 0.6)
+    // the daily flash covers breaking news; a breaking story that also trends is the big one worth explaining
+    if ((a.isBreaking || isGovernment(text)) && !trending) continue
     add({
       id: ideaId(a.title),
       title: a.title,
@@ -162,7 +196,8 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
       baseScore: (trending ? 34 : 12) + (a.priority === 'high' ? 8 : 0),
       createdAt: now,
       hookUntil: Date.parse(a.publishedAt) + 36 * HOUR,
-      risk: isSensitive(text) ? 'needs-veto' : 'low',
+      ...(trending ? { trending: true } : {}),
+      risk: isSensitive(text) || isGovernment(text) ? 'needs-veto' : 'low',
       status: 'backlog',
     })
   }
@@ -207,7 +242,7 @@ export class IdeaStore {
     for (const f of found) {
       const old = have.get(f.id)
       if (!old) await this.put(f)
-      else if (old.status === 'backlog') await this.put({ ...old, baseScore: Math.max(old.baseScore, f.baseScore), hookUntil: f.hookUntil ?? old.hookUntil, sources: old.sources.length ? old.sources : f.sources })
+      else if (old.status === 'backlog') await this.put({ ...old, baseScore: Math.max(old.baseScore, f.baseScore), hookUntil: f.hookUntil ?? old.hookUntil, ...(old.trending || f.trending ? { trending: true } : {}), sources: old.sources.length ? old.sources : f.sources })
     }
   }
 

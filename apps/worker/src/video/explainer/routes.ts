@@ -1,7 +1,7 @@
 /** The explainer backlog over HTTP for the editor agent (and for Waleed): list, add, decide, and make one now. */
 import { z } from 'zod'
 import type { ExtraRoutes } from '../media-hub.js'
-import { HOUR, ideaId, isGovernment, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
+import { blockedReason, HOUR, ideaId, isGovernment, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
 
 const AddSchema = z.object({
   title: z.string().min(8).max(160),
@@ -9,6 +9,8 @@ const AddSchema = z.object({
   sources: z.array(z.string().url()).max(4).default([]),
   tags: z.array(z.string()).max(4).default([]),
   hours: z.number().min(1).max(72).optional(),
+  /** a big trending story (several outlets or a Trends hit): needs 2+ sources; lets a government, election or war topic through once the editor says ok or boost */
+  trending: z.boolean().optional(),
 })
 const DecideSchema = z.object({ decision: z.enum(['boost', 'ok', 'veto']), note: z.string().max(300).optional() })
 const RunSchema = z.object({ ideaId: z.string().optional(), dry: z.boolean().optional(), now: z.boolean().optional() })
@@ -17,9 +19,9 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
   return async (method, pathname, body) => {
     if (method === 'GET' && pathname === '/ideas') {
       const t = now()
-      // needs-veto ideas are listed too (flagged): approving them is the editor's job; vetoed, made and expired ones are not
+      // needs-veto ideas are listed too (flagged): approving them is the editor's job; vetoed, made, expired and hard-blocked ones are not
       const ranked = (await store.all())
-        .map((idea) => ({ idea, score: scoreIdea({ ...idea, risk: 'low' }, t) }))
+        .map((idea) => ({ idea, score: scoreIdea(idea, t, { listing: true }) }))
         .filter((r) => Number.isFinite(r.score))
         .sort((a, b) => b.score - a.score)
         .slice(0, 30)
@@ -31,6 +33,7 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
           angle: idea.angle,
           origin: idea.origin,
           risk: idea.risk,
+          trending: idea.trending ?? false,
           score: Math.round(score),
           decision: idea.decision ?? null,
           note: idea.note ?? null,
@@ -42,7 +45,10 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
     if (method === 'POST' && pathname === '/ideas') {
       const p = AddSchema.safeParse(body)
       if (!p.success) return { status: 400, body: { error: p.error.issues[0]?.message ?? 'invalid' } }
-      if (isGovernment(`${p.data.title} ${p.data.angle}`)) return { status: 400, body: { error: 'government and public-administration topics are not made as videos' } }
+      if (p.data.trending && p.data.sources.length < 2) return { status: 400, body: { error: 'a trending story needs 2 or more source URLs (several outlets)' } }
+      const text = `${p.data.title} ${p.data.angle}`
+      const blocked = blockedReason({ title: p.data.title, angle: p.data.angle, trending: p.data.trending, decision: 'ok', risk: 'low' }, true)
+      if (blocked) return { status: 400, body: { error: blocked } }
       const t = now()
       const idea: Idea = {
         id: ideaId(p.data.title),
@@ -54,7 +60,8 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
         baseScore: 30,
         createdAt: t,
         ...(p.data.hours ? { hookUntil: t + p.data.hours * HOUR } : {}),
-        risk: isSensitive(`${p.data.title} ${p.data.angle}`) ? 'needs-veto' : 'low',
+        ...(p.data.trending ? { trending: true } : {}),
+        risk: isSensitive(text) || isGovernment(text) ? 'needs-veto' : 'low',
         status: 'backlog',
       }
       await store.put(idea)

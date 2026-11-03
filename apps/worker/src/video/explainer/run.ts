@@ -16,7 +16,7 @@ import { postWithRetry } from '../post-retry.js'
 import { hhmm, karachiDate, KARACHI_OFFSET_MS, runsOn, slotTimeMs, type Slot } from '../schedule.js'
 import type { VideoTelegram } from '../telegram.js'
 import { speechSentences, toSpeechText } from '../urdu-speech.js'
-import { discoverIdeas, IdeaStore, pickIdea, type DiscoverArticle, type Idea } from './ideas.js'
+import { discoverIdeas, IdeaStore, isHardBlocked, pickIdea, type DiscoverArticle, type Idea } from './ideas.js'
 import type { ExplainerScript, ScriptResult } from './script.js'
 
 export const SCRIPT_WAIT_MS = 12 * 60_000
@@ -160,7 +160,8 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
   await store.merge(discoverIdeas({ articles: articles.map((a) => toDiscover(a, cfg.siteUrl)), trends, now: startedAt }))
   await store.prune(startedAt)
   const idea = opts.ideaId ? await store.get(opts.ideaId) : pickIdea(await store.all(), startedAt, await store.madeTitles(startedAt))
-  if (!idea) return { status: 'no-idea', key }
+  // a named idea skips the ranking, so the hard blocks (blasphemy, minors, sectarian, Pakistani party or army) are checked here too
+  if (!idea || isHardBlocked(`${idea.title} ${idea.angle}`)) return { status: 'no-idea', key }
   log.info({ idea: idea.title, origin: idea.origin }, 'explainer picked')
 
   const fail = async (status: ExplainerOutcome['status'], error: string): Promise<ExplainerOutcome> => {
