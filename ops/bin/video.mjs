@@ -2,6 +2,7 @@
 // The explainer-video backlog, for the editor agent (the key stays out of the command line, like payload.mjs).
 //   video.mjs ideas                                  ranked backlog: id, title, score, risk, decision, hours left, sources
 //   video.mjs add '{"title":"...","angle":"...","sources":["https://..."],"tags":["AI"],"hours":24}'
+//        add "trending":true (and 2+ sources) for a big trending story: war, election and government topics are then allowed once decided ok/boost
 //   video.mjs decide <id> <boost|ok|veto> [note]     boost = make it soon; ok = allowed (needed for needs-veto ideas); veto = never
 //   video.mjs run [--dry] [--now] [ideaId]           make one now (--dry: make and preview, never post)
 // Talks to the media hub of the video service (http://video:8790 inside the compose network).

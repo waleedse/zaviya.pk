@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EVERGREEN } from './evergreen.js'
-import { DAY, discoverIdeas, isGovernment, HOUR, IdeaStore, ideaId, isPakistan, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
+import { DAY, blockedReason, discoverIdeas, isGovernment, isHardBlocked, HOUR, IdeaStore, ideaId, isPakistan, isSensitive, memoryIdeaRedis, pickIdea, rank, scoreIdea, similar, type Idea } from './ideas.js'
 
 const NOW = Date.UTC(2026, 9, 24, 8)
 const idea = (over: Partial<Idea> = {}): Idea => ({ id: ideaId(over.title ?? 'x'), title: 'Some topic about rockets', angle: 'a', origin: 'evergreen', sources: [], tags: [], baseScore: 16, createdAt: NOW, risk: 'low', status: 'backlog', ...over })
@@ -99,6 +99,82 @@ describe('discovery', () => {
     expect(isSensitive('Imran Khan court hearing')).toBe(true)
     expect(isSensitive('How solar panels work')).toBe(false)
     expect(similar('How rockets reach orbit', 'How a rocket reaches orbit')).toBeGreaterThan(0.5)
+  })
+})
+
+describe('big trending stories (Waleed, 4 Nov)', () => {
+  const hack = 'How a $6.3bn hack hit Binance and what Pakistani crypto users should check'
+  const war = 'What US-Iran strikes mean for petrol prices in Pakistan'
+  const midterm = 'How the US midterm election works and why it moves the dollar'
+
+  it('lets a trending government, election or war idea through only with an editor ok or boost', () => {
+    for (const title of [war, midterm]) {
+      expect(isSensitive(title) || isGovernment(title)).toBe(true)
+      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto' }), NOW)).toBe(-Infinity)
+      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'ok' }), NOW)).toBeGreaterThan(0)
+      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'boost' }), NOW)).toBeGreaterThan(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'ok' }), NOW))
+      // the editor sees it while it waits
+      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto' }), NOW, { listing: true })).toBeGreaterThan(0)
+    }
+    expect(scoreIdea(idea({ title: hack, trending: true, decision: 'ok' }), NOW)).toBeGreaterThan(0)
+    // an election topic that is not trending: the old government rule holds, an editor boost does not lift it
+    expect(scoreIdea(idea({ title: midterm, risk: 'needs-veto', decision: 'boost' }), NOW)).toBe(-Infinity)
+  })
+
+  it('a vetoed trending idea stays out, and it runs after the normal veto window with no other wait', () => {
+    expect(scoreIdea(idea({ title: war, trending: true, risk: 'needs-veto', decision: 'veto' }), NOW)).toBe(-Infinity)
+    const picked = pickIdea([idea({ title: war, trending: true, risk: 'needs-veto', decision: 'boost' }), idea({ title: 'How solar panels make electricity' })], NOW, [])
+    expect(picked?.title).toBe(war)
+  })
+
+  it('keeps the hard blocks whatever trends or the editor says', () => {
+    for (const t of [
+      'Blasphemy case sparks outrage',
+      'Sectarian clashes: what happened',
+      'Minor girl case explained',
+      'What the army chief said about the border',
+      'ISPR press conference explained',
+      'PTI long march: what happens next',
+      'PML-N and PPP coalition talks explained',
+      'Why Imran Khan trended on X',
+    ]) {
+      expect(isHardBlocked(t)).toBe(true)
+      expect(blockedReason(idea({ title: t, trending: true, decision: 'boost' }))).toMatch(/never made/)
+      expect(scoreIdea(idea({ title: t, trending: true, decision: 'boost' }), NOW, { listing: true })).toBe(-Infinity)
+    }
+    for (const t of [war, midterm, hack, 'What the Israel-Gaza ceasefire means for oil', 'How the US Army uses drones']) expect(isHardBlocked(t)).toBe(false)
+    // lower-case "ppp" or "isi" in ordinary words is not the party
+    expect(isHardBlocked('How to spot a fake ppp loan site')).toBe(false)
+  })
+
+  it('discovery keeps a Google Trends hit about war or elections (needs-veto, trending) and still drops one that is not trending', () => {
+    const found = discoverIdeas({
+      articles: [
+        article({ id: 20, title: 'US strikes on Iran push oil prices up', category: 'world' }),
+        article({ id: 21, title: 'US midterm election results: what changes for the dollar', category: 'world' }),
+        article({ id: 22, title: 'Senate passes a bill on state funding', category: 'world' }),
+        article({ id: 23, title: 'PTI announces a protest in Islamabad', category: 'world' }),
+        article({ id: 24, title: 'Binance hack: $6.3bn moved out', category: 'business', isBreaking: true }),
+      ],
+      trends: ['US strikes Iran oil prices', 'US midterm election results dollar', 'PTI announces protest Islamabad', 'Binance hack $6.3bn moved'],
+      now: NOW,
+    })
+    const by = (id: number) => found.find((i) => i.articleId === id)
+    expect(by(20)).toMatchObject({ trending: true, risk: 'needs-veto', origin: 'trend' })
+    expect(by(21)).toMatchObject({ trending: true, risk: 'needs-veto' })
+    expect(by(22)).toBeUndefined()
+    expect(by(23)).toBeUndefined()
+    // a breaking story that also trends is the big one: kept (the flash covers breaking news that does not trend)
+    expect(by(24)).toMatchObject({ trending: true })
+    expect(found.find((i) => i.articleId === 20 && scoreIdea(i, NOW) > 0)).toBeUndefined()
+  })
+
+  it('merge keeps the trending flag and still never touches a decision', async () => {
+    const store = new IdeaStore(memoryIdeaRedis())
+    const a = idea({ title: war, decision: 'ok' })
+    await store.put(a)
+    await store.merge([{ ...a, trending: true, decision: undefined, baseScore: 40 }])
+    expect(await store.get(a.id)).toMatchObject({ trending: true, decision: 'ok', baseScore: 40 })
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { IdeaStore, ideaId, memoryIdeaRedis, type Idea } from './ideas.js'
+import { IdeaStore, ideaId, memoryIdeaRedis, scoreIdea, type Idea } from './ideas.js'
 import { explainerRoutes } from './routes.js'
 
 const NOW = Date.UTC(2026, 9, 24, 8)
@@ -19,10 +19,29 @@ describe('explainer routes', () => {
     expect(list[0]!.risk).toBe('needs-veto')
   })
 
-  it('refuses a government topic from the editor', async () => {
+  it('refuses a government topic from the editor unless it is a trending story with 2+ sources', async () => {
     const routes = explainerRoutes(new IdeaStore(memoryIdeaRedis()), () => NOW, vi.fn())
     const res = await routes('POST', '/ideas', { title: 'Federal budget explained for beginners', angle: 'what the finance minister announced and why' })
     expect(res!.status).toBe(400)
+    const one = await routes('POST', '/ideas', { title: 'How the US midterm election works', angle: 'what changes for the dollar and for Pakistan', trending: true, sources: ['https://example.com/a'] })
+    expect(one!.status).toBe(400)
+  })
+
+  it('adds a trending war or election story as needs-veto; the editor ok lets it run; hard blocks are refused', async () => {
+    const store = new IdeaStore(memoryIdeaRedis())
+    const routes = explainerRoutes(store, () => NOW, vi.fn())
+    const sources = ['https://example.com/a', 'https://example.com/b']
+    const added = await routes('POST', '/ideas', { title: 'What US-Iran strikes mean for petrol prices in Pakistan', angle: 'how the Hormuz situation reaches the pump price', trending: true, sources, hours: 48 })
+    expect(added!.status).toBe(200)
+    const id = (added!.body as { id: string }).id
+    expect((await store.get(id))).toMatchObject({ trending: true, risk: 'needs-veto' })
+    const waiting = (await routes('GET', '/ideas', {}))!.body as { title: string; trending: boolean }[]
+    expect(waiting.map((i) => i.title)).toContain('What US-Iran strikes mean for petrol prices in Pakistan')
+    expect(waiting[0]!.trending).toBe(true)
+    await routes('POST', `/ideas/${id}`, { decision: 'boost', note: 'big trending story, sourced' })
+    expect(scoreIdea((await store.get(id))!, NOW)).toBeGreaterThan(0)
+    const blocked = await routes('POST', '/ideas', { title: 'PTI long march explained step by step', angle: 'what the party plans and why it matters', trending: true, sources })
+    expect(blocked!.status).toBe(400)
   })
 
   it('adds an idea (sensitive ones are flagged), decides on it, and queues a run', async () => {

@@ -110,6 +110,8 @@ New pure module `src/captions.ts`:
 4. Category tags: pakistan → `#Pakistan`, business → `#Business`, world → `#WorldNews`, tech-telecom → `#Tech`, ai → `#ArtificialIntelligence`, cricket → `#Cricket`, education-jobs → `#Jobs`.
 5. Brand `#Zaviya` is always last.
 
+**Newsroom posts (`apps/worker/src/social/hashtags.ts`, 4 Nov 2026):** three tags at most, brand last. A story that matches a current trend (Google Trends PK or X trends, remembered by `rememberTrends` when the feeds are read and restored from Redis at start; ignored after 6 h) gets that trend's tag first (at most two). The whole trend in the headline, or two of its words in the headline or tags, is a match. Political-party, party-leader and army tags (`isPartyTag`) are never used.
+
 **Per-platform rules:**
 
 | Platform | Hashtags | Caption |

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { finalizeCopy, pickHashtags, stripHashtags, toHashtag } from './hashtags.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import { currentTrends, finalizeCopy, hydrateTrends, isPartyTag, pickHashtags, rememberTrends, stripHashtags, toHashtag, trendHashtag } from './hashtags.js'
 
 describe('hashtags', () => {
   it('camel-cases entities and drops generic or non-latin ones', () => {
@@ -24,3 +24,63 @@ describe('hashtags', () => {
     expect(out.x).toContain('#IMF')
   })
 })
+
+describe('trending hashtags', () => {
+  afterEach(() => {
+    rememberTrends('google', [])
+    rememberTrends('x', [])
+  })
+
+  it('puts the trending topic first when the story matches a trend, three tags at most, brand last', () => {
+    const tags = pickHashtags({
+      tags: ['Binance', 'Crypto'],
+      category: 'business',
+      title: 'Binance hack: $6.3bn moved, what Pakistani users should check',
+      trends: ['binance hack', 'psl draft'],
+    })
+    expect(tags).toEqual(['#BinanceHack', '#Binance', '#Zaviya'])
+  })
+
+  it('matches on words, not only the whole phrase, and ignores trends the story is not about', () => {
+    expect(trendHashtag('us iran strikes', { title: 'Iran strike on a US base pushes oil above $100', tags: [] })).toBe('#IranStrikes')
+    expect(trendHashtag('binance', { title: 'Binance pauses withdrawals', tags: [] })).toBe('#Binance')
+    expect(trendHashtag('psl draft', { title: 'Petrol price cut from Friday', tags: [] })).toBeNull()
+    expect(trendHashtag('iran news today', { title: 'Cricket: Pakistan beat Australia', tags: ['Cricket'] })).toBeNull()
+    expect(trendHashtag('', { title: 'x', tags: [] })).toBeNull()
+  })
+
+  it('never uses a political-party, leader or army tag, from a trend or from the story tags', () => {
+    expect(isPartyTag('#PTI')).toBe(true)
+    expect(isPartyTag('#PMLN')).toBe(true)
+    expect(isPartyTag('#ImranKhan')).toBe(true)
+    expect(isPartyTag('#ISPR')).toBe(true)
+    expect(isPartyTag('#Petrol')).toBe(false)
+    expect(trendHashtag('pti', { title: 'PTI announces rally', tags: [] })).toBeNull()
+    const tags = pickHashtags({ tags: ['PTI', 'Imran Khan', 'Lahore'], category: 'pakistan', title: 'PTI rally in Lahore draws crowd', trends: ['pti rally'] })
+    expect(tags.some((t) => isPartyTag(t))).toBe(false)
+    expect(tags).toContain('#Lahore')
+    expect(tags.length).toBeLessThanOrEqual(3)
+  })
+
+  it('finalizeCopy reads the remembered trends, and old ones expire', () => {
+    rememberTrends('google', ['binance hack'])
+    const out = finalizeCopy({ facebook: 'f', instagram: 'i', x: 'x' }, { tags: ['Binance'], category: 'business', title: 'Binance hack explained' })
+    expect(out.instagram).toContain('#BinanceHack')
+    expect(out.facebook).toContain('#BinanceHack')
+    expect(out.instagram.match(/#\w+/g)!.length).toBeLessThanOrEqual(3)
+    expect(currentTrends(Date.now() + 7 * 3_600_000)).toEqual([])
+    rememberTrends('google', [])
+    expect(finalizeCopy({ facebook: 'f', instagram: 'i', x: 'x' }, { tags: ['Binance'], category: 'business', title: 'Binance hack explained' }).instagram).not.toContain('#BinanceHack')
+  })
+
+  it('reads the last snapshots back from redis after a restart', async () => {
+    const data: Record<string, string> = {
+      'zaviya:trends:pk': JSON.stringify({ at: new Date().toISOString(), trends: [{ query: 'binance hack' }] }),
+      'zaviya:trends:x': JSON.stringify({ at: new Date().toISOString(), trends: [{ name: 'Hormuz' }] }),
+    }
+    await hydrateTrends({ get: async (k) => data[k] ?? null })
+    expect(currentTrends()).toEqual(['binance hack', 'Hormuz'])
+    await hydrateTrends({ get: async () => 'not json' })
+  })
+})
+

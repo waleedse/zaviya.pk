@@ -18,6 +18,7 @@ import { isAllowedByRobots } from './ingest/robots.js'
 import { fetchArticleText } from './ingest/extract.js'
 import { fetchCuratedTweets } from './ingest/x.js'
 import { fetchTrends, isTrendsUrl, trendsToSourceItems } from './ingest/trends.js'
+import { hydrateTrends, rememberTrends } from './social/hashtags.js'
 import { DEFAULT_X_QUERIES, runDiscovery, X_TRENDS_KEY } from './ingest/discovery.js'
 import { runLearningJob } from './pipeline/learning.js'
 import { Redis } from 'ioredis'
@@ -117,6 +118,8 @@ export async function createWorkerRuntime(
   }
 
   const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null })
+  // the trending terms social hashtags match against survive a restart (ZAV hashtags: trending topic tag)
+  void hydrateTrends(redis)
 
   const queues = Object.fromEntries(
     QUEUE_NAMES.map((name) => [name, new Queue(name, { connection, defaultJobOptions: defaultJobOpts })]),
@@ -174,6 +177,7 @@ export async function createWorkerRuntime(
         } else if (isTrendsUrl(url)) {
           const trends = await fetchTrends(url)
           await redis.set(TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends }))
+          rememberTrends('google', trends.map((t) => t.query))
           inputs = trendsToSourceItems(sourceId, trends)
         } else {
           const feed = await fetchRssFeed(url, { etag })
@@ -448,6 +452,7 @@ export async function createWorkerRuntime(
         })
         if (result.xTrends.length) {
           await redis.set(X_TRENDS_KEY, JSON.stringify({ at: new Date().toISOString(), trends: result.xTrends }))
+          rememberTrends('x', result.xTrends.map((t) => t.name))
         }
         if (result.items.length) await storeItems(result.items)
         if (result.errors.some((e) => /checkpoint/.test(e))) {
