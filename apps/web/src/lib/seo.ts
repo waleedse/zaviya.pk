@@ -2,6 +2,7 @@ import { DATA_PAGES, SITE, type Locale } from '@zaviya/shared'
 import type { ArticleCard, ArticleFull, FAQ } from '@zaviya/shared'
 import type { Metadata } from 'next'
 import { urduEnabled } from './i18n'
+import { discoverImage } from './hero-image'
 
 export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://zaviya.pk').replace(/\/$/, '')
 
@@ -177,7 +178,8 @@ export function articleKeywords(article: ArticleCard & { tags?: { name: string }
 
 /** The share picture: the article's own photo (the generated text card only when it has none). */
 export function articleShareImage(article: ArticleCard): { url: string; size?: { width: number; height: number } } {
-  if (article.image?.url) return { url: article.image.url, size: { width: article.image.width, height: article.image.height } }
+  const img = discoverImage(article.image)
+  if (img) return { url: img.url, size: { width: img.width, height: img.height } }
   return { url: articleOgUrl(article) }
 }
 
@@ -298,7 +300,10 @@ export function newsArticleJsonLd(article: ArticleFull, locale: Locale) {
     headline: article.title,
     description: article.dek,
     // No hero image: fall back to the generated 1200x630 social card, never an empty list.
-    image: [article.image?.url ? (article.image.url.startsWith('/') ? absoluteUrl(article.image.url) : article.image.url) : articleOgUrl(article)],
+    image: [(() => {
+      const img = discoverImage(article.image)
+      return img ? (img.url.startsWith('/') ? absoluteUrl(img.url) : img.url) : articleOgUrl(article)
+    })()],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt ?? article.publishedAt,
     ...(articleKeywords(article).length ? { keywords: articleKeywords(article).join(', ') } : {}),

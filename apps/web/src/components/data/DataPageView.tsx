@@ -15,7 +15,7 @@ import { breadcrumbJsonLd, faqJsonLd } from '@/lib/seo'
 import { formatChange, formatNumber, formatPktTime, todayPktDate } from '@/lib/format'
 import { localePath, t } from '@/lib/i18n'
 
-export default function DataPageView({ locale, page, slug }: { locale: Locale; page: DataPageFull; slug: string }) {
+export default function DataPageView({ locale, page, slug, pastDays = [] }: { locale: Locale; page: DataPageFull; slug: string; pastDays?: { date: string; label: string; href: string }[] }) {
   const d = t(locale)
   const isUr = locale === 'ur'
   const h = page.headline
@@ -122,6 +122,25 @@ export default function DataPageView({ locale, page, slug }: { locale: Locale; p
             <strong className="text-fg-muted">{d.source}:</strong> {page.source}
           </p>
 
+          {pastDays.length > 0 && !isUr && (
+            <section className="my-8">
+              <h2 className="mb-3 font-display text-h2 font-extrabold">{page.title.replace(/ today/i, '')}: earlier days</h2>
+              <ul className="flex flex-wrap gap-2">
+                {pastDays.map((p) => (
+                  <li key={p.date}>
+                    <Link href={p.href} className="chip">
+                      {p.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link href={`/${slug}/history`} className="chip font-bold">
+                    All days
+                  </Link>
+                </li>
+              </ul>
+            </section>
+          )}
           <FAQAccordion faqs={page.faqs} locale={locale} />
         </div>
 

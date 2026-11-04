@@ -34,6 +34,8 @@ import { ArticleCard } from '@/components/article/ArticleCard'
 import { ArticleToolbar } from '@/components/article/ArticleToolbar'
 import { AuthorAvatar } from '@/components/article/AuthorBox'
 import { isSmogStory } from '@/lib/aqi'
+import { discoverImage } from '@/lib/hero-image'
+import { ArticleResultLinks } from '@/components/results/ArticleResultLinks'
 import { NextPrayerCard } from '@/components/namaz/NextPrayerCard'
 import { WhatsAppCTA } from '@/components/marketing/WhatsAppCTA'
 import { todayForAllCities } from '@/lib/prayer-times'
@@ -119,6 +121,7 @@ export default async function ArticlePage({ params }: Props) {
   const namaz = todayForAllCities()
 
   const publicPath = article.href
+  const heroPhoto = discoverImage(article.image)
 
   return (
     <>
@@ -197,7 +200,13 @@ export default async function ArticlePage({ params }: Props) {
             {article.image && (
               <figure className="my-8">
                 <div className="relative aspect-video overflow-hidden rounded-[var(--radius-card)] bg-surface-2">
-                  <Image src={article.image.url} alt={article.image.alt} fill priority className="object-cover" sizes="(max-width:1024px) 100vw, 900px" />
+                  {heroPhoto?.enlarged ? (
+                    // Narrow stored photo: the enlarged 1280 px copy is already an optimised JPEG, so it skips next/image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={heroPhoto.url} alt={article.image.alt} width={heroPhoto.width} height={heroPhoto.height} fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <Image src={article.image.url} alt={article.image.alt} fill priority className="object-cover" sizes="(max-width:1024px) 100vw, 900px" />
+                  )}
                 </div>
                 {(article.image.credit || article.image.alt) && (
                   <figcaption className="mt-2.5 flex flex-wrap justify-between gap-2 text-[13px] text-fg-subtle">
@@ -229,6 +238,7 @@ export default async function ArticlePage({ params }: Props) {
                   </Link>
                 </p>
               )}
+              {!isUr && <ArticleResultLinks title={article.title} dek={article.dek} />}
               {article.tags.length > 0 && (
                 <div className="my-8 flex flex-wrap gap-2">
                   {article.tags.map((tag, i) =>

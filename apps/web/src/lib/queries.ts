@@ -22,6 +22,7 @@ import { categoryRef, mockArticle, mockCards, mockRates, articleHref } from './m
 import { getPayloadClient } from './payload'
 import { findReplacementHref, type FindApi } from './duplicate-redirect'
 import { getLearning } from './learning'
+import { getDerivedUpcoming } from './results-data'
 import { LATEST_PAGE_SIZE } from './tag-rules'
 import { groupStoryDigests, pktDate, type StoryDigest } from './web-stories'
 import { ARCHIVE_DAYS, archiveDayRange } from './archive'
@@ -766,6 +767,9 @@ export const getUpcoming = cache(async (limit = 5): Promise<UpcomingEvent[]> => 
   } catch {
     list = []
   }
+  // Result dates and winter breaks that have a source (Payload `result-exams` / `vacation-notices`)
+  const derived = await getDerivedUpcoming(today).catch(() => [])
+  list = [...list, ...derived.filter((d) => !list.some((e) => e.href === d.href && e.date === d.date))]
   const fuel = nextFuelReview()
   const all = list.some((e) => e.kind === 'prices' && e.date === fuel.date) ? list : [...list, fuel]
   // ZAV-206: SBP policy / MPC rows link to the policy rate page unless the list already carries a link

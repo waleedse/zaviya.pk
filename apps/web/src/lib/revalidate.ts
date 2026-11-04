@@ -34,3 +34,9 @@ export async function revalidatePhonePages() {
   safeRevalidate(() => revalidatePath('/[locale]/mobile/[slug]', 'page'))
   safeRevalidate(() => revalidatePath('/[locale]/compare/[pair]', 'page'))
 }
+
+export const RESULTS_TAG = 'results-data'
+
+export async function revalidateResultsTag() {
+  safeRevalidate(() => revalidateTag(RESULTS_TAG, 'max'))
+}

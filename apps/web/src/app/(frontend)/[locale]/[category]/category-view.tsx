@@ -11,6 +11,8 @@ import { LatestList } from '@/components/article/LatestList'
 import { publicPath } from '@/lib/locale'
 import { localePath, t } from '@/lib/i18n'
 import { dataPageSlugToKey, SECTION_SEO } from '@/lib/seo'
+import { rateDateLabel, rateDayPath, rateFamilyBySlug } from '@/lib/rate-history'
+import { getRateDays } from '@/lib/rate-history-data'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { breadcrumbJsonLd } from '@/lib/seo'
 
@@ -21,7 +23,11 @@ export async function renderCategoryPage(locale: Locale, category: string, pageN
   const dataKey = dataPageSlugToKey(category)
   if (dataKey) {
     const page = await getDataPage(locale, dataKey)
-    return <DataPageView locale={locale} page={page} slug={category} />
+    const family = rateFamilyBySlug(category)
+    const pastDays = family
+      ? (await getRateDays(family, 8)).slice(1, 8).map((d) => ({ date: d.date, label: rateDateLabel(d.date), href: rateDayPath(family, d.date) }))
+      : []
+    return <DataPageView locale={locale} page={page} slug={category} pastDays={pastDays} />
   }
 
   const feed = await getCategoryFeed(locale, category, pageNum)

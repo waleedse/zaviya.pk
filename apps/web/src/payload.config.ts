@@ -27,6 +27,10 @@ import { MetricsDaily } from './collections/MetricsDaily'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { PhoneBrands } from './collections/PhoneBrands'
 import { Phones } from './collections/Phones'
+import { ResultBoards } from './collections/ResultBoards'
+import { ResultExams } from './collections/ResultExams'
+import { VacationNotices } from './collections/VacationNotices'
+import { SchoolClosures } from './collections/SchoolClosures'
 import { Settings } from './globals/Settings'
 import { FrontPage } from './globals/FrontPage'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
@@ -34,6 +38,7 @@ import { ANALYTICS_DDL } from './lib/analytics'
 import { NEWSLETTER_DDL } from './lib/newsletter'
 import { ensureBootstrapCategories } from './lib/category-bootstrap'
 import { ensureBootstrapSources } from './lib/source-bootstrap'
+import { ensureResultsSeed } from './lib/results-seed'
 import { LEARNING_DDL } from './lib/learning'
 import { migrations } from './migrations'
 
@@ -97,6 +102,10 @@ export default buildConfig({
     PushSubscriptions,
     PhoneBrands,
     Phones,
+    ResultBoards,
+    ResultExams,
+    VacationNotices,
+    SchoolClosures,
   ],
   globals: [Settings, FrontPage],
   localization: {
@@ -165,6 +174,13 @@ export default buildConfig({
         if (made.length) payload.logger.info({ made }, 'bootstrap sources created')
       } catch (err) {
         payload.logger.error({ err }, 'bootstrap sources failed (retried on next boot)')
+      }
+
+      try {
+        const made = await ensureResultsSeed(payload)
+        if (made.length) payload.logger.info({ made }, 'results/vacation seed created')
+      } catch (err) {
+        payload.logger.error({ err }, 'results seed failed (retried on next boot)')
       }
 
       await drizzle.execute(sql`

@@ -1,5 +1,5 @@
 import type { CollectionAfterChangeHook } from 'payload'
-import { revalidateArticle, revalidateCategory, revalidateHome, revalidateDataTag } from '../lib/revalidate'
+import { revalidateArticle, revalidateCategory, revalidateHome, revalidateDataTag, revalidateResultsTag } from '../lib/revalidate'
 
 const SERIES_TO_DATA_KEY: Record<string, string> = {
   gold_24k_tola: 'gold',
@@ -33,5 +33,11 @@ export const revalidateDataPoint: CollectionAfterChangeHook = async ({ doc }) =>
     const key = SERIES_TO_DATA_KEY[series]
     if (key) await revalidateDataTag(key)
   }
+  return doc
+}
+
+/** Result boards / exams / vacation notices / school closures changed: refresh the pages that read them. */
+export const revalidateResults: CollectionAfterChangeHook = async ({ doc }) => {
+  await revalidateResultsTag()
   return doc
 }
