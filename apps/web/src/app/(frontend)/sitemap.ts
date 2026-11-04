@@ -7,6 +7,7 @@ import { PK_CITIES } from '@/lib/prayer-times'
 import { sitemapArticleCutoff } from '@/lib/crawl-cache'
 import { getArchiveDays, getStoryDigests } from '@/lib/queries'
 import { archivePath } from '@/lib/archive'
+import { phoneSitemapEntries } from '@/lib/phones/sitemap'
 import { dailyStorySlug, DIGEST_MIN, WEB_STORY_DAYS, webStoriesPath } from '@/lib/web-stories'
 
 export const revalidate = 600
@@ -49,6 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/income-tax-return-deadline-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/aqi-pakistan`, changeFrequency: 'hourly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/riyal-dirham-rate-pakistan`, changeFrequency: 'daily', priority: 0.9 })
+  entries.push(...(await phoneSitemapEntries(siteUrl)))
   entries.push({ url: `${siteUrl}/latest`, changeFrequency: 'hourly', priority: 0.8 })
   entries.push({ url: `${siteUrl}/web-stories`, changeFrequency: 'hourly', priority: 0.6 })
   entries.push({ url: `${siteUrl}/widgets`, changeFrequency: 'monthly', priority: 0.6 })

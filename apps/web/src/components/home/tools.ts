@@ -1,4 +1,4 @@
-import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, MoonStar, Radio, type LucideIcon } from 'lucide-react'
+import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, MoonStar, Radio, Smartphone, type LucideIcon } from 'lucide-react'
 
 export interface ToolLink {
   path: string
@@ -21,6 +21,7 @@ export const TOOLS: ToolLink[] = [
   { path: '/namaz-timings#islamic-dates', en: 'Islamic calendar', ur: 'اسلامی کیلنڈر', subEn: 'Hijri dates & events', subUr: 'ہجری تاریخیں اور مواقع', icon: CalendarDays, tile: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
   { path: '/namaz-timings#qibla', en: 'Qibla direction', ur: 'قبلہ رخ', subEn: 'Bearing for your city', subUr: 'اپنے شہر کے لیے', icon: Compass, tile: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
   { path: '/live', en: 'Live updates', ur: 'لائیو اپ ڈیٹس', subEn: 'Developing stories', subUr: 'جاری خبریں', icon: Radio, tile: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' },
+  { path: '/mobile-prices', en: 'Mobile prices', ur: 'موبائل قیمتیں', subEn: 'Phone prices & specs in Pakistan', subUr: 'پاکستان میں موبائل کی قیمتیں اور خصوصیات', icon: Smartphone, tile: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
 ]
 
 export const QUICK_TOOLS = TOOLS.slice(0, 6)

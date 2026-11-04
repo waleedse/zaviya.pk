@@ -3,6 +3,7 @@ import * as migration_20261011_191032_r2_object_key from './20261011_191032_r2_o
 import * as migration_20261011_210826_media_alt_nullable from './20261011_210826_media_alt_nullable';
 import * as migration_20261012_200348_add_ai_category from './20261012_200348_add_ai_category';
 import * as migration_20261015_220642_front_page_plan from './20261015_220642_front_page_plan';
+import * as migration_20261103_192624_mobile_prices from './20261103_192624_mobile_prices';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20261015_220642_front_page_plan.up,
     down: migration_20261015_220642_front_page_plan.down,
-    name: '20261015_220642_front_page_plan'
+    name: '20261015_220642_front_page_plan',
+  },
+  {
+    up: migration_20261103_192624_mobile_prices.up,
+    down: migration_20261103_192624_mobile_prices.down,
+    name: '20261103_192624_mobile_prices'
   },
 ];

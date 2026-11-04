@@ -85,6 +85,8 @@ export interface Config {
     'prompt-versions': PromptVersion;
     'metrics-daily': MetricsDaily;
     'push-subscriptions': PushSubscription;
+    'phone-brands': PhoneBrand;
+    phones: Phone;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -110,6 +112,8 @@ export interface Config {
     'prompt-versions': PromptVersionsSelect<false> | PromptVersionsSelect<true>;
     'metrics-daily': MetricsDailySelect<false> | MetricsDailySelect<true>;
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
+    'phone-brands': PhoneBrandsSelect<false> | PhoneBrandsSelect<true>;
+    phones: PhonesSelect<false> | PhonesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -717,6 +721,126 @@ export interface PushSubscription {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phone-brands".
+ */
+export interface PhoneBrand {
+  id: number;
+  name: string;
+  slug: string;
+  order?: number | null;
+  /**
+   * The brand's Pakistan website
+   */
+  officialSite?: string | null;
+  /**
+   * Our own short intro for the brand page (no copied text)
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phones".
+ */
+export interface Phone {
+  id: number;
+  name: string;
+  slug: string;
+  brand: number | PhoneBrand;
+  launchDate?: string | null;
+  status?: ('current' | 'discontinued' | 'upcoming') | null;
+  /**
+   * Keep out of the site and the sitemap
+   */
+  hidden?: boolean | null;
+  /**
+   * 0-100: sort order and compare pairs
+   */
+  popularity?: number | null;
+  /**
+   * Product photo URL (official press image)
+   */
+  imageUrl?: string | null;
+  /**
+   * The brand's Pakistan page for this phone
+   */
+  officialUrl?: string | null;
+  /**
+   * Our own 2-3 sentence summary. Empty: one is generated from the specs.
+   */
+  summary?: string | null;
+  colours?:
+    | {
+        name: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * RAM + storage options. pricePkr empty = price not announced.
+   */
+  variants?:
+    | {
+        ramGb?: number | null;
+        storageGb: number;
+        pricePkr?: number | null;
+        priceSourceUrl?: string | null;
+        priceCheckedAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Lowest variant price (set automatically)
+   */
+  pricePkr?: number | null;
+  priceUpdatedAt?: string | null;
+  /**
+   * One row per official price change (written by the daily refresh)
+   */
+  priceHistory?:
+    | {
+        date: string;
+        variant: string;
+        pricePkr: number;
+        sourceUrl?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  pta?: {
+    status?: ('approved' | 'not-listed' | 'unknown') | null;
+    /**
+     * Only when an official PTA/FBR notification states it
+     */
+    taxPkr?: number | null;
+    sourceUrl?: string | null;
+    note?: string | null;
+  };
+  specs?: {
+    displaySize?: string | null;
+    displayType?: string | null;
+    displayResolution?: string | null;
+    refreshRateHz?: number | null;
+    chipset?: string | null;
+    os?: string | null;
+    network?: string | null;
+    sim?: string | null;
+    rearCamera?: string | null;
+    frontCamera?: string | null;
+    batteryMah?: number | null;
+    chargingW?: number | null;
+    weightG?: number | null;
+    dimensions?: string | null;
+    protection?: string | null;
+  };
+  /**
+   * Manufacturer spec page the specs were read from
+   */
+  specsSourceUrl?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -810,6 +934,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'push-subscriptions';
         value: number | PushSubscription;
+      } | null)
+    | ({
+        relationTo: 'phone-brands';
+        value: number | PhoneBrand;
+      } | null)
+    | ({
+        relationTo: 'phones';
+        value: number | Phone;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1294,6 +1426,92 @@ export interface PushSubscriptionsSelect<T extends boolean = true> {
       };
   locale?: T;
   userAgent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phone-brands_select".
+ */
+export interface PhoneBrandsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  order?: T;
+  officialSite?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phones_select".
+ */
+export interface PhonesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  brand?: T;
+  launchDate?: T;
+  status?: T;
+  hidden?: T;
+  popularity?: T;
+  imageUrl?: T;
+  officialUrl?: T;
+  summary?: T;
+  colours?:
+    | T
+    | {
+        name?: T;
+        id?: T;
+      };
+  variants?:
+    | T
+    | {
+        ramGb?: T;
+        storageGb?: T;
+        pricePkr?: T;
+        priceSourceUrl?: T;
+        priceCheckedAt?: T;
+        id?: T;
+      };
+  pricePkr?: T;
+  priceUpdatedAt?: T;
+  priceHistory?:
+    | T
+    | {
+        date?: T;
+        variant?: T;
+        pricePkr?: T;
+        sourceUrl?: T;
+        id?: T;
+      };
+  pta?:
+    | T
+    | {
+        status?: T;
+        taxPkr?: T;
+        sourceUrl?: T;
+        note?: T;
+      };
+  specs?:
+    | T
+    | {
+        displaySize?: T;
+        displayType?: T;
+        displayResolution?: T;
+        refreshRateHz?: T;
+        chipset?: T;
+        os?: T;
+        network?: T;
+        sim?: T;
+        rearCamera?: T;
+        frontCamera?: T;
+        batteryMah?: T;
+        chargingW?: T;
+        weightG?: T;
+        dimensions?: T;
+        protection?: T;
+      };
+  specsSourceUrl?: T;
   updatedAt?: T;
   createdAt?: T;
 }

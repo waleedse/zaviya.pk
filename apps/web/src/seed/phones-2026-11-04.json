@@ -1,0 +1,1129 @@
+[
+ {
+  "brand": "samsung",
+  "name": "Galaxy A07",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a075fzkdpkd/gallery/pk-galaxy-a07-sm-a075-sm-a075fzkdpkd-thumb-548696538",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a07-black-64gb-sm-a075fzkdpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a07-black-64gb-sm-a075fzkdpkd/",
+  "colours": [
+   "Black",
+   "Green",
+   "Light Violet"
+  ],
+  "specs": {
+   "batteryMah": 5000,
+   "chipset": "MediaTek G99 (MT6789)",
+   "weightG": 184,
+   "dimensions": "167.4 x 77.4 x 7.6. mm",
+   "displaySize": "6.7 inches",
+   "rearCamera": "50MP wide",
+   "frontCamera": "8MP"
+  },
+  "variants": [
+   {
+    "storageGb": 64,
+    "pricePkr": 45999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a07-black-64gb-sm-a075fzkdpkd/"
+   },
+   {
+    "storageGb": 128,
+    "pricePkr": 56999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a07-black-128gb-sm-a075fzkgpkd/"
+   }
+  ],
+  "popularity": 70
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A13",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a135fzkhpkd/gallery/pk-galaxy-a13-sm-a135-sm-a135fzkhpkd-thumb-532103494",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a13-black-128gb-sm-a135fzkhpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a13-black-128gb-sm-a135fzkhpkd/",
+  "colours": [
+   "Black",
+   "Light Blue",
+   "Orange",
+   "White"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 128,
+    "pricePkr": 62999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a13-black-128gb-sm-a135fzkhpkd/"
+   },
+   {
+    "storageGb": 64,
+    "pricePkr": 57999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a13-black-64gb-sm-a135fzkgpkd/"
+   }
+  ],
+  "popularity": 68
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A15",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a155fzkgpkd/gallery/pk-galaxy-a15-sm-a155-sm-a155fzkgpkd-thumb-539360499",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a15-black-128gb-sm-a155fzkgpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a15-black-128gb-sm-a155fzkgpkd/",
+  "colours": [
+   "Black",
+   "Blue",
+   "Yellow"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 128,
+    "pricePkr": 47499,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a15-black-128gb-sm-a155fzkgpkd/"
+   }
+  ],
+  "popularity": 66
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A17",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a175fzkcpkd/gallery/pk-galaxy-a17-sm-a175-sm-a175fzkcpkd-thumb-549001582",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-black-128gb-sm-a175fzkcpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-black-128gb-sm-a175fzkcpkd/",
+  "colours": [
+   "Black",
+   "Gray",
+   "Light Blue"
+  ],
+  "specs": {
+   "refreshRateHz": 90,
+   "displaySize": "6.7 inches",
+   "displayType": "Super AMOLED",
+   "rearCamera": "50MP wide + 5MP ultra-wide + 2MP macro",
+   "batteryMah": 5000,
+   "chipset": "MediaTek G99 (MT6789)",
+   "weightG": 190,
+   "dimensions": "164.4 x 77.9 x 7.5. mm",
+   "frontCamera": "13MP"
+  },
+  "variants": [
+   {
+    "storageGb": 128,
+    "pricePkr": 72999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-black-128gb-sm-a175fzkcpkd/"
+   },
+   {
+    "storageGb": 256,
+    "pricePkr": 94999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-black-256gb-sm-a175fzkopkd/"
+   }
+  ],
+  "popularity": 63
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A17 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a176bzkgpkd/gallery/pk-galaxy-a17-5g-sm-a176-sm-a176bzkgpkd-thumb-554071322",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-5g-black-256gb-sm-a176bzkgpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-5g-black-256gb-sm-a176bzkgpkd/",
+  "colours": [
+   "Black",
+   "Blue",
+   "Gray"
+  ],
+  "specs": {
+   "refreshRateHz": 90,
+   "displaySize": "6.7 inches",
+   "displayType": "Super AMOLED",
+   "rearCamera": "50MP wide + 5MP ultra-wide + 2MP macro",
+   "batteryMah": 5000,
+   "chipset": "Exynos 1330",
+   "weightG": 192,
+   "dimensions": "164.4 x 77.9 x 7.5. mm",
+   "frontCamera": "13MP"
+  },
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 99999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a17-5g-black-256gb-sm-a176bzkgpkd/"
+   }
+  ],
+  "popularity": 61
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A27 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a276bzkjpkd/gallery/pk-galaxy-a27-5g-sm-a276-sm-a276bzkjpkd-thumb-554203408",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a27-5g-black-256gb-sm-a276bzkjpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a27-5g-black-256gb-sm-a276bzkjpkd/",
+  "colours": [
+   "Black",
+   "Blue",
+   "Light Pink"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 133500,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a27-5g-black-256gb-sm-a276bzkjpkd/"
+   }
+  ],
+  "popularity": 59
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A34 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a346ezkepkd/gallery/pk-galaxy-a34-5g-sm-a346-sm-a346ezkepkd-thumb-538124900",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a34-5g-awesome-graphite-256gb-sm-a346ezkepkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a34-5g-awesome-graphite-256gb-sm-a346ezkepkd/",
+  "colours": [
+   "Awesome Graphite",
+   "Awesome Lime",
+   "Awesome Silver"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 114999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a34-5g-awesome-graphite-256gb-sm-a346ezkepkd/"
+   }
+  ],
+  "popularity": 56
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A35 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a356elbvpkd/gallery/pk-galaxy-a35-5g-sm-a356-sm-a356elbvpkd-thumb-541450220",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a35-5g-awesome-iceblue-256gb-sm-a356elbvpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a35-5g-awesome-iceblue-256gb-sm-a356elbvpkd/",
+  "colours": [
+   "Awesome Iceblue",
+   "Awesome Lemon",
+   "Awesome Lilac",
+   "Awesome Navy"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 99999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a35-5g-awesome-iceblue-256gb-sm-a356elbvpkd/"
+   }
+  ],
+  "popularity": 54
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A37 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a376bzavpkd/gallery/pk-galaxy-a37-5g-sm-a376-sm-a376bzavpkd-thumb-552380151",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a37-5g-awesome-charcoal-256gb-sm-a376bzavpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a37-5g-awesome-charcoal-256gb-sm-a376bzavpkd/",
+  "colours": [
+   "Awesome Charcoal",
+   "Awesome Graygreen",
+   "Awesome Lavender",
+   "Awesome White"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 164999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a37-5g-awesome-charcoal-256gb-sm-a376bzavpkd/"
+   }
+  ],
+  "popularity": 52
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A55 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a556elbwpkd/gallery/pk-galaxy-a55-5g-sm-a556-sm-a556elbwpkd-thumb-541456341",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a55-5g-awesome-iceblue-256gb-sm-a556elbwpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a55-5g-awesome-iceblue-256gb-sm-a556elbwpkd/",
+  "colours": [
+   "Awesome Iceblue",
+   "Awesome Lemon",
+   "Awesome Lilac",
+   "Awesome Navy"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 128999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a55-5g-awesome-iceblue-256gb-sm-a556elbwpkd/"
+   }
+  ],
+  "popularity": 49
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A56 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a566bzkwpkd/gallery/pk-galaxy-a56-5g-sm-a566-sm-a566bzkwpkd-thumb-545585766",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a56-5g-awesome-graphite-256gb-sm-a566bzkwpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a56-5g-awesome-graphite-256gb-sm-a566bzkwpkd/",
+  "colours": [
+   "Awesome Graphite",
+   "Awesome Lightgray",
+   "Awesome Olive",
+   "Awesome Pink"
+  ],
+  "specs": {
+   "displaySize": "6.7 inches",
+   "displayType": "Super AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 115999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a56-5g-awesome-graphite-256gb-sm-a566bzkwpkd/"
+   }
+  ],
+  "popularity": 47
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy A57 5G",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-a576bzappkd/gallery/pk-galaxy-a57-5g-sm-a576-sm-a576bzappkd-thumb-552382278",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a57-5g-awesome-gray-256gb-sm-a576bzappkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a57-5g-awesome-gray-256gb-sm-a576bzappkd/",
+  "colours": [
+   "Awesome Gray",
+   "Awesome Icyblue",
+   "Awesome Lilac",
+   "Awesome Navy"
+  ],
+  "specs": {
+   "batteryMah": 5000,
+   "displaySize": "6.7 inches",
+   "displayType": "Super AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 182999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a57-5g-awesome-gray-256gb-sm-a576bzappkd/"
+   },
+   {
+    "storageGb": 512,
+    "pricePkr": 249500,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-a/galaxy-a57-5g-awesome-gray-512gb-sm-a576bzawpkd/"
+   }
+  ],
+  "popularity": 45
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy S24 FE",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-s721blbcpkd/gallery/pk-galaxy-s24-fe-s721-sm-s721blbcpkd-thumb-543637923",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s24-fe-blue-256gb-sm-s721blbcpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s24-fe-blue-256gb-sm-s721blbcpkd/",
+  "colours": [
+   "Blue",
+   "Graphite",
+   "Marble Gray",
+   "Mint"
+  ],
+  "specs": {
+   "refreshRateHz": 120,
+   "displaySize": "6.7 inches",
+   "displayType": "AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 164999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s24-fe-blue-256gb-sm-s721blbcpkd/"
+   }
+  ],
+  "popularity": 42
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy S25 FE",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-s731blbwpkd/gallery/pk-galaxy-s25-fe-sm-s731-562279-sm-s731blbwpkd-thumb-549078383",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s25-fe-icyblue-512gb-sm-s731blbwpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s25-fe-icyblue-512gb-sm-s731blbwpkd/",
+  "colours": [
+   "Icyblue",
+   "Jetblack",
+   "Navy",
+   "White"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 512,
+    "pricePkr": 199999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s25-fe-icyblue-512gb-sm-s731blbwpkd/"
+   }
+  ],
+  "popularity": 40
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy S26 FE",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-s741bzvgpkd/gallery/pk-galaxy-s26-fe-sm-s741-605636-sm-s741bzvgpkd-thumb-554534612",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s26-fe-blueberry-256gb-sm-s741bzvgpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s26-fe-blueberry-256gb-sm-s741bzvgpkd/",
+  "colours": [
+   "Blueberry",
+   "Graphite",
+   "Pistachio"
+  ],
+  "specs": {
+   "refreshRateHz": 120,
+   "displaySize": "6.7 inches",
+   "displayType": "Dynamic AMOLED 2X"
+  },
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 249999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s26-fe-blueberry-256gb-sm-s741bzvgpkd/"
+   },
+   {
+    "storageGb": 512,
+    "pricePkr": 319999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-s/galaxy-s26-fe-blueberry-512gb-sm-s741bzvipkd/"
+   }
+  ],
+  "popularity": 38
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy Z Flip5",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-f731bzaapkd/gallery/pk-galaxy-z-flip5-f731-472126-sm-f731bzaapkd-thumb-538236872",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-flip5-graphite-256gb-sm-f731bzaapkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-flip5-graphite-256gb-sm-f731bzaapkd/",
+  "colours": [
+   "Graphite"
+  ],
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 256,
+    "pricePkr": 249999,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-flip5-graphite-256gb-sm-f731bzaapkd/"
+   }
+  ],
+  "popularity": 35
+ },
+ {
+  "brand": "samsung",
+  "name": "Galaxy Z Fold5",
+  "imageUrl": "https://images.samsung.com/is/image/samsung/p6pim/pk/sm-f946bzegpkd/gallery/pk-galaxy-z-fold5-f946-472130-sm-f946bzegpkd-thumb-538237532",
+  "officialUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-fold5-cream-512gb-sm-f946bzegpkd/",
+  "specsSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-fold5-cream-512gb-sm-f946bzegpkd/",
+  "colours": [
+   "Cream"
+  ],
+  "specs": {
+   "displaySize": "7.6 inches",
+   "displayType": "Dynamic AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "storageGb": 512,
+    "pricePkr": 328499,
+    "priceSourceUrl": "https://www.samsung.com/pk/smartphones/galaxy-z/galaxy-z-fold5-cream-512gb-sm-f946bzegpkd/"
+   }
+  ],
+  "popularity": 33
+ },
+ {
+  "brand": "vivo",
+  "name": "Y32",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1792059909582/a91ee10a30bc596d818a5235da49a762.png",
+  "officialUrl": "https://www.vivo.com/pk/products/y32",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/y32",
+  "specs": {
+   "batteryMah": 8000,
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "ramGb": 6,
+    "storageGb": 128,
+    "pricePkr": 82999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   },
+   {
+    "ramGb": 6,
+    "storageGb": 256,
+    "pricePkr": 99999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   }
+  ],
+  "popularity": 80
+ },
+ {
+  "brand": "vivo",
+  "name": "X200 FE",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1751888408565/43880ac865e0a47b14c11da6a080f2a6.png",
+  "officialUrl": "https://www.vivo.com/pk/products/x200-fe",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/x200-fe",
+  "specs": {},
+  "variants": [],
+  "popularity": 72
+ },
+ {
+  "brand": "vivo",
+  "name": "Y05",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1770641034728/0768f187d8bf7cf8fdab23e45f55ed25.png",
+  "officialUrl": "https://www.vivo.com/pk/products/y05",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/y05",
+  "specs": {
+   "batteryMah": 6500,
+   "refreshRateHz": 120
+  },
+  "variants": [
+   {
+    "ramGb": 4,
+    "storageGb": 64,
+    "pricePkr": 44999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   },
+   {
+    "ramGb": 4,
+    "storageGb": 128,
+    "pricePkr": 52999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   }
+  ],
+  "popularity": 64
+ },
+ {
+  "brand": "vivo",
+  "name": "V70",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1772263369827/7a8b69cbee1720c2f023c15978ac6c79.png",
+  "officialUrl": "https://www.vivo.com/pk/products/v70",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/v70",
+  "specs": {
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "ramGb": 8,
+    "storageGb": 256,
+    "pricePkr": 179999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   },
+   {
+    "ramGb": 12,
+    "storageGb": 512,
+    "pricePkr": 229999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   }
+  ],
+  "popularity": 55
+ },
+ {
+  "brand": "vivo",
+  "name": "X300 FE",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1783065845601/102f1197167f9734ff6a52423dc8ebfe.png",
+  "officialUrl": "https://www.vivo.com/pk/products/x300-fe",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/x300-fe",
+  "specs": {},
+  "variants": [],
+  "popularity": 47
+ },
+ {
+  "brand": "vivo",
+  "name": "Y500",
+  "imageUrl": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1781597357612/e6326839ef8eb528e810aa652410a6e6.png",
+  "officialUrl": "https://www.vivo.com/pk/products/y500",
+  "specsSourceUrl": "https://www.vivo.com/pk/products/y500",
+  "specs": {
+   "batteryMah": 8100,
+   "displayType": "AMOLED"
+  },
+  "variants": [
+   {
+    "ramGb": 6,
+    "storageGb": 128,
+    "pricePkr": 89999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   },
+   {
+    "ramGb": 6,
+    "storageGb": 256,
+    "pricePkr": 114999,
+    "priceSourceUrl": "https://www.vivo.com/pk/products"
+   }
+  ],
+  "popularity": 39
+ },
+ {
+  "brand": "realme",
+  "name": "Note 70",
+  "imageUrl": "https://image01.realme.net/general/20250905/17570531146121c24c39ae5954fdb8dc45cbfc69eb46a.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-note-70",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-note-70",
+  "specs": {
+   "batteryMah": 6300,
+   "chargingW": 15,
+   "refreshRateHz": 90,
+   "rearCamera": "13MP main"
+  },
+  "variants": [],
+  "popularity": 80
+ },
+ {
+  "brand": "realme",
+  "name": "Note 60x",
+  "imageUrl": "https://image01.realme.net/general/20250120/173733924005311c87ce8ad974e009c8bff77dbb20acc.png",
+  "officialUrl": "https://www.realme.com/pk/realme-note-60x",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-note-60x",
+  "specs": {
+   "batteryMah": 5000,
+   "refreshRateHz": 90
+  },
+  "variants": [
+   {
+    "storageGb": 0,
+    "pricePkr": 20999,
+    "priceSourceUrl": "https://www.realme.com/pk/"
+   }
+  ],
+  "popularity": 78
+ },
+ {
+  "brand": "realme",
+  "name": "Note 60",
+  "imageUrl": "https://image01.realme.net/general/20240919/1726727360877317107e81a38435b84521b9aac3aa030.png",
+  "officialUrl": "https://www.realme.com/pk/realme-note60",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-note60",
+  "specs": {},
+  "variants": [
+   {
+    "storageGb": 0,
+    "pricePkr": 26999,
+    "priceSourceUrl": "https://www.realme.com/pk/"
+   }
+  ],
+  "popularity": 76
+ },
+ {
+  "brand": "realme",
+  "name": "Note 50",
+  "imageUrl": "https://image01.realme.net/general/20240221/1708501473325f9abd74c238e45c6af425e214247f95d.png",
+  "officialUrl": "https://www.realme.com/pk/realme-note50",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-note50",
+  "specs": {
+   "batteryMah": 5000
+  },
+  "variants": [
+   {
+    "storageGb": 0,
+    "pricePkr": 24999,
+    "priceSourceUrl": "https://www.realme.com/pk/"
+   }
+  ],
+  "popularity": 74
+ },
+ {
+  "brand": "realme",
+  "name": "Note 80",
+  "imageUrl": "https://image01.realme.net/general/20260930/1790751526043df2cf402689541d194986750566883c3.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-note80",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-note80",
+  "specs": {
+   "batteryMah": 6300,
+   "refreshRateHz": 90
+  },
+  "variants": [],
+  "popularity": 72
+ },
+ {
+  "brand": "realme",
+  "name": "C100",
+  "imageUrl": "https://image01.realme.net/general/20260831/1788156436480ea1d697b7bed4886863a3e56ecaf4da0.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-c100",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c100",
+  "specs": {
+   "batteryMah": 8000,
+   "chargingW": 45,
+   "refreshRateHz": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 70
+ },
+ {
+  "brand": "realme",
+  "name": "C100i",
+  "imageUrl": "https://image01.realme.net/general/20260601/1780303094364f4bbca2792564dbd8dedd969914efdf7.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-c100i",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c100i",
+  "specs": {
+   "batteryMah": 7000,
+   "refreshRateHz": 120
+  },
+  "variants": [],
+  "popularity": 68
+ },
+ {
+  "brand": "realme",
+  "name": "C85",
+  "imageUrl": "https://image01.realme.net/general/20260106/17676913357820e6169c715eb445e811ea141a0855edd.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-c85",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c85",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 45,
+   "refreshRateHz": 144
+  },
+  "variants": [],
+  "popularity": 66
+ },
+ {
+  "brand": "realme",
+  "name": "C85 Pro",
+  "imageUrl": "https://image01.realme.net/general/20251031/1761903590198e79abec32e494d5795d5d832b3849e76.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-c85-pro",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c85-pro",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 45,
+   "displayType": "AMOLED"
+  },
+  "variants": [],
+  "popularity": 64
+ },
+ {
+  "brand": "realme",
+  "name": "C100x",
+  "imageUrl": "https://image01.realme.net/general/20260831/17881564551192ff0c47bed654e4bbed4bdd9c8f7a4f4.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-c100x",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c100x",
+  "specs": {
+   "batteryMah": 8000,
+   "chargingW": 45,
+   "refreshRateHz": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 62
+ },
+ {
+  "brand": "realme",
+  "name": "C75x",
+  "imageUrl": "https://image01.realme.net/general/20250407/1744007637002815e8c2a899d428ca89148bbb5bccea0.png",
+  "officialUrl": "https://www.realme.com/pk/realme-c75x",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c75x",
+  "specs": {
+   "batteryMah": 5600,
+   "refreshRateHz": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 60
+ },
+ {
+  "brand": "realme",
+  "name": "C71",
+  "imageUrl": "https://image01.realme.net/general/20250603/1748913697462ea9c2945beae4c68ac201dbcc2a10509.png",
+  "officialUrl": "https://www.realme.com/pk/realme-c71",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c71",
+  "specs": {
+   "batteryMah": 6300,
+   "chargingW": 45,
+   "refreshRateHz": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 58
+ },
+ {
+  "brand": "realme",
+  "name": "C75",
+  "imageUrl": "https://image01.realme.net/general/20241212/17339679873027b691f7443c145b6a14e7be528f17f71.png",
+  "officialUrl": "https://www.realme.com/pk/realme-c75",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-c75",
+  "specs": {
+   "batteryMah": 6000,
+   "refreshRateHz": 90,
+   "rearCamera": "50MP main"
+  },
+  "variants": [
+   {
+    "storageGb": 0,
+    "pricePkr": 46999,
+    "priceSourceUrl": "https://www.realme.com/pk/"
+   }
+  ],
+  "popularity": 55
+ },
+ {
+  "brand": "realme",
+  "name": "16 Pro+ 5G",
+  "imageUrl": "https://image01.realme.net/general/20260406/1775471669381f913c1b543364e85a6e56a29d0a04557.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-16-pro-plus-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-16-pro-plus-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "rearCamera": "200MP main"
+  },
+  "variants": [],
+  "popularity": 53
+ },
+ {
+  "brand": "realme",
+  "name": "16 5G",
+  "imageUrl": "https://image01.realme.net/general/20260406/177547165622144b1d3d2d1dd4226af37fc352d6544a9.png",
+  "officialUrl": "https://www.realme.com/pk/realme-16-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-16-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 60,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 51
+ },
+ {
+  "brand": "realme",
+  "name": "15 Pro 5G",
+  "imageUrl": "https://image01.realme.net/general/20251009/176000570624545519f69ed8142cba67551f7417aa196.png",
+  "officialUrl": "https://www.realme.com/pk/realme-15-pro-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-15-pro-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 80,
+   "refreshRateHz": 144,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 49
+ },
+ {
+  "brand": "realme",
+  "name": "15 5G",
+  "imageUrl": "https://image01.realme.net/general/20251009/17600056997380738d9cfbbeb4d61a05a3d33e5a35ada.png",
+  "officialUrl": "https://www.realme.com/pk/realme-15-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-15-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 80,
+   "refreshRateHz": 144,
+   "displayType": "AMOLED"
+  },
+  "variants": [],
+  "popularity": 47
+ },
+ {
+  "brand": "realme",
+  "name": "16 Pro 5G",
+  "imageUrl": "https://image01.realme.net/general/20260406/17754716644395190907aa2d7453eb0b242f400140f06.webp",
+  "officialUrl": "https://www.realme.com/pk/realme-16-pro-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-16-pro-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 80,
+   "rearCamera": "200MP main"
+  },
+  "variants": [],
+  "popularity": 45
+ },
+ {
+  "brand": "realme",
+  "name": "14 5G",
+  "imageUrl": "https://image01.realme.net/general/20250627/175101971516774ea115eced242dcb8d70086ab899b0a.png",
+  "officialUrl": "https://www.realme.com/pk/realme-14-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-14-5g",
+  "specs": {
+   "batteryMah": 6000,
+   "refreshRateHz": 120,
+   "displayType": "AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 43
+ },
+ {
+  "brand": "realme",
+  "name": "15T",
+  "imageUrl": "https://image01.realme.net/general/20251009/1760005717145d3f584a61b4349b8b810ce90b3c8ae22.png",
+  "officialUrl": "https://www.realme.com/pk/realme-15t-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-15t-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 60,
+   "displayType": "AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 41
+ },
+ {
+  "brand": "realme",
+  "name": "14T 5G",
+  "imageUrl": "https://image01.realme.net/general/20250627/1751020010169fdf5408ad8bc47fc94f2db8224d8eadb.png",
+  "officialUrl": "https://www.realme.com/pk/realme-14t-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-14t-5g",
+  "specs": {
+   "batteryMah": 6000,
+   "chargingW": 45,
+   "refreshRateHz": 120,
+   "displayType": "AMOLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 39
+ },
+ {
+  "brand": "realme",
+  "name": "GT 7",
+  "imageUrl": "https://image01.realme.net/general/20250804/17543025196351a003b464e124788825ea82a0379ae32.png",
+  "officialUrl": "https://www.realme.com/pk/realme-gt-7-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-gt-7-5g",
+  "specs": {
+   "batteryMah": 7000,
+   "chargingW": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 37
+ },
+ {
+  "brand": "realme",
+  "name": "GT 6",
+  "imageUrl": "https://image01.realme.net/general/20240930/17276900542087384988e264e48b28f06e74590b36c55.png",
+  "officialUrl": "https://www.realme.com/pk/realme-gt-6",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-gt-6",
+  "specs": {
+   "batteryMah": 5500,
+   "refreshRateHz": 120
+  },
+  "variants": [
+   {
+    "storageGb": 0,
+    "pricePkr": 149999,
+    "priceSourceUrl": "https://www.realme.com/pk/"
+   }
+  ],
+  "popularity": 35
+ },
+ {
+  "brand": "realme",
+  "name": "GT 7T",
+  "imageUrl": "https://image01.realme.net/general/20250804/1754302604007fcf4f6416cfb4f8e9adf39b2fb8ea806.png",
+  "officialUrl": "https://www.realme.com/pk/realme-gt-7t-5g",
+  "specsSourceUrl": "https://www.realme.com/pk/realme-gt-7t-5g",
+  "specs": {},
+  "variants": [],
+  "popularity": 33
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno16 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/oppo-reno16-series-en/list-page/reno16/480-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno16/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno16/",
+  "specs": {},
+  "variants": [],
+  "popularity": 80
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno16 F 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/oppo-reno16-series-en/list-page/reno16-f/480-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno16-f/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno16-f/",
+  "specs": {},
+  "variants": [],
+  "popularity": 78
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno15 Pro 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/reno15-series-en/list-page/reno15-pro/480-600-blue.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15-pro/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15-pro/",
+  "specs": {},
+  "variants": [],
+  "popularity": 75
+ },
+ {
+  "brand": "oppo",
+  "name": "A6k",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/a6t-series/b4/list-page/a6t/480-600-blue.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-a/a6k/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-a/a6k/",
+  "specs": {
+   "refreshRateHz": 120,
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 73
+ },
+ {
+  "brand": "oppo",
+  "name": "A6 Pro",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/a6-pro-series/list-page/448-600-red.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-a/a6-pro/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-a/a6-pro/",
+  "specs": {
+   "chargingW": 80,
+   "refreshRateHz": 120,
+   "displayType": "AMOLED"
+  },
+  "variants": [],
+  "popularity": 70
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno15 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/reno15-series-en/list-page/reno15/480-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15/",
+  "specs": {},
+  "variants": [],
+  "popularity": 67
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno15 F 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/reno15-series-en/list-page/reno15-f/480-600-blue.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15-f/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno15-f/",
+  "specs": {},
+  "variants": [],
+  "popularity": 65
+ },
+ {
+  "brand": "oppo",
+  "name": "A6s",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/a6-series/b4/list-page/a6s/480-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-a/a6s/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-a/a6s/",
+  "specs": {
+   "chargingW": 80
+  },
+  "variants": [],
+  "popularity": 62
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno14 Pro",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno14-series/list-page/reno14-pro/448-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14-pro/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14-pro/",
+  "specs": {},
+  "variants": [],
+  "popularity": 59
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno14",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno14-series/list-page/reno14/448-600-white-v1.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14/",
+  "specs": {},
+  "variants": [],
+  "popularity": 57
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno14 F 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno14-series/list-page/reno14-f/448-600-blue.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14-f-5g/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno14-f-5g/",
+  "specs": {},
+  "variants": [],
+  "popularity": 54
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno13",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno13-series/list-page/reno13-5g/white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13/",
+  "specs": {},
+  "variants": [],
+  "popularity": 52
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno13 Pro 5G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno13-series/list-page/reno13-pro-5g/purple.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13-pro/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13-pro/",
+  "specs": {},
+  "variants": [],
+  "popularity": 49
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno13 F 4G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno13-series/list-page/reno13-f-4g/purple-v1.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13-f-4g/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno13-f-4g/",
+  "specs": {},
+  "variants": [],
+  "popularity": 46
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno12F 4G",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno12-f-4g-en/listpage/427-600-orange.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno12-f-4g/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno12-f-4g/",
+  "specs": {},
+  "variants": [],
+  "popularity": 44
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno11 5G The Portrait Expert",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno11-5g-en/listpage/reno11-427-600-green.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno11/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno11/",
+  "specs": {
+   "displayType": "OLED",
+   "rearCamera": "50MP main"
+  },
+  "variants": [],
+  "popularity": 41
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno5  Pro",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/reno5-pro-5g-chaka/listpage/Reno5-pro-chaka-navigation-silver-v2.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno5-pro/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno5-pro/",
+  "specs": {
+   "chargingW": 65
+  },
+  "variants": [],
+  "popularity": 38
+ },
+ {
+  "brand": "oppo",
+  "name": "A6c",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo_com/common/mkt/v2-2/a6c-en/list-page/480-600-white.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-a/a6c/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-a/a6c/",
+  "specs": {
+   "refreshRateHz": 120,
+   "displaySize": "6.75 inches"
+  },
+  "variants": [],
+  "popularity": 36
+ },
+ {
+  "brand": "oppo",
+  "name": "Reno5",
+  "imageUrl": "https://www.oppo.com/content/dam/oppo/common/mkt/v2-2/navigation/reno-series/reno5-pro-plus/Reno5-pro-plus-navigation-silver-v2.png",
+  "officialUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno5/",
+  "specsSourceUrl": "https://www.oppo.com/pk/smartphones/series-reno/reno5/",
+  "specs": {},
+  "variants": [],
+  "popularity": 33
+ }
+]

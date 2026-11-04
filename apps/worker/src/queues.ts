@@ -34,6 +34,7 @@ import { runNewsletter } from './newsletter/send.js'
 import { findDuplicateStory } from './social/guards.js'
 import { decideSlot, pktDayStart } from './social/caps.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
+import { runPhonePrices } from './phones/refresh.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
 import { sendReviewCard } from './telegram/bot.js'
@@ -431,6 +432,8 @@ export async function createWorkerRuntime(
           const mailer = smtpMailer({ host: env.MAIL_HOST, user: env.NEWS_MAIL_USER, password: env.NEWS_MAIL_PASSWORD! })
           return runNewsletter({ request: (m, p, b) => payload.request(m, p, b), mailer, kv: mailKv(redis), site: SITE_ORIGIN })
         }
+        // Mobile prices: read the brands' official Pakistan sites, record price changes (once a day)
+        if (job.name === 'phone-prices') return runPhonePrices((m, p, b, o) => payload.request(m, p, b, o))
         const rates = await fetchRatePoints(env, redis)
         await postRatePoints(payload, rates)
         return { points: rates.points.length, tables: rates.snapshots.map((x) => x.key) }
@@ -543,6 +546,12 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
   )
   await runtime.queues.discover.add('discover', {}, { delay: 60_000 })
   await runtime.queues.data.add('rates', {})
+  // Mobile prices and specs (zaviya.pk/mobile-prices): daily refresh from the official Pakistan sites. PHONE_PRICES=0 turns it off.
+  if (process.env.PHONE_PRICES === '0') {
+    await runtime.queues.data.removeJobScheduler('phone-prices').catch(() => {})
+  } else {
+    await runtime.queues.data.upsertJobScheduler('phone-prices', { every: 24 * 60 * 60 * 1000 }, { name: 'phone-prices', data: {} })
+  }
   // ZAV-109 phase 2: confirmation mails and the 07:30 PKT briefing. Scheduled only with NEWSLETTER_SEND=true and the news@ password set.
   if (runtime.env.NEWSLETTER_SEND && runtime.env.NEWS_MAIL_PASSWORD) {
     await runtime.queues.data.upsertJobScheduler('newsletter', { every: 10 * 60 * 1000 }, { name: 'newsletter', data: {} })

@@ -25,6 +25,8 @@ import { AuditLog } from './collections/AuditLog'
 import { PromptVersions } from './collections/PromptVersions'
 import { MetricsDaily } from './collections/MetricsDaily'
 import { PushSubscriptions } from './collections/PushSubscriptions'
+import { PhoneBrands } from './collections/PhoneBrands'
+import { Phones } from './collections/Phones'
 import { Settings } from './globals/Settings'
 import { FrontPage } from './globals/FrontPage'
 import { pipelineEndpointsExport } from './endpoints/pipeline'
@@ -93,6 +95,8 @@ export default buildConfig({
     PromptVersions,
     MetricsDaily,
     PushSubscriptions,
+    PhoneBrands,
+    Phones,
   ],
   globals: [Settings, FrontPage],
   localization: {
