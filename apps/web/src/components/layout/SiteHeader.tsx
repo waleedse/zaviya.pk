@@ -1,4 +1,4 @@
-import { House } from 'lucide-react'
+import { House, Smartphone } from 'lucide-react'
 import Link from 'next/link'
 import type { CategoryRef, Locale } from '@zaviya/shared'
 import { Logo } from '@/components/brand/Logo'
@@ -49,6 +49,10 @@ export function SiteHeader({
           <div className="min-w-0 flex-1">
             <CategoryNav categories={categories} locale={locale} variant="inline" />
           </div>
+          <Link href={localePath(locale, '/mobile-prices')} className="flex h-12 shrink-0 items-center gap-2 px-3 text-[15px] font-semibold text-fg-muted hover:text-accent">
+            <Smartphone className="h-4 w-4" aria-hidden />
+            {isUr ? 'موبائل قیمتیں' : 'Mobile prices'}
+          </Link>
           <Link href={localePath(locale, '/live')} className="flex h-12 shrink-0 items-center gap-2 px-3 text-[15px] font-bold text-breaking">
             <span className="live-dot" aria-hidden />
             {isUr ? 'لائیو' : 'Live'}

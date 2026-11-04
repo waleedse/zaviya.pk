@@ -27,3 +27,10 @@ export async function revalidateDataTag(key: string) {
 export async function revalidatePathSafe(path: string) {
   safeRevalidate(() => revalidatePath(path))
 }
+
+/** Mobile prices (zaviya.pk/mobile-prices): hub, brand and under-X lists, phone and compare pages. Marks them stale; they rebuild on the next visit. */
+export async function revalidatePhonePages() {
+  safeRevalidate(() => revalidatePath('/[locale]/mobile-prices', 'layout'))
+  safeRevalidate(() => revalidatePath('/[locale]/mobile/[slug]', 'page'))
+  safeRevalidate(() => revalidatePath('/[locale]/compare/[pair]', 'page'))
+}
