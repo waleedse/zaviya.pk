@@ -8,7 +8,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
-import { effectiveIntervalMin } from './triage-rules.js'
+import { dailyArticleCap, effectiveIntervalMin } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 
@@ -173,6 +173,11 @@ export async function finishGated(
     await dropOrphanedGateDraft(articleId, deps.payload)
     return false
   }
+  // Daily cap (5 Nov): an approved story waits in the gate instead of going out over the cap.
+  if (action === 'publish' && (JSON.parse(raw) as { priority?: string }).priority !== 'breaking' && (await dailyCapReached(deps.payload).catch(() => false))) {
+    logger.info({ articleId }, 'editor approved, but the daily cap is reached: the story keeps waiting')
+    return true
+  }
   await deps.redis.hdel(GATE_KEY, articleId)
   const data = JSON.parse(raw) as Parameters<typeof processPublishJob>[0]
   if (action === 'reject') {
@@ -199,6 +204,7 @@ export async function gateFallback(deps: { payload: PayloadClient; socialQueue: 
   const waiting = await deps.redis.hgetall(GATE_KEY)
   const ids = Object.keys(waiting)
   if (!ids.length) return
+  if (await dailyCapReached(deps.payload).catch(() => false)) return
   const settings = await deps.payload.getSettings()
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
   if (Date.now() - last < minutes * 60_000) return
@@ -207,8 +213,8 @@ export async function gateFallback(deps: { payload: PayloadClient; socialQueue: 
   await finishGated(oldest, 'publish', deps)
 }
 
-/** Categories that must publish at least once every 4 hours (Waleed, 13 Oct) */
-export const QUOTA_CATEGORIES: string[] = ['ai', 'education-jobs']
+/** Categories that must publish at least once every 4 hours (Waleed, 13 Oct). AI dropped on 5 Nov: foreign tech rewrites do not earn a cap bypass. */
+export const QUOTA_CATEGORIES: string[] = ['education-jobs']
 const QUOTA_WINDOW_MS = 4 * 60 * 60_000
 
 export async function categoryOverdue(payload: PayloadClient, category: string, now = Date.now()): Promise<boolean> {
@@ -220,13 +226,18 @@ export async function categoryOverdue(payload: PayloadClient, category: string, 
   return now - last > QUOTA_WINDOW_MS
 }
 
+/** The day's story cap is used up (Settings.dailyCaps.articles, else DEFAULT_DAILY_ARTICLE_CAP). */
+export async function dailyCapReached(payload: Pick<PayloadClient, 'getSettings'>): Promise<boolean> {
+  const settings = await payload.getSettings()
+  return (settings.articlesPublishedToday ?? 0) >= dailyArticleCap(settings)
+}
+
 /** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
 export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
   const settings = await payload.getSettings()
   // Never slower than one story every MAX_PUBLISH_INTERVAL_MIN minutes (10 since ZAV-201, was 15)
   const minIntervalMs = effectiveIntervalMin(settings) * 60_000
-  const cap = settings.dailyCaps?.articles ?? 96
-  if ((settings.articlesPublishedToday ?? 0) >= cap) return 60 * 60_000
+  if (await dailyCapReached(payload)) return 60 * 60_000
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
   const gap = now - last
   // A little jitter so several waiting stories do not all wake at the same second

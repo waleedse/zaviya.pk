@@ -19,6 +19,8 @@ async function categorySlugOf(payload: Payload, category: unknown): Promise<stri
 /** Pings IndexNow when an article goes live and again when a live article changes. Never blocks or fails the save. */
 export const pingIndexNowOnFirstPublish: CollectionAfterChangeHook = async ({ doc, req }) => {
   if (!indexNowEnabled() || doc._status !== 'published') return doc
+  // A noindex story (thin rewrite, 5 Nov) is not announced to search engines
+  if ((doc.seo as { noindex?: boolean } | undefined)?.noindex) return doc
   try {
     const slug = doc.slug as Record<string, string> | string | undefined
     const urls = urlsForArticle(siteUrl(), {

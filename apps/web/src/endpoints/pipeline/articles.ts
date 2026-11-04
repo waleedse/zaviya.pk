@@ -1,4 +1,5 @@
 import { convertMarkdownToLexical, editorConfigFactory } from '@payloadcms/richtext-lexical'
+import { countWords, storyNoindex } from '@/lib/index-policy'
 import type { PayloadRequest } from 'payload'
 import { z } from 'zod'
 import { CATEGORY_SLUGS, PRIORITIES } from '@zaviya/shared'
@@ -159,6 +160,17 @@ async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof p
   const workflow: Article['workflow'] =
     body.status === 'published' ? 'published' : body.status === 'in_review' ? 'in_review' : 'draft'
 
+  // Thin rewrites stay readable but out of Google (5 Nov). Decided on every save that carries the text,
+  // so a rewrite with more sources can lift it; a save without text leaves it as it was.
+  const noindex = en
+    ? storyNoindex({
+        category: body.category,
+        priority: body.priority,
+        sourceCount: new Set(body.sources.map((s) => s.name.toLowerCase())).size,
+        words: countWords(en.bodyMarkdown) + countWords(en.whatItMeans),
+      })
+    : undefined
+
   const sharedData: Partial<Article> = {
     category: Number(categoryId),
     priority: body.priority,
@@ -191,7 +203,7 @@ async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof p
             ...(en.bodyMarkdown.trim() ? { body: await markdownToLexical(req, en.bodyMarkdown) } : {}),
             ...(en.whatItMeans.trim() ? { whatItMeans: await markdownToLexical(req, en.whatItMeans) } : {}),
             faqs: en.faqs,
-            seo: en.metaDescription ? { metaDescription: en.metaDescription } : undefined,
+            seo: { ...(en.metaDescription ? { metaDescription: en.metaDescription } : {}), noindex },
           } as Partial<Article>
         : sharedData,
       draft: body.status !== 'published',
@@ -209,7 +221,7 @@ async function createOrUpdateArticle(req: PayloadRequest, body: z.infer<typeof p
       body: await markdownToLexical(req, en.bodyMarkdown),
       whatItMeans: await markdownToLexical(req, en.whatItMeans),
       faqs: en.faqs,
-      seo: en.metaDescription ? { metaDescription: en.metaDescription } : undefined,
+      seo: { ...(en.metaDescription ? { metaDescription: en.metaDescription } : {}), noindex },
       _status: body.status === 'published' ? ('published' as const) : ('draft' as const),
     }
     const created =

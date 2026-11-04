@@ -124,3 +124,13 @@ describe('applyTriageRules', () => {
     })
   })
 })
+
+describe('daily article cap (5 Nov)', () => {
+  it('defaults to 40 when Settings has no articles cap', async () => {
+    const { dailyArticleCap, DEFAULT_DAILY_ARTICLE_CAP } = await import('./triage-rules.js')
+    expect(DEFAULT_DAILY_ARTICLE_CAP).toBe(40)
+    expect(dailyArticleCap({ dailyCaps: { facebook: 15 } })).toBe(40)
+    expect(dailyArticleCap({})).toBe(40)
+    expect(dailyArticleCap({ dailyCaps: { articles: 60 } })).toBe(60)
+  })
+})

@@ -76,6 +76,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       and: [{ _status: { equals: 'published' } }, { workflow: { not_equals: 'retracted' } },
         // ZAV-229: only the last 7 days; older stories are reached through the hubs, tags and /latest
         { publishedAt: { greater_than_equal: sitemapArticleCutoff() } },
+          // Thin rewrites are noindex (5 Nov): a sitemap must not list them
+          { 'seo.noindex': { not_equals: true } },
       ],
     },
     locale: 'all',
