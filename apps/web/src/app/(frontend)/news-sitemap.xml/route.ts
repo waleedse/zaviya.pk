@@ -21,6 +21,8 @@ export async function GET() {
           { _status: { equals: 'published' } },
           { workflow: { not_equals: 'retracted' } },
           { publishedAt: { greater_than: since } },
+          // Thin rewrites are noindex (5 Nov): a sitemap must not list them
+          { 'seo.noindex': { not_equals: true } },
         ],
       },
       sort: '-publishedAt',

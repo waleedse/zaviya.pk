@@ -39,6 +39,16 @@ const HARD_FLAGS = new Set(['military', 'judiciary', 'religion', 'blasphemy', 'v
  * since 16 Oct. Revert by setting it back to 15. Breaking news ignores the gap.
  */
 export const MAX_PUBLISH_INTERVAL_MIN = 10
+
+/**
+ * Stories a day when Settings has no articles cap (Waleed, 5 Nov 2026: quality over volume).
+ * Google stopped showing the site on 16 Oct while it published ~150 rewrites a day; ~40 strong
+ * stories a day is the new ceiling. Breaking news still goes out.
+ */
+export const DEFAULT_DAILY_ARTICLE_CAP = 40
+export function dailyArticleCap(settings: { dailyCaps?: Record<string, number | null | undefined> | null }): number {
+  return settings.dailyCaps?.articles ?? settings.dailyCaps?.publish ?? DEFAULT_DAILY_ARTICLE_CAP
+}
 export function effectiveIntervalMin(settings: { minIntervalMin?: number }): number {
   return Math.min(settings.minIntervalMin ?? MAX_PUBLISH_INTERVAL_MIN, MAX_PUBLISH_INTERVAL_MIN)
 }
@@ -157,7 +167,7 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
     }
   }
 
-  const dailyCap = ctx.settings.dailyCaps?.articles ?? ctx.settings.dailyCaps?.publish ?? 999
+  const dailyCap = dailyArticleCap(ctx.settings)
   const publishedToday = ctx.articlesPublishedToday ?? 0
   const wouldPublish = triage.decision !== 'reject' && weightedScore >= publishThreshold && triage.decision === 'publish'
   if (wouldPublish && !isBreaking && !ctx.quotaOverdue && publishedToday >= dailyCap) {

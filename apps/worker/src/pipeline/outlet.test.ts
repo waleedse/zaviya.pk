@@ -32,5 +32,8 @@ describe('publish pacing', () => {
     expect(wait).toBeGreaterThanOrEqual(5 * 60_000)
     expect(wait).toBeLessThan(7 * 60_000)
     expect(await pacingWaitMs(settings({ minIntervalMin: 15, articlesPublishedToday: 96, dailyCaps: { articles: 96 } }), now)).toBe(60 * 60_000)
+    // 5 Nov: no articles cap in Settings means 40 a day
+    expect(await pacingWaitMs(settings({ minIntervalMin: 15, articlesPublishedToday: 40, dailyCaps: { facebook: 15 } }), now)).toBe(60 * 60_000)
+    expect(await pacingWaitMs(settings({ minIntervalMin: 15, articlesPublishedToday: 39, lastPublishedAt: '2026-10-13T09:00:00Z' }), now)).toBe(0)
   })
 })
