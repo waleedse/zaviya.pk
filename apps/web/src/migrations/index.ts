@@ -4,6 +4,7 @@ import * as migration_20261011_210826_media_alt_nullable from './20261011_210826
 import * as migration_20261012_200348_add_ai_category from './20261012_200348_add_ai_category';
 import * as migration_20261015_220642_front_page_plan from './20261015_220642_front_page_plan';
 import * as migration_20261103_192624_mobile_prices from './20261103_192624_mobile_prices';
+import * as migration_20261104_043222_results_vacations_closures from './20261104_043222_results_vacations_closures';
 
 export const migrations = [
   {
@@ -34,6 +35,11 @@ export const migrations = [
   {
     up: migration_20261103_192624_mobile_prices.up,
     down: migration_20261103_192624_mobile_prices.down,
-    name: '20261103_192624_mobile_prices'
+    name: '20261103_192624_mobile_prices',
+  },
+  {
+    up: migration_20261104_043222_results_vacations_closures.up,
+    down: migration_20261104_043222_results_vacations_closures.down,
+    name: '20261104_043222_results_vacations_closures'
   },
 ];

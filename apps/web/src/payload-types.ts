@@ -87,6 +87,10 @@ export interface Config {
     'push-subscriptions': PushSubscription;
     'phone-brands': PhoneBrand;
     phones: Phone;
+    'result-boards': ResultBoard;
+    'result-exams': ResultExam;
+    'vacation-notices': VacationNotice;
+    'school-closures': SchoolClosure;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -114,6 +118,10 @@ export interface Config {
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'phone-brands': PhoneBrandsSelect<false> | PhoneBrandsSelect<true>;
     phones: PhonesSelect<false> | PhonesSelect<true>;
+    'result-boards': ResultBoardsSelect<false> | ResultBoardsSelect<true>;
+    'result-exams': ResultExamsSelect<false> | ResultExamsSelect<true>;
+    'vacation-notices': VacationNoticesSelect<false> | VacationNoticesSelect<true>;
+    'school-closures': SchoolClosuresSelect<false> | SchoolClosuresSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -840,6 +848,188 @@ export interface Phone {
   createdAt: string;
 }
 /**
+ * Boards shown at /results. Dates go in "Result exams".
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "result-boards".
+ */
+export interface ResultBoard {
+  id: number;
+  name: string;
+  /**
+   * URL: /results/<slug>. Do not change once live.
+   */
+  slug: string;
+  region: 'federal' | 'punjab' | 'sindh' | 'kp' | 'balochistan' | 'ajk';
+  city?: string | null;
+  /**
+   * The board's own website. Only a link you opened and checked.
+   */
+  officialSite?: string | null;
+  /**
+   * The board's own result-checking page, if it has one separate from the home page.
+   */
+  resultUrl?: string | null;
+  /**
+   * Short code the board publishes for result by SMS, e.g. 800291. Leave empty if the board publishes none.
+   */
+  smsCode?: string | null;
+  /**
+   * e.g. "Type the roll number and send it to 800291."
+   */
+  smsHowTo?: string | null;
+  /**
+   * Link to the latest gazette / position-holder list on the board site.
+   */
+  gazetteUrl?: string | null;
+  /**
+   * Anything readers need to know about this board (shown on its page).
+   */
+  notes?: string | null;
+  /**
+   * Extra questions for this board. Standard ones are added automatically.
+   */
+  faqs?:
+    | {
+        q: string;
+        a: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * YYYY-MM-DD the board site was last checked
+   */
+  checkedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Result dates. A date needs a source link or a source note.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "result-exams".
+ */
+export interface ResultExam {
+  id: number;
+  label?: string | null;
+  board: number | ResultBoard;
+  classLevel: '9' | '10' | '11' | '12';
+  session: 'annual' | 'supplementary';
+  year: number;
+  status: 'not_announced' | 'expected' | 'announced';
+  /**
+   * YYYY-MM-DD, only from a source
+   */
+  expectedDate?: string | null;
+  /**
+   * YYYY-MM-DD the result came out
+   */
+  announcedDate?: string | null;
+  /**
+   * Link to the board notice or the news report the date comes from
+   */
+  sourceUrl?: string | null;
+  /**
+   * e.g. "BISE Multan notice dated 2 Sep 2026"
+   */
+  sourceNote?: string | null;
+  /**
+   * Direct link to this result on the board site
+   */
+  resultLink?: string | null;
+  /**
+   * Gazette / position holders PDF
+   */
+  gazetteUrl?: string | null;
+  /**
+   * One per line: "1. Name, school, marks". Only from the gazette or board notice.
+   */
+  positionHolders?: string | null;
+  /**
+   * e.g. "78.4%". Only from the board.
+   */
+  passPercentage?: string | null;
+  notes?: string | null;
+  /**
+   * YYYY-MM-DD last checked on the board site
+   */
+  checkedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Winter vacations 2026-27. A date needs a source.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vacation-notices".
+ */
+export interface VacationNotice {
+  id: number;
+  region: 'punjab' | 'sindh' | 'kp' | 'balochistan' | 'islamabad';
+  status: 'not_announced' | 'reported' | 'notified';
+  /**
+   * First day of the break, YYYY-MM-DD
+   */
+  startDate?: string | null;
+  /**
+   * Last day of the break, YYYY-MM-DD
+   */
+  endDate?: string | null;
+  sourceUrl?: string | null;
+  /**
+   * e.g. "School Education Department notification, 4 Dec 2026"
+   */
+  sourceNote?: string | null;
+  /**
+   * YYYY-MM-DD the source was published
+   */
+  sourceDate?: string | null;
+  /**
+   * Last winter break (2025-26), shown clearly marked as last year
+   */
+  lastYear?: {
+    startDate?: string | null;
+    endDate?: string | null;
+    note?: string | null;
+    sourceUrl?: string | null;
+  };
+  /**
+   * Extra detail shown on the page (private schools, board classes, exceptions)
+   */
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Schools closed tomorrow tracker. Needs a source.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "school-closures".
+ */
+export interface SchoolClosure {
+  id: number;
+  region: 'punjab' | 'sindh' | 'kp' | 'balochistan' | 'islamabad';
+  /**
+   * Who is closed, e.g. "All schools in Lahore division"
+   */
+  scope: string;
+  /**
+   * First closed day, YYYY-MM-DD
+   */
+  date: string;
+  /**
+   * Last closed day if more than one day, YYYY-MM-DD
+   */
+  endDate?: string | null;
+  reason: 'smog' | 'rain' | 'weather' | 'security' | 'other';
+  status: 'announced' | 'extended' | 'cancelled';
+  sourceUrl?: string | null;
+  sourceNote?: string | null;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -942,6 +1132,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'phones';
         value: number | Phone;
+      } | null)
+    | ({
+        relationTo: 'result-boards';
+        value: number | ResultBoard;
+      } | null)
+    | ({
+        relationTo: 'result-exams';
+        value: number | ResultExam;
+      } | null)
+    | ({
+        relationTo: 'vacation-notices';
+        value: number | VacationNotice;
+      } | null)
+    | ({
+        relationTo: 'school-closures';
+        value: number | SchoolClosure;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1512,6 +1718,97 @@ export interface PhonesSelect<T extends boolean = true> {
         protection?: T;
       };
   specsSourceUrl?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "result-boards_select".
+ */
+export interface ResultBoardsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  region?: T;
+  city?: T;
+  officialSite?: T;
+  resultUrl?: T;
+  smsCode?: T;
+  smsHowTo?: T;
+  gazetteUrl?: T;
+  notes?: T;
+  faqs?:
+    | T
+    | {
+        q?: T;
+        a?: T;
+        id?: T;
+      };
+  checkedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "result-exams_select".
+ */
+export interface ResultExamsSelect<T extends boolean = true> {
+  label?: T;
+  board?: T;
+  classLevel?: T;
+  session?: T;
+  year?: T;
+  status?: T;
+  expectedDate?: T;
+  announcedDate?: T;
+  sourceUrl?: T;
+  sourceNote?: T;
+  resultLink?: T;
+  gazetteUrl?: T;
+  positionHolders?: T;
+  passPercentage?: T;
+  notes?: T;
+  checkedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vacation-notices_select".
+ */
+export interface VacationNoticesSelect<T extends boolean = true> {
+  region?: T;
+  status?: T;
+  startDate?: T;
+  endDate?: T;
+  sourceUrl?: T;
+  sourceNote?: T;
+  sourceDate?: T;
+  lastYear?:
+    | T
+    | {
+        startDate?: T;
+        endDate?: T;
+        note?: T;
+        sourceUrl?: T;
+      };
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "school-closures_select".
+ */
+export interface SchoolClosuresSelect<T extends boolean = true> {
+  region?: T;
+  scope?: T;
+  date?: T;
+  endDate?: T;
+  reason?: T;
+  status?: T;
+  sourceUrl?: T;
+  sourceNote?: T;
+  notes?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -8,6 +8,11 @@ import { sitemapArticleCutoff } from '@/lib/crawl-cache'
 import { getArchiveDays, getStoryDigests } from '@/lib/queries'
 import { archivePath } from '@/lib/archive'
 import { phoneSitemapEntries } from '@/lib/phones/sitemap'
+import { boardPath, classPath, resultsPath } from '@/lib/result-boards'
+import { closuresPath, vacationRegionPath, vacationsHubPath, VACATION_REGIONS } from '@/lib/vacations'
+import { RATE_FAMILIES, rateDayPath, rateHistoryPath } from '@/lib/rate-history'
+import { getRateDays } from '@/lib/rate-history-data'
+import { getBoards } from '@/lib/results-data'
 import { dailyStorySlug, DIGEST_MIN, WEB_STORY_DAYS, webStoriesPath } from '@/lib/web-stories'
 
 export const revalidate = 600
@@ -126,6 +131,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}${archivePath()}`, changeFrequency: 'hourly', priority: 0.6 })
   for (const day of await getArchiveDays()) {
     entries.push({ url: `${siteUrl}${archivePath(day.date)}`, lastModified: day.lastPublishedAt, changeFrequency: 'daily', priority: 0.5 })
+  }
+
+  // Results hub, one page per board and class, winter vacations and school closures (English only)
+  entries.push({ url: `${siteUrl}${resultsPath()}`, changeFrequency: 'daily', priority: 0.9 })
+  for (const b of await getBoards()) {
+    entries.push({ url: `${siteUrl}${boardPath(b.slug)}`, changeFrequency: 'daily', priority: 0.8 })
+    for (const c of b.classes) entries.push({ url: `${siteUrl}${classPath(b.slug, c)}`, changeFrequency: 'daily', priority: 0.7 })
+  }
+  entries.push({ url: `${siteUrl}${vacationsHubPath()}`, changeFrequency: 'daily', priority: 0.9 })
+  for (const r of VACATION_REGIONS) entries.push({ url: `${siteUrl}${vacationRegionPath(r.slug)}`, changeFrequency: 'daily', priority: 0.8 })
+  entries.push({ url: `${siteUrl}${closuresPath()}`, changeFrequency: 'hourly', priority: 0.8 })
+
+  // Dated rate pages: only days that have data
+  for (const f of RATE_FAMILIES) {
+    const days = await getRateDays(f)
+    if (!days.length) continue
+    entries.push({ url: `${siteUrl}${rateHistoryPath(f)}`, changeFrequency: 'daily', priority: 0.6 })
+    for (const d of days) entries.push({ url: `${siteUrl}${rateDayPath(f, d.date)}`, changeFrequency: 'monthly', priority: 0.5 })
   }
 
   // lastmod of hubs = newest article change (a lastmod of "now" on every fetch is ignored by Google)
