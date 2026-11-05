@@ -203,3 +203,12 @@ describe('page rendering', () => {
     expect(html).toContain('"@type":"FAQPage"')
   })
 })
+
+describe('phone index policy (5 Nov)', () => {
+  it('indexes a phone only with an official price', async () => {
+    const { phoneIndexable } = await import('@/lib/phones/logic')
+    expect(phoneIndexable({ pricePkr: 52000 })).toBe(true)
+    expect(phoneIndexable({ pricePkr: null })).toBe(false)
+    expect(phoneIndexable({})).toBe(false)
+  })
+})

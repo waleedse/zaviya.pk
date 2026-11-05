@@ -2,7 +2,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import { ComparePageView, pairLabel } from '@/components/phones/PhoneViews'
 import { getPhones } from '@/lib/phones/queries'
 import { findPhone } from '@/lib/phones/pages'
-import { findPair, popularPairs } from '@/lib/phones/logic'
+import { findPair, phoneIndexable, popularPairs } from '@/lib/phones/logic'
 import type { PhonePair, PhoneView } from '@/lib/phones/types'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
@@ -42,6 +42,7 @@ export async function generateMetadata({ params }: Params) {
     title: `${label}: Price & Specs Compared`,
     description: `${label}: price in Pakistan, display, chipset, camera and battery compared side by side, with the official PKR prices.`,
     enPath: `/compare/${r.pair.key}`,
+    noindex: !phoneIndexable(r.a) || !phoneIndexable(r.b),
   })
 }
 
