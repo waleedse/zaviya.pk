@@ -81,6 +81,12 @@ export function PhoneFilters({ brands, active }: { brands: BrandView[]; active?:
         ))}
       </div>
       <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Price bands">
+        <Link href="/mobile-prices/new-phones" role="listitem" className="chip whitespace-nowrap">
+          New phones
+        </Link>
+        <Link href="/mobile-prices/upcoming" role="listitem" className="chip whitespace-nowrap">
+          Upcoming
+        </Link>
         {PRICE_BANDS.map((band) => (
           <Link key={band} href={`/mobile-prices/${bandSlug(band)}`} role="listitem" className={cn('chip', active?.band === band && 'border-transparent bg-accent text-accent-fg')}>
             Under Rs {bandLabel(band)}

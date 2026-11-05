@@ -136,6 +136,8 @@ export function mergePhone(
   variants.sort((a, b) => (a.storageGb ?? 0) - (b.storageGb ?? 0) || (a.ramGb ?? 0) - (b.ramGb ?? 0))
 
   data.pricePkr = lowestPrice(variants.map((v) => ({ pricePkr: v.pricePkr ?? null })))
+  // An upcoming phone that gets an official price has launched
+  if (seenPrice && data.status === 'upcoming' && data.pricePkr != null) data.status = 'current'
   if (seenPrice) data.priceUpdatedAt = nowIso
   return { data, created: !existing, changes, skipped }
 }

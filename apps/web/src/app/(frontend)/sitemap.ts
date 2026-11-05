@@ -8,6 +8,7 @@ import { sitemapArticleCutoff } from '@/lib/crawl-cache'
 import { getArchiveDays, getStoryDigests } from '@/lib/queries'
 import { archivePath } from '@/lib/archive'
 import { phoneSitemapEntries } from '@/lib/phones/sitemap'
+import { applianceSitemapEntries } from '@/lib/appliances/sitemap'
 import { boardPath, classPath, resultsPath } from '@/lib/result-boards'
 import { closuresPath, vacationRegionPath, vacationsHubPath, VACATION_REGIONS } from '@/lib/vacations'
 import { RATE_FAMILIES, rateDayPath, rateHistoryPath } from '@/lib/rate-history'
@@ -56,6 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/aqi-pakistan`, changeFrequency: 'hourly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/riyal-dirham-rate-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push(...(await phoneSitemapEntries(siteUrl)))
+  entries.push(...(await applianceSitemapEntries(siteUrl)))
   entries.push({ url: `${siteUrl}/latest`, changeFrequency: 'hourly', priority: 0.8 })
   entries.push({ url: `${siteUrl}/web-stories`, changeFrequency: 'hourly', priority: 0.6 })
   entries.push({ url: `${siteUrl}/widgets`, changeFrequency: 'monthly', priority: 0.6 })

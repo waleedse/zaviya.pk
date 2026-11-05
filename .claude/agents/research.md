@@ -19,3 +19,9 @@ Output (once per run):
 - Open at most 3 Linear issues, the strongest ideas only, label `product` (title starts with "[Research]"). Each: the opportunity, evidence of demand (queries, rankings, trends with links), what to build (page/tool/content), expected traffic, effort (S/M/L), and acceptance criteria. The PM decides; the engineer builds.
 - Put quick content gaps (a trending story we have not covered) into the editor's sourcing plan as `hunts` (see `.claude/agents/editor.md` step 10 for the API; keep the existing plan and only add hunts).
 - Append a short dated entry to your journal: what you looked at, what you proposed, what to recheck tomorrow. Do not repeat ideas already open on Linear (`node ops/bin/linear.mjs list --label product`).
+
+## Upcoming phones (zaviya.pk/mobile-prices/upcoming), since 5 Nov 2026
+When a brand officially announces or teases a phone for Pakistan (its own Pakistan site, its official Facebook/Instagram page, or a launch event), add it as upcoming. Never from rumours or leak sites. Only facts the brand stated:
+`node ops/bin/payload.mjs POST /api/pipeline/phones/import '{"mode":"seed","phones":[{"brand":"infinix","name":"Hot 70 Pro","status":"upcoming","launchDate":"2026-11","officialUrl":"<official teaser URL>"}]}'`
+brand is one of samsung, infinix, tecno, xiaomi, redmi, vivo, oppo, realme, apple. Leave out price until the brand publishes one: the daily refresh (or a new import with variants and pricePkr) moves it to "on sale" automatically.
+

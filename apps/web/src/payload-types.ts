@@ -87,6 +87,7 @@ export interface Config {
     'push-subscriptions': PushSubscription;
     'phone-brands': PhoneBrand;
     phones: Phone;
+    appliances: Appliance;
     'result-boards': ResultBoard;
     'result-exams': ResultExam;
     'vacation-notices': VacationNotice;
@@ -118,6 +119,7 @@ export interface Config {
     'push-subscriptions': PushSubscriptionsSelect<false> | PushSubscriptionsSelect<true>;
     'phone-brands': PhoneBrandsSelect<false> | PhoneBrandsSelect<true>;
     phones: PhonesSelect<false> | PhonesSelect<true>;
+    appliances: AppliancesSelect<false> | AppliancesSelect<true>;
     'result-boards': ResultBoardsSelect<false> | ResultBoardsSelect<true>;
     'result-exams': ResultExamsSelect<false> | ResultExamsSelect<true>;
     'vacation-notices': VacationNoticesSelect<false> | VacationNoticesSelect<true>;
@@ -848,6 +850,74 @@ export interface Phone {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "appliances".
+ */
+export interface Appliance {
+  id: number;
+  name: string;
+  slug: string;
+  brand: 'samsung' | 'nasgas' | 'anex' | 'westpoint';
+  category:
+    | 'air-conditioners'
+    | 'refrigerators'
+    | 'washing-machines'
+    | 'water-heaters'
+    | 'room-heaters'
+    | 'air-coolers'
+    | 'water-dispensers'
+    | 'microwave-ovens'
+    | 'cooking-ranges'
+    | 'kitchen-hoods'
+    | 'dishwashers'
+    | 'air-fryers'
+    | 'blenders'
+    | 'kettles'
+    | 'irons'
+    | 'fans'
+    | 'cookers'
+    | 'toasters-sandwich-makers';
+  model?: string | null;
+  /**
+   * Keep out of the site and the sitemap
+   */
+  hidden?: boolean | null;
+  popularity?: number | null;
+  imageUrl?: string | null;
+  /**
+   * The product page on the brand's own store (the Buy button)
+   */
+  officialUrl: string;
+  summary?: string | null;
+  pricePkr?: number | null;
+  /**
+   * The brand's own 'was' price, when shown
+   */
+  listPricePkr?: number | null;
+  inStock?: boolean | null;
+  priceUpdatedAt?: string | null;
+  specs?:
+    | {
+        label: string;
+        value: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * One row per official price change (written by the daily refresh)
+   */
+  priceHistory?:
+    | {
+        date: string;
+        pricePkr: number;
+        sourceUrl?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Boards shown at /results. Dates go in "Result exams".
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1132,6 +1202,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'phones';
         value: number | Phone;
+      } | null)
+    | ({
+        relationTo: 'appliances';
+        value: number | Appliance;
       } | null)
     | ({
         relationTo: 'result-boards';
@@ -1718,6 +1792,43 @@ export interface PhonesSelect<T extends boolean = true> {
         protection?: T;
       };
   specsSourceUrl?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "appliances_select".
+ */
+export interface AppliancesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  brand?: T;
+  category?: T;
+  model?: T;
+  hidden?: T;
+  popularity?: T;
+  imageUrl?: T;
+  officialUrl?: T;
+  summary?: T;
+  pricePkr?: T;
+  listPricePkr?: T;
+  inStock?: T;
+  priceUpdatedAt?: T;
+  specs?:
+    | T
+    | {
+        label?: T;
+        value?: T;
+        id?: T;
+      };
+  priceHistory?:
+    | T
+    | {
+        date?: T;
+        pricePkr?: T;
+        sourceUrl?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

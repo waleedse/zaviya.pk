@@ -307,3 +307,30 @@ export function itemListJsonLd(name: string, items: { name: string; url: string 
 export function phoneIndexable(p: { pricePkr?: number | null }): boolean {
   return typeof p.pricePkr === 'number' && p.pricePkr > 0
 }
+
+/** Upcoming phones (status "upcoming"), expected launch first; added by the editor from official teasers and launch news */
+export function upcomingPhones(phones: PhoneView[]): PhoneView[] {
+  return phones
+    .filter((p) => p.status === 'upcoming')
+    .sort((a, b) => (a.launchDate ?? '9999').localeCompare(b.launchDate ?? '9999') || b.popularity - a.popularity)
+}
+
+/**
+ * The newest phones on sale: launched in the last 180 days when we know the date, otherwise the models each brand lists
+ * first on its own Pakistan site (our popularity starts from that order), at most `perBrand` per brand.
+ */
+export function latestPhones(phones: PhoneView[], now: Date, perBrand = 4): PhoneView[] {
+  const cutoff = new Date(now.getTime() - 180 * 86_400_000).toISOString().slice(0, 10)
+  const onSale = phones.filter((p) => p.status === 'current')
+  const dated = onSale.filter((p) => p.launchDate && p.launchDate >= cutoff)
+  const out: PhoneView[] = [...dated].sort((a, b) => b.launchDate!.localeCompare(a.launchDate!))
+  const byBrand = new Map<string, PhoneView[]>()
+  for (const p of [...onSale].sort((a, b) => b.popularity - a.popularity)) {
+    if (out.includes(p)) continue
+    const list = byBrand.get(p.brand.slug) ?? []
+    if (list.length < perBrand) list.push(p)
+    byBrand.set(p.brand.slug, list)
+  }
+  const rest = [...byBrand.values()].flat().sort((a, b) => b.popularity - a.popularity)
+  return [...out, ...rest]
+}

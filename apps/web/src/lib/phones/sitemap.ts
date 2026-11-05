@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { PRICE_BANDS } from '@zaviya/shared'
 import { getBrands, getPhones } from './queries'
-import { MIN_INDEXABLE_LIST, bandSlug, phoneIndexable, phonesUnder, popularPairs } from './logic'
+import { MIN_INDEXABLE_LIST, bandSlug, latestPhones, phoneIndexable, phonesUnder, popularPairs, upcomingPhones } from './logic'
 
 type Entry = MetadataRoute.Sitemap[number]
 
@@ -18,6 +18,8 @@ export async function phoneSitemapEntries(siteUrl: string): Promise<Entry[]> {
     for (const b of brands) {
       if (phones.some((p) => p.brand.slug === b.slug)) entries.push({ url: `${siteUrl}/mobile-prices/${b.slug}`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
     }
+    if (latestPhones(phones, new Date()).filter(phoneIndexable).length >= MIN_INDEXABLE_LIST) entries.push({ url: `${siteUrl}/mobile-prices/new-phones`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
+    if (upcomingPhones(phones).length >= MIN_INDEXABLE_LIST) entries.push({ url: `${siteUrl}/mobile-prices/upcoming`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
     for (const band of PRICE_BANDS) {
       // thin lists are noindex (see the page) and stay out of the sitemap
       if (phonesUnder(phones, band).length >= MIN_INDEXABLE_LIST) entries.push({ url: `${siteUrl}/mobile-prices/${bandSlug(band)}`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
