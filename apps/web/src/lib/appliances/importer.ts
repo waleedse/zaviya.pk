@@ -71,6 +71,8 @@ export function mergeAppliance(existing: StoredAppliance | null, item: Appliance
   if (empty(data.imageUrl) && item.imageUrl) data.imageUrl = item.imageUrl
   if (empty(data.specs) && item.specs?.length) data.specs = item.specs
   if ((empty(data.popularity) || data.popularity === 0) && item.popularity) data.popularity = item.popularity
+  // Category comes from our own rules on the store's title, so a better rule fixes stored items too
+  data.category = item.category
   // The store URL can move; the newest one is the one that works
   data.officialUrl = item.officialUrl
   if (item.inStock !== undefined) data.inStock = item.inStock
