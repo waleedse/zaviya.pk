@@ -35,6 +35,11 @@ export async function revalidatePhonePages() {
   safeRevalidate(() => revalidatePath('/[locale]/compare/[pair]', 'page'))
 }
 
+/** Home appliance prices (zaviya.pk/prices): hub, category, brand, product and compare pages */
+export async function revalidateAppliancePages() {
+  safeRevalidate(() => revalidatePath('/[locale]/prices', 'layout'))
+}
+
 export const RESULTS_TAG = 'results-data'
 
 export async function revalidateResultsTag() {

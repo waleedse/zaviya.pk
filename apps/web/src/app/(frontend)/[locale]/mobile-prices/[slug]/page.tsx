@@ -1,8 +1,9 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PhoneListView, bandLinks } from '@/components/phones/PhoneViews'
 import { getBrandBySlug, getBrands, getPhones } from '@/lib/phones/queries'
 import { bandFaqs, brandFaqs } from '@/lib/phones/pages'
-import { MIN_INDEXABLE_LIST, bandLabel, parseBandSlug, phonesUnder, sortPhones } from '@/lib/phones/logic'
+import { MIN_INDEXABLE_LIST, bandLabel, latestPhones, parseBandSlug, phoneIndexable, phonesUnder, sortPhones, upcomingPhones } from '@/lib/phones/logic'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -14,6 +15,28 @@ export async function generateMetadata({ params }: Params) {
   const { locale: raw, slug } = await params
   const locale = parseLocale(raw)
   const year = new Date().getFullYear()
+  if (slug === 'upcoming') {
+    const phones = upcomingPhones(await getPhones())
+    return buildPageMetadata({
+      locale,
+      title: `Upcoming Mobile Phones in Pakistan ${year}: Expected Launch Dates`,
+      description: `Phones expected to launch in Pakistan soon: ${phones.slice(0, 4).map((p) => `${p.brand.name} ${p.name}`).join(', ') || 'Samsung, Infinix, Tecno, Xiaomi, Vivo, Oppo and Realme'}. Launch dates and prices as soon as they are official.`,
+      enPath: '/mobile-prices/upcoming',
+      absoluteTitle: true,
+      noindex: phones.length < MIN_INDEXABLE_LIST,
+    })
+  }
+  if (slug === 'new-phones') {
+    const phones = latestPhones(await getPhones(), new Date())
+    return buildPageMetadata({
+      locale,
+      title: `New Mobile Phones in Pakistan ${year}: Latest Launches & Prices`,
+      description: `The latest phones on sale in Pakistan with official PKR prices: ${phones.slice(0, 4).map((p) => `${p.brand.name} ${p.name}`).join(', ')}, and more.`,
+      enPath: '/mobile-prices/new-phones',
+      absoluteTitle: true,
+      noindex: phones.filter(phoneIndexable).length < MIN_INDEXABLE_LIST,
+    })
+  }
   const band = parseBandSlug(slug)
   if (band) {
     const phones = phonesUnder(await getPhones(), band)
@@ -47,6 +70,37 @@ export default async function MobilePricesList({ params }: Params) {
   const brandsWithPhones = brands.filter((b) => all.some((p) => p.brand.slug === b.slug))
   const year = new Date().getFullYear()
 
+  if (slug === 'upcoming' || slug === 'new-phones') {
+    const upcoming = slug === 'upcoming'
+    const phones = upcoming ? upcomingPhones(all) : latestPhones(all, new Date())
+    const label = upcoming ? 'Upcoming phones' : 'New phones'
+    return (
+      <PhoneListView
+        title={upcoming ? `Upcoming mobile phones in Pakistan ${year}` : `New mobile phones in Pakistan ${year}`}
+        description={
+          upcoming
+            ? 'Phones the brands have announced or teased for Pakistan. We add the official price and launch date the day they are published.'
+            : "The newest phones on sale in Pakistan, with official PKR prices from the brands' own sites."
+        }
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label, url: `/mobile-prices/${slug}` }]}
+        phones={phones}
+        brands={brandsWithPhones}
+        emptyText={upcoming ? 'No upcoming phone has been officially announced for Pakistan yet. Check the new phones list.' : 'No phones listed yet.'}
+      >
+        <p className="text-sm text-fg-muted">
+          {upcoming ? (
+            <>
+              Already launched? See <Link href="/mobile-prices/new-phones" className="underline">new phones in Pakistan</Link>.
+            </>
+          ) : (
+            <>
+              Coming soon: <Link href="/mobile-prices/upcoming" className="underline">upcoming phones in Pakistan</Link>.
+            </>
+          )}
+        </p>
+      </PhoneListView>
+    )
+  }
   const band = parseBandSlug(slug)
   if (band) {
     const phones = phonesUnder(all, band)

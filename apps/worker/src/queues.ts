@@ -35,6 +35,7 @@ import { findDuplicateStory } from './social/guards.js'
 import { decideSlot, pktDayStart } from './social/caps.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import { runPhonePrices } from './phones/refresh.js'
+import { runAppliancePrices } from './appliances/collect.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
 import { sendReviewCard } from './telegram/bot.js'
@@ -434,6 +435,8 @@ export async function createWorkerRuntime(
         }
         // Mobile prices: read the brands' official Pakistan sites, record price changes (once a day)
         if (job.name === 'phone-prices') return runPhonePrices((m, p, b, o) => payload.request(m, p, b, o))
+        // Home appliance prices (zaviya.pk/prices): brand stores, once a day
+        if (job.name === 'appliance-prices') return runAppliancePrices((m, p, b, o) => payload.request(m, p, b, o))
         const rates = await fetchRatePoints(env, redis)
         await postRatePoints(payload, rates)
         return { points: rates.points.length, tables: rates.snapshots.map((x) => x.key) }
@@ -551,6 +554,12 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.data.removeJobScheduler('phone-prices').catch(() => {})
   } else {
     await runtime.queues.data.upsertJobScheduler('phone-prices', { every: 24 * 60 * 60 * 1000 }, { name: 'phone-prices', data: {} })
+  }
+  // Home appliance prices (zaviya.pk/prices): daily from the brands' own stores. APPLIANCE_PRICES=0 turns it off.
+  if (process.env.APPLIANCE_PRICES === '0') {
+    await runtime.queues.data.removeJobScheduler('appliance-prices').catch(() => {})
+  } else {
+    await runtime.queues.data.upsertJobScheduler('appliance-prices', { every: 24 * 60 * 60 * 1000 }, { name: 'appliance-prices', data: {} })
   }
   // ZAV-109 phase 2: confirmation mails and the 07:30 PKT briefing. Scheduled only with NEWSLETTER_SEND=true and the news@ password set.
   if (runtime.env.NEWSLETTER_SEND && runtime.env.NEWS_MAIL_PASSWORD) {

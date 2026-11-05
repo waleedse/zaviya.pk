@@ -12,6 +12,7 @@ import {
 import { refreshClusterStats, runClusterMatch } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { phoneEndpoints } from './phones'
+import { applianceEndpoints } from './appliances'
 import { pageviewsReport } from '../../lib/pageviews-report'
 import { expireBreaking, expireLive, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
@@ -1549,4 +1550,4 @@ const pipelineEndpoints: Endpoint[] = [
   },
 ]
 
-export const pipelineEndpointsExport = [...pipelineEndpoints, ...phoneEndpoints]
+export const pipelineEndpointsExport = [...pipelineEndpoints, ...phoneEndpoints, ...applianceEndpoints]

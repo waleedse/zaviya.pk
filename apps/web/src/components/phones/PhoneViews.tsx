@@ -5,6 +5,7 @@ import { FAQAccordion } from '@/components/article/FAQAccordion'
 import { PageHero } from '@/components/layout/PageHero'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { PhoneFilters, PhoneGrid, PhoneImage, PriceHistoryTable, hostOf, phoneHref } from '@/components/phones/PhoneParts'
+import { BuyButton } from '@/components/appliances/ApplianceViews'
 import { absoluteUrl, breadcrumbJsonLd, faqJsonLd } from '@/lib/seo'
 import {
   bandLabel,
@@ -81,10 +82,11 @@ export function PhonePageView({ phone, related, pairs, brandPhones }: { phone: P
             <p className="mt-2 text-sm text-fg-muted">
               {phone.priceUpdatedAt ? `Last updated ${dateText(phone.priceUpdatedAt)}` : 'We update this page when an official price is published.'}
             </p>
-            {phone.officialUrl && (
-              <a href={phone.officialUrl} rel="noopener nofollow" className="mt-3 inline-block text-sm font-semibold text-accent underline">
-                See it on {hostOf(phone.officialUrl)}
-              </a>
+            {phone.officialUrl && phone.status !== 'discontinued' && (
+              <>
+                <BuyButton url={phone.officialUrl} brand={phone.brand.name} className="mt-3 w-full" />
+                <p className="mt-2 text-xs text-fg-subtle">Opens {hostOf(phone.officialUrl)}. Zaviya does not sell phones or earn from this link.</p>
+              </>
             )}
           </div>
         </aside>

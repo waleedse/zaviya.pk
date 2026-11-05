@@ -212,3 +212,22 @@ describe('phone index policy (5 Nov)', () => {
     expect(phoneIndexable({})).toBe(false)
   })
 })
+
+describe('new and upcoming phones (5 Nov)', () => {
+  it('lists upcoming by expected date and the newest on sale per brand', async () => {
+    const { latestPhones, upcomingPhones } = await import('@/lib/phones/logic')
+    const p = (slug: string, brand: string, extra: Record<string, unknown> = {}) =>
+      ({ id: slug, slug, name: slug, brand: { slug: brand, name: brand }, status: 'current', colours: [], variants: [], pricePkr: 50000, priceHistory: [], specs: {}, popularity: 50, ...extra }) as never
+    const all = [
+      p('u2', 'xiaomi', { status: 'upcoming', launchDate: '2026-12-01' }),
+      p('u1', 'xiaomi', { status: 'upcoming', launchDate: '2026-11-20' }),
+      p('s1', 'samsung', { popularity: 70 }),
+      p('s2', 'samsung', { popularity: 60 }),
+      p('s3', 'samsung', { popularity: 40 }),
+      p('d1', 'vivo', { launchDate: '2026-10-01', popularity: 10 }),
+      p('old', 'vivo', { status: 'discontinued' }),
+    ]
+    expect((upcomingPhones(all) as { slug: string }[]).map((x) => x.slug)).toEqual(['u1', 'u2'])
+    expect((latestPhones(all, new Date('2026-11-05'), 2) as { slug: string }[]).map((x) => x.slug)).toEqual(['d1', 's1', 's2'])
+  })
+})
