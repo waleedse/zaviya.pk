@@ -8,8 +8,10 @@ const view = (slug: string, price: number | null, extra: Partial<ApplianceView> 
   id: slug,
   slug,
   name: slug,
-  brand: { slug: 'anex', name: 'Anex' },
-  category: { slug: 'kettles', name: 'Electric Kettles', singular: 'Kettle', ur: 'کیتلی' },
+  brand: { slug: 'anex', name: 'Anex', kind: 'store' },
+  category: { slug: 'kettles', name: 'Electric Kettles', singular: 'Kettle', ur: 'کیتلی', group: 'appliances' },
+  cityPrices: [],
+  hotScore: 0,
   pricePkr: price,
   listPricePkr: null,
   inStock: true,
@@ -84,7 +86,7 @@ describe('appliance importer', () => {
 describe('appliance pages logic', () => {
   const a = view('anex-a', 8000)
   const b = view('anex-b', 9000)
-  const c = view('nasgas-c', 8500, { brand: { slug: 'nasgas', name: 'Nasgas' } })
+  const c = view('nasgas-c', 8500, { brand: { slug: 'nasgas', name: 'Nasgas', kind: 'store' } })
   const far = view('anex-far', 30000)
   const none = view('anex-none', null)
   const all = [a, b, c, far, none]
@@ -134,10 +136,10 @@ describe('appliance views render', () => {
     const V = await import('@/components/appliances/ApplianceViews')
     const { categoryFaqs, hubFaqs, productFaqs } = await import('@/lib/appliances/logic')
     const a = view('anex-a', 8000, { specs: [{ label: 'Capacity', value: '1.7 litres' }], listPricePkr: 9000, priceUpdatedAt: '2026-11-05T06:00:00Z', priceHistory: [{ date: '2026-11-05T06:00:00Z', pricePkr: 8000 }] })
-    const b = view('nasgas-b', 8500, { brand: { slug: 'nasgas', name: 'Nasgas' } })
+    const b = view('nasgas-b', 8500, { brand: { slug: 'nasgas', name: 'Nasgas', kind: 'store' } })
     const all = [a, b]
     const summaries = categorySummaries(all)
-    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, latest: [a], faqs: hubFaqs(2), phones: { count: 66, minPrice: 20000, brands: ['Samsung'] } }))
+    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, latest: [a], trending: [a], faqs: hubFaqs(2), phones: { count: 66, minPrice: 20000, brands: ['Samsung'] } }))
     expect(hub).toContain('Prices in Pakistan today')
     expect(hub).toContain('href="/mobile-prices"')
     expect(hub).toContain('href="/petrol-price-today-pakistan"')

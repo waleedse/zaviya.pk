@@ -4,13 +4,15 @@ import { makeCtx } from '../phones/catalog.js'
 import { decodeEntities, pageTitle } from '../phones/highlights.js'
 import { parseSamsungPdp } from '../phones/samsung.js'
 import type { AdapterCtx } from '../phones/types.js'
+import { WOO_STORES, fetchHyundai, fetchPbsSpi, fetchToyota, fetchWoo } from './sources.js'
 
 /**
  * Home appliance prices (zaviya.pk/prices), added 5 Nov 2026.
  * Sources are only the brands' own Pakistan stores, read politely once a day with Zaviya's own user agent and robots.txt:
  *  - Shopify stores (Nasgas, Anex, West Point) publish a product feed at /products.json
  *  - Samsung Pakistan lists appliances in its sitemap; each product page carries a schema.org Product with the PKR price
- * Brands that block us (Dawlance answers 403) or show no prices (Haier) are not read.
+ *  - since 6 Nov 2026 also motorcycles, cars and weekly grocery prices (sources.ts, docs/PRICE-ENGINE.md)
+ * Brands that block us (Dawlance answers 403, Honda cars 403) or show no prices (Haier) are not read.
  */
 
 type Request = <T>(method: string, path: string, body?: unknown, opts?: { timeoutMs?: number; retries?: number }) => Promise<T>
@@ -19,6 +21,7 @@ const SHOPIFY_STORES = [
   { brand: 'nasgas', base: 'https://www.nasgas.com' },
   { brand: 'anex', base: 'https://www.anex.pk' },
   { brand: 'westpoint', base: 'https://www.westpoint.pk' },
+  { brand: 'gfc', base: 'https://gfcfans.com' },
 ] as const
 
 const SHOPIFY_MAX_PAGES = 4
@@ -213,6 +216,10 @@ export async function collectAppliances(ctx: AdapterCtx, only?: string[]): Promi
   const sources: [string, () => Promise<ApplianceImportInput[]>][] = [
     ...SHOPIFY_STORES.map((s) => [s.brand, () => fetchShopify(ctx, s)] as [string, () => Promise<ApplianceImportInput[]>]),
     ['samsung', () => fetchSamsungAppliances(ctx)],
+    ...WOO_STORES.map((s) => [s.brand, () => fetchWoo(ctx, s)] as [string, () => Promise<ApplianceImportInput[]>]),
+    ['toyota', () => fetchToyota(ctx)],
+    ['hyundai', () => fetchHyundai(ctx)],
+    ['pbs', () => fetchPbsSpi(ctx)],
   ]
   for (const [brand, run] of sources) {
     if (only?.length && !only.includes(brand)) continue
@@ -251,5 +258,12 @@ export async function runAppliancePrices(request: Request, only?: string[]) {
     changes.push(...res.changes)
   }
   logger.info({ items: items.length, created, updated, changes: changes.length, failed }, 'appliance prices refreshed')
-  return { items: items.length, created, updated, changes: changes.length, failed, dropped: dropped.length }
+  // Then re-rank: hotScore from 7-day visitors and the searches each item answers ("Trending prices", compare pages)
+  let hot: unknown = null
+  try {
+    hot = await request<{ changed: number; uncovered: unknown[] }>('POST', '/api/pipeline/prices/hot', {}, { timeoutMs: 180_000 })
+  } catch (e) {
+    logger.warn({ err: String(e) }, 'price hot scores failed')
+  }
+  return { items: items.length, created, updated, changes: changes.length, failed, dropped: dropped.length, hot }
 }

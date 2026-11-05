@@ -58,6 +58,6 @@ describe('collect', () => {
     const r = await collectAppliances(ctx)
     expect(r.items).toHaveLength(1)
     expect(r.items[0]).toMatchObject({ brand: 'westpoint', category: 'kettles', slug: 'westpoint-deluxe-kettle-wf-3118' })
-    expect(r.failed.map((f) => f.brand).sort()).toEqual(['anex', 'nasgas', 'samsung'])
+    expect(r.failed.map((f) => f.brand).sort()).toEqual(['anex', 'gfc', 'honda', 'hyundai', 'nasgas', 'pbs', 'samsung', 'toyota'])
   })
 })

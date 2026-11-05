@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import { APPLIANCE_BRANDS } from '@zaviya/shared'
 import { ApplianceListView, AppliancePageView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
 import {
@@ -8,7 +7,10 @@ import {
   categoryBySlug,
   categoryFaqs,
   categorySummaries,
+  fullName,
+  monthYear,
   productFaqs,
+  sourceText,
   similarAppliances,
   sortByPrice,
 } from '@/lib/appliances/logic'
@@ -19,8 +21,9 @@ export const revalidate = 1800
 
 type Params = { params: Promise<{ locale: string; category: string; slug: string }> }
 
-/** /prices/<category>/<brand> is a brand list; anything else is a product slug */
-const isBrand = (slug: string) => APPLIANCE_BRANDS.some((b) => b.slug === slug)
+/** /prices/<category>/<brand> is a brand list (a brand with items in this category); anything else is a product slug */
+const isBrandIn = (all: { brand: { slug: string; kind: string }; category: { slug: string } }[], category: string, slug: string) =>
+  all.some((a) => a.category.slug === category && a.brand.slug === slug && a.brand.kind !== 'source')
 
 export async function generateMetadata({ params }: Params) {
   const { locale: raw, category, slug } = await params
@@ -28,14 +31,14 @@ export async function generateMetadata({ params }: Params) {
   const cat = categoryBySlug(category)
   if (!cat) return { title: 'Not found', robots: { index: false } }
   const all = await getAppliances()
-  const year = new Date().getFullYear()
-  if (isBrand(slug)) {
+  const when = monthYear()
+  if (isBrandIn(all, category, slug)) {
     const items = all.filter((a) => a.category.slug === category && a.brand.slug === slug)
-    const name = APPLIANCE_BRANDS.find((b) => b.slug === slug)!.name
+    const name = items[0]!.brand.name
     return buildPageMetadata({
       locale,
-      title: `${name} ${cat.name} Prices in Pakistan ${year}`,
-      description: `${items.length} ${name} ${cat.name.toLowerCase()} with official PKR prices from the ${name} Pakistan store, specs and a link to buy.`,
+      title: `${name} ${cat.name} Prices in Pakistan ${when}`,
+      description: `${items.length} ${name} ${cat.name.toLowerCase()} with official PKR prices from ${sourceText(items[0]!)}, specs, price history and comparisons.`,
       enPath: `/prices/${category}/${slug}`,
       absoluteTitle: true,
       noindex: items.filter(applianceIndexable).length < MIN_INDEXABLE_APPLIANCE_LIST,
@@ -43,11 +46,17 @@ export async function generateMetadata({ params }: Params) {
   }
   const a = all.find((x) => x.slug === slug && x.category.slug === category)
   if (!a) return { title: 'Not found', robots: { index: false } }
-  const full = `${a.brand.name} ${a.name}`
+  const full = fullName(a)
+  const grocery = a.brand.kind === 'source'
+  const rs = a.pricePkr ? `Rs ${a.pricePkr.toLocaleString('en-US')}` : null
+  const title = grocery ? `${a.name} Price Today in Pakistan (${when}): Lahore, Karachi, Islamabad` : `${full} Price in Pakistan ${when}`
+  const description = grocery
+    ? `${a.name} price today: ${rs ? `${rs} average this week` : 'no average this week'}, with the lowest and highest price in ${a.cityPrices.length || 17} cities from the PBS weekly survey, and the price history.`
+    : `${full} price in Pakistan: ${rs ? `${rs} on ${sourceText(a)}` : 'not shown by the maker yet'}. ${a.category.group === 'vehicles' ? 'Variants, ex-factory price, price history and comparisons.' : `Specs, price history, similar ${cat.name.toLowerCase()} and where to buy.`}`
   return buildPageMetadata({
     locale,
-    title: `${full} Price in Pakistan ${year}`,
-    description: `${full} price in Pakistan: ${a.pricePkr ? `Rs ${a.pricePkr.toLocaleString('en-US')} on the official ${a.brand.name} store` : 'not shown by the brand yet'}. Specs, price history, similar ${cat.name.toLowerCase()} and where to buy.`.slice(0, 300),
+    title,
+    description: description.slice(0, 300),
     enPath: `/prices/${category}/${slug}`,
     ogImage: a.imageUrl,
     absoluteTitle: false,
@@ -61,7 +70,7 @@ export default async function ApplianceOrBrandPage({ params }: Params) {
   const cat = categoryBySlug(category)
   if (!cat) notFound()
   const all = await getAppliances()
-  if (isBrand(slug)) {
+  if (isBrandIn(all, category, slug)) {
     const inCat = sortByPrice(all.filter((a) => a.category.slug === category))
     const items = inCat.filter((a) => a.brand.slug === slug)
     if (!items.length) notFound()
@@ -70,7 +79,7 @@ export default async function ApplianceOrBrandPage({ params }: Params) {
     return (
       <ApplianceListView
         title={`${name} ${cat.name.toLowerCase()} prices in Pakistan`}
-        description={`Official prices of ${items.length} ${name} ${cat.name.toLowerCase()} from the ${name} Pakistan store, cheapest first.`}
+        description={`Official prices of ${items.length} ${name} ${cat.name.toLowerCase()} from ${sourceText(items[0]!)}, cheapest first.`}
         crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: cat.name, href: `/prices/${category}` }, { label: name }]}
         items={items}
         summaries={categorySummaries(all)}

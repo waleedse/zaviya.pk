@@ -28,6 +28,7 @@ import { PushSubscriptions } from './collections/PushSubscriptions'
 import { PhoneBrands } from './collections/PhoneBrands'
 import { Phones } from './collections/Phones'
 import { Appliances } from './collections/Appliances'
+import { PriceDemand } from './collections/PriceDemand'
 import { ResultBoards } from './collections/ResultBoards'
 import { ResultExams } from './collections/ResultExams'
 import { VacationNotices } from './collections/VacationNotices'
@@ -104,6 +105,7 @@ export default buildConfig({
     PhoneBrands,
     Phones,
     Appliances,
+    PriceDemand,
     ResultBoards,
     ResultExams,
     VacationNotices,
