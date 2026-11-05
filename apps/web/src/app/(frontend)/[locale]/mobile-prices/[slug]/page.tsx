@@ -82,7 +82,7 @@ export default async function MobilePricesList({ params }: Params) {
             ? 'Phones the brands have announced or teased for Pakistan. We add the official price and launch date the day they are published.'
             : "The newest phones on sale in Pakistan, with official PKR prices from the brands' own sites."
         }
-        crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label, url: `/mobile-prices/${slug}` }]}
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label, url: `/mobile-prices/${slug}` }]}
         phones={phones}
         brands={brandsWithPhones}
         emptyText={upcoming ? 'No upcoming phone has been officially announced for Pakistan yet. Check the new phones list.' : 'No phones listed yet.'}
@@ -108,7 +108,7 @@ export default async function MobilePricesList({ params }: Params) {
       <PhoneListView
         title={`Best phones under Rs ${bandLabel(band)} in Pakistan`}
         description={`Phones with an official price of Rs ${bandLabel(band)} or less in Pakistan, ${year} prices in PKR, sorted by popularity.`}
-        crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: `Under Rs ${bandLabel(band)}`, url: `/mobile-prices/${slug}` }]}
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: `Under Rs ${bandLabel(band)}`, url: `/mobile-prices/${slug}` }]}
         phones={phones}
         brands={brandsWithPhones}
         active={{ band }}
@@ -133,7 +133,7 @@ export default async function MobilePricesList({ params }: Params) {
     <PhoneListView
       title={`${brand.name} mobile prices in Pakistan`}
       description={brand.description ?? `Official prices in PKR and specs of ${brand.name} phones sold in Pakistan, ${year}.`}
-      crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: brand.name, url: `/mobile-prices/${slug}` }]}
+      crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: brand.name, url: `/mobile-prices/${slug}` }]}
       phones={phones}
       brands={brandsWithPhones}
       active={{ brand: slug }}

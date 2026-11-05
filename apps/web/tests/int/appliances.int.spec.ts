@@ -137,8 +137,10 @@ describe('appliance views render', () => {
     const b = view('nasgas-b', 8500, { brand: { slug: 'nasgas', name: 'Nasgas' } })
     const all = [a, b]
     const summaries = categorySummaries(all)
-    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, latest: [a], faqs: hubFaqs(2) }))
-    expect(hub).toContain('Home appliance prices in Pakistan')
+    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, latest: [a], faqs: hubFaqs(2), phones: { count: 66, minPrice: 20000, brands: ['Samsung'] } }))
+    expect(hub).toContain('Prices in Pakistan today')
+    expect(hub).toContain('href="/mobile-prices"')
+    expect(hub).toContain('href="/petrol-price-today-pakistan"')
     expect(hub).toContain('href="/prices/kettles"')
     const list = renderToStaticMarkup(h(V.ApplianceListView, { title: 'Kettle prices', description: 'd', crumbs: [{ label: 'Home', href: '/' }], items: all, summaries, category: summaries[0]!.category, brands: [{ slug: 'anex', name: 'Anex', count: 1 }, { slug: 'nasgas', name: 'Nasgas', count: 1 }], faqs: categoryFaqs(summaries[0]!.category, all) }))
     expect(list).toContain('Rs 8,000')

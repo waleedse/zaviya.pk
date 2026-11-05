@@ -39,7 +39,7 @@ export default async function MobilePricesHub({ params }: { params: Promise<{ lo
     <PhoneListView
       title={`Mobile prices in Pakistan ${year}`}
       description="Official prices in rupees, specs, price history and comparisons for the phones sold in Pakistan. Pick a brand or a budget."
-      crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', url: '/mobile-prices' }]}
+      crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', url: '/mobile-prices' }]}
       phones={popular}
       brands={brandsWithPhones}
       faqs={hubFaqs(phones.length)}

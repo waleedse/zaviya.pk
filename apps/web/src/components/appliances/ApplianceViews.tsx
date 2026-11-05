@@ -144,7 +144,10 @@ export function CategoryChips({ summaries, active }: { summaries: CategorySummar
   return (
     <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Categories">
       <Link href={PRICES_HUB} role="listitem" className={cn('chip', !active && 'border-transparent bg-accent text-accent-fg')}>
-        All appliances
+        All prices
+      </Link>
+      <Link href="/mobile-prices" role="listitem" className="chip whitespace-nowrap">
+        Mobile phones
       </Link>
       {summaries.map((s) => (
         <Link key={s.category.slug} href={categoryHref(s.category.slug)} role="listitem" className={cn('chip whitespace-nowrap', active === s.category.slug && 'border-transparent bg-accent text-accent-fg')}>
@@ -157,26 +160,91 @@ export function CategoryChips({ summaries, active }: { summaries: CategorySummar
 
 // ---------- hub ----------
 
-export function ApplianceHubView({ summaries, latest, faqs }: { summaries: CategorySummary[]; latest: ApplianceView[]; faqs: FAQ[] }) {
+/** Daily rate pages that belong to the one Prices section */
+export const RATE_LINKS = [
+  { href: '/petrol-price-today-pakistan', label: 'Petrol & diesel price today', ur: 'پیٹرول' },
+  { href: '/gold-rate-today-pakistan', label: 'Gold rate today', ur: 'سونا' },
+  { href: '/dollar-rate-today-pakistan', label: 'Dollar rate today', ur: 'ڈالر' },
+  { href: '/riyal-dirham-rate-pakistan', label: 'Riyal & dirham rate', ur: 'ریال' },
+  { href: '/chicken-price-pakistan', label: 'Chicken price today', ur: 'مرغی' },
+] as const
+
+export interface PhonesSummary {
+  count: number
+  minPrice: number | null
+  brands: string[]
+}
+
+export function ApplianceHubView({ summaries, latest, faqs, phones }: { summaries: CategorySummary[]; latest: ApplianceView[]; faqs: FAQ[]; phones: PhonesSummary }) {
   const total = summaries.reduce((n, s) => n + s.count, 0)
   const crumbs = [{ label: 'Home', href: '/' }, { label: 'Prices' }]
   return (
     <div className="pb-10">
       <JsonLd data={[breadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: 'Prices', url: PRICES_HUB }]), ...(faqs.length ? [faqJsonLd(faqs)] : [])]} />
       <PageHero
-        title="Home appliance prices in Pakistan"
-        description="Official PKR prices of ACs, fridges, washing machines, geysers, heaters, coolers and kitchen appliances, read daily from the brands' own Pakistan stores, with a link to buy."
+        title="Prices in Pakistan today"
+        description="One place for prices: mobile phones, home appliances (AC, fridge, washing machine, geyser, heater) from the brands' own stores, and today's petrol, gold, dollar and chicken rates."
         icon={Plug}
         color={COLOR}
         eyebrow="Prices"
         crumbs={crumbs}
-        stats={[{ label: 'Products listed', value: total }]}
+        stats={[
+          { label: 'Phones', value: phones.count },
+          { label: 'Appliances', value: total },
+        ]}
       />
       <div className="container-wide mt-8 space-y-8">
         <CategoryChips summaries={summaries} />
+        <section aria-labelledby="rates">
+          <h2 id="rates" className="font-display text-xl font-bold">
+            Daily rates
+          </h2>
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {RATE_LINKS.map((r) => (
+              <li key={r.href}>
+                <Link href={r.href} className="card-lift flex h-full flex-col p-4">
+                  <span className="font-display font-bold">{r.label}</span>
+                  <span className="mt-1 text-sm text-fg-subtle" lang="ur">
+                    {r.ur}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section aria-labelledby="mobiles">
+          <h2 id="mobiles" className="font-display text-xl font-bold">
+            Mobile phones
+          </h2>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <li className="sm:col-span-2">
+              <Link href="/mobile-prices" className="card-lift flex h-full flex-col p-4">
+                <span className="font-display text-lg font-bold">
+                  Mobile prices in Pakistan <span className="text-fg-subtle" lang="ur">(موبائل)</span>
+                </span>
+                <span className="mt-1 text-sm text-fg-muted">
+                  {phones.count} phones · {phones.brands.join(', ')}
+                </span>
+                {phones.minPrice ? <span className="mt-2 font-semibold tabular-nums">From {formatPkr(phones.minPrice)}</span> : null}
+              </Link>
+            </li>
+            <li>
+              <Link href="/mobile-prices/new-phones" className="card-lift flex h-full flex-col p-4">
+                <span className="font-display font-bold">New phones</span>
+                <span className="mt-1 text-sm text-fg-muted">Latest launches with official prices</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/mobile-prices/upcoming" className="card-lift flex h-full flex-col p-4">
+                <span className="font-display font-bold">Upcoming phones</span>
+                <span className="mt-1 text-sm text-fg-muted">Announced for Pakistan, coming soon</span>
+              </Link>
+            </li>
+          </ul>
+        </section>
         <section aria-labelledby="cats">
           <h2 id="cats" className="font-display text-xl font-bold">
-            Prices by category
+            Home appliances
           </h2>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {summaries.map((s) => (
@@ -202,16 +270,13 @@ export function ApplianceHubView({ summaries, latest, faqs }: { summaries: Categ
         {latest.length ? (
           <section aria-labelledby="latest">
             <h2 id="latest" className="font-display text-xl font-bold">
-              Price changes this week
+              Appliance price changes this week
             </h2>
             <div className="mt-4">
               <ApplianceGrid items={latest} />
             </div>
           </section>
         ) : null}
-        <p className="text-sm text-fg-muted">
-          Looking for phones? See <Link href="/mobile-prices" className="underline">mobile prices in Pakistan</Link>.
-        </p>
         <ApplianceSourcingNote />
         <FAQAccordion faqs={faqs} locale="en" />
       </div>

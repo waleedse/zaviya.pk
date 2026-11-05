@@ -28,6 +28,7 @@ import type { BrandView, PhonePair, PhoneView } from '@/lib/phones/types'
 
 const COLOR = '#2563eb'
 const HOME = { name: 'Home', url: '/' }
+const PRICES = { name: 'Prices', url: '/prices' }
 const HUB = { name: 'Mobile prices', url: '/mobile-prices' }
 
 export function pairLabel(a: PhoneView, b: PhoneView) {
@@ -56,7 +57,7 @@ export function PhonePageView({ phone, related, pairs, brandPhones }: { phone: P
     <div className="pb-10">
       <JsonLd
         data={[
-          breadcrumbJsonLd([HOME, HUB, { name: phone.brand.name, url: `/mobile-prices/${phone.brand.slug}` }, { name: full, url: phoneHref(phone.slug) }]),
+          breadcrumbJsonLd([HOME, PRICES, HUB, { name: phone.brand.name, url: `/mobile-prices/${phone.brand.slug}` }, { name: full, url: phoneHref(phone.slug) }]),
           phoneJsonLd(phone, url, phone.imageUrl),
           ...(faqs.length ? [faqJsonLd(faqs)] : []),
         ]}
@@ -67,7 +68,7 @@ export function PhonePageView({ phone, related, pairs, brandPhones }: { phone: P
         icon={Smartphone}
         color={COLOR}
         eyebrow={phone.status === 'upcoming' ? 'Upcoming phone' : phone.status === 'discontinued' ? 'No longer sold' : `${phone.brand.name} mobile`}
-        crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: phone.brand.name, href: `/mobile-prices/${phone.brand.slug}` }, { label: phone.name }]}
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label: phone.brand.name, href: `/mobile-prices/${phone.brand.slug}` }, { label: phone.name }]}
       />
       <div className="container-wide mt-8 grid gap-8 lg:grid-cols-[320px_1fr]">
         <aside className="space-y-4">
@@ -308,7 +309,7 @@ export function ComparePageView({ a, b, pair }: { a: PhoneView; b: PhoneView; pa
     <div className="pb-10">
       <JsonLd
         data={[
-          breadcrumbJsonLd([HOME, HUB, { name: label, url: `/compare/${pair.key}` }]),
+          breadcrumbJsonLd([HOME, PRICES, HUB, { name: label, url: `/compare/${pair.key}` }]),
           ...(faqs.length ? [faqJsonLd(faqs)] : []),
         ]}
       />
@@ -318,7 +319,7 @@ export function ComparePageView({ a, b, pair }: { a: PhoneView; b: PhoneView; pa
         icon={Smartphone}
         color={COLOR}
         eyebrow="Compare phones"
-        crumbs={[{ label: 'Home', href: '/' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label }]}
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Prices', href: '/prices' }, { label: 'Mobile prices', href: '/mobile-prices' }, { label }]}
       />
       <div className="container-wide mt-8 max-w-[960px] space-y-8">
         <div className="grid grid-cols-2 gap-3">

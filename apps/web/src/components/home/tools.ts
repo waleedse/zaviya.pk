@@ -1,4 +1,4 @@
-import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, GraduationCap, MoonStar, Plug, Radio, Smartphone, Snowflake, type LucideIcon } from 'lucide-react'
+import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, GraduationCap, MoonStar, Radio, Tag, Snowflake, type LucideIcon } from 'lucide-react'
 
 export interface ToolLink {
   path: string
@@ -21,8 +21,7 @@ export const TOOLS: ToolLink[] = [
   { path: '/namaz-timings#islamic-dates', en: 'Islamic calendar', ur: 'اسلامی کیلنڈر', subEn: 'Hijri dates & events', subUr: 'ہجری تاریخیں اور مواقع', icon: CalendarDays, tile: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
   { path: '/namaz-timings#qibla', en: 'Qibla direction', ur: 'قبلہ رخ', subEn: 'Bearing for your city', subUr: 'اپنے شہر کے لیے', icon: Compass, tile: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
   { path: '/live', en: 'Live updates', ur: 'لائیو اپ ڈیٹس', subEn: 'Developing stories', subUr: 'جاری خبریں', icon: Radio, tile: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' },
-  { path: '/mobile-prices', en: 'Mobile prices', ur: 'موبائل قیمتیں', subEn: 'Phone prices & specs in Pakistan', subUr: 'پاکستان میں موبائل کی قیمتیں اور خصوصیات', icon: Smartphone, tile: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
-  { path: '/prices', en: 'Appliance prices', ur: 'الیکٹرانکس قیمتیں', subEn: 'AC, fridge, geyser prices in Pakistan', subUr: 'اے سی، فریج، گیزر کی قیمتیں', icon: Plug, tile: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
+  { path: '/prices', en: 'Prices', ur: 'قیمتیں', subEn: 'Mobiles, appliances & daily rates', subUr: 'موبائل، الیکٹرانکس اور روزانہ ریٹ', icon: Tag, tile: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
   { path: '/results', en: 'Board results', ur: 'بورڈ کے نتائج', subEn: 'BISE, FBISE, BSEK dates & links', subUr: 'بورڈز کی تاریخیں اور لنکس', icon: GraduationCap, tile: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
   { path: '/winter-vacations-2026-27', en: 'Winter vacations', ur: 'سردیوں کی چھٹیاں', subEn: 'Dates by province, school closures', subUr: 'صوبوں کی تاریخیں اور بندش', icon: Snowflake, tile: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
 ]

@@ -1,7 +1,7 @@
 'use client'
 
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { Menu, Plug, Smartphone, X } from 'lucide-react'
+import { Menu, Tag, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { SITE, type CategoryRef, type Locale } from '@zaviya/shared'
@@ -43,11 +43,8 @@ export function MobileMenu({ locale, categories, langHref }: { locale: Locale; c
             <Link href={localePath(locale, '/live')} onClick={close} className="flex items-center gap-2 rounded-lg px-3 py-3 text-lg font-semibold hover:bg-surface-2">
               <span className="live-dot" /> {d.nav.live}
             </Link>
-            <Link href={localePath(locale, '/mobile-prices')} onClick={close} className="flex items-center gap-2 rounded-lg px-3 py-3 text-lg font-semibold hover:bg-surface-2">
-              <Smartphone className="h-5 w-5 text-accent" aria-hidden /> {isUr ? 'موبائل قیمتیں' : 'Mobile prices'}
-            </Link>
             <Link href={localePath(locale, '/prices')} onClick={close} className="flex items-center gap-2 rounded-lg px-3 py-3 text-lg font-semibold hover:bg-surface-2">
-              <Plug className="h-5 w-5 text-accent" aria-hidden /> {isUr ? 'قیمتیں' : 'Appliance prices'}
+              <Tag className="h-5 w-5 text-accent" aria-hidden /> {isUr ? 'قیمتیں' : 'Prices'}
             </Link>
             <div className="my-2 border-t border-border" />
             {categories.map((c) => {
