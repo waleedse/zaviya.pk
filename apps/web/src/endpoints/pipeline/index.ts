@@ -33,6 +33,8 @@ const SERIES_TO_DATA_KEY: Record<string, string> = {
 }
 
 const SOURCING_PLAN_KEY = 'sourcing_plan'
+/** Hard ceiling on stories a day (5 Nov 2026): Google stopped showing the site while it published ~150 rewrites a day. */
+export const QUALITY_DAILY_ARTICLE_CAP = 40
 const SourcingPlanSchema = z.object({
   /** X searches the extension runs every discovery cycle (max 12) */
   xQueries: z.array(z.string().min(3).max(300)).max(12).optional(),
@@ -890,7 +892,8 @@ const pipelineEndpoints: Endpoint[] = [
         ...(plan?.minIntervalMin ? { minIntervalMin: plan.minIntervalMin } : {}),
         dailyCaps: {
           ...(settings.dailyCaps ?? {}),
-          articles: plan?.dailyArticleCap ?? Number(process.env.DAILY_ARTICLE_CAP ?? 60),
+          // Waleed, 5 Nov: quality over volume. Neither the editor's plan (it asked for 160) nor the env (96) may go above 40.
+          articles: Math.min(plan?.dailyArticleCap ?? Number(process.env.DAILY_ARTICLE_CAP ?? QUALITY_DAILY_ARTICLE_CAP), QUALITY_DAILY_ARTICLE_CAP),
         },
         sourcingPlan: plan ?? null,
       })
