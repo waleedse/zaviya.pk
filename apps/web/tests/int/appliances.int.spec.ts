@@ -155,3 +155,20 @@ describe('appliance views render', () => {
     expect(cmp).toContain('cheaper than')
   })
 })
+
+describe('appliance category fixes (5 Nov)', () => {
+  it('an AC/DC hybrid air cooler is a cooler, not an AC', () => {
+    expect(classifyAppliance('NasGas Eco-Hybrid NAC-2100 | AC/DC Dual Input Air Cooler | 40L Tank', 'Room Air Cooler')).toBe('air-coolers')
+    expect(classifyAppliance('NasGas 85L Copper Room Air Cooler NAC-9700 AC')).toBe('air-coolers')
+    expect(classifyAppliance('Wall Mount AC 12,000 BTU')).toBe('air-conditioners')
+    expect(classifyAppliance('AG-3072 Deluxe Oven Toaster with Convection Fan')).toBe('toasters-sandwich-makers')
+    expect(classifyAppliance('NasGas NG-553 Built-in Professional Baking Oven with Convection Fan')).toBe('microwave-ovens')
+    expect(classifyAppliance('Deluxe Ultra Quiet Tower Fan WF-1546')).toBe('fans')
+  })
+  it('the importer moves a stored item to the corrected category', () => {
+    const now = new Date('2026-11-05T06:00:00Z')
+    const item = { brand: 'nasgas' as const, category: 'air-conditioners' as const, name: 'NAC-2100 Air Cooler', officialUrl: 'https://www.nasgas.com/products/nac-2100', pricePkr: 23500 }
+    const stored = mergeAppliance(null, item, now).data
+    expect(mergeAppliance(stored, { ...item, category: 'air-coolers' }, now).data.category).toBe('air-coolers')
+  })
+})

@@ -16,7 +16,7 @@ export const APPLIANCE_CATEGORIES = [
   { slug: 'room-heaters', name: 'Room Heaters', singular: 'Room Heater', ur: 'ہیٹر', order: 5 },
   { slug: 'air-coolers', name: 'Air Coolers', singular: 'Air Cooler', ur: 'ایئر کولر', order: 6 },
   { slug: 'water-dispensers', name: 'Water Dispensers & Coolers', singular: 'Water Dispenser', ur: 'واٹر ڈسپنسر', order: 7 },
-  { slug: 'microwave-ovens', name: 'Microwave Ovens', singular: 'Microwave Oven', ur: 'مائیکرو ویو', order: 8 },
+  { slug: 'microwave-ovens', name: 'Microwave & Baking Ovens', singular: 'Oven', ur: 'اوون', order: 8 },
   { slug: 'cooking-ranges', name: 'Cooking Ranges, Hobs & Stoves', singular: 'Cooking Range', ur: 'چولہا', order: 9 },
   { slug: 'kitchen-hoods', name: 'Kitchen Hoods', singular: 'Kitchen Hood', ur: 'کچن ہڈ', order: 10 },
   { slug: 'dishwashers', name: 'Dishwashers', singular: 'Dishwasher', ur: 'ڈش واشر', order: 11 },
@@ -26,7 +26,7 @@ export const APPLIANCE_CATEGORIES = [
   { slug: 'irons', name: 'Irons', singular: 'Iron', ur: 'استری', order: 15 },
   { slug: 'fans', name: 'Fans', singular: 'Fan', ur: 'پنکھا', order: 16 },
   { slug: 'cookers', name: 'Rice & Pressure Cookers', singular: 'Cooker', ur: 'ککر', order: 17 },
-  { slug: 'toasters-sandwich-makers', name: 'Toasters & Sandwich Makers', singular: 'Toaster', ur: 'ٹوسٹر', order: 18 },
+  { slug: 'toasters-sandwich-makers', name: 'Toasters, Oven Toasters & Sandwich Makers', singular: 'Toaster', ur: 'ٹوسٹر', order: 18 },
 ] as const
 export type ApplianceCategorySlug = (typeof APPLIANCE_CATEGORIES)[number]['slug']
 export const APPLIANCE_CATEGORY_SLUGS = APPLIANCE_CATEGORIES.map((c) => c.slug) as [ApplianceCategorySlug, ...ApplianceCategorySlug[]]
@@ -44,13 +44,15 @@ export const APPLIANCE_BRAND_SLUGS = APPLIANCE_BRANDS.map((b) => b.slug) as [App
 const RULES: [RegExp, ApplianceCategorySlug][] = [
   [/dish\s?washer/i, 'dishwashers'],
   [/air\s?fryer/i, 'air-fryers'],
-  [/air\s?condition|\binverter ac\b|\bsplit ac\b|wind-?free|\bac\b/i, 'air-conditioners'],
   [/refrigerat|fridge|freezer/i, 'refrigerators'],
   [/washing machine|washer|dryer|spin/i, 'washing-machines'],
   [/geyser|water heater/i, 'water-heaters'],
   [/dispenser|dispender|water cooler/i, 'water-dispensers'],
   [/air cooler|room cooler|\bcooler\b/i, 'air-coolers'],
+  [/air\s?condition|\binverter ac\b|\bsplit ac\b|wind-?free|\bac\b(?!\s*\/\s*dc)/i, 'air-conditioners'],
   [/microwave/i, 'microwave-ovens'],
+  [/oven toaster|toaster oven/i, 'toasters-sandwich-makers'],
+  [/\boven\b/i, 'microwave-ovens'],
   [/\bhood\b/i, 'kitchen-hoods'],
   [/cooking range|\bhob\b|gas stove|\bstove\b|hot\s?plate|infrared cooker|induction/i, 'cooking-ranges'],
   [/rice cooker|pressure cooker|slow cooker|multi cooker/i, 'cookers'],
