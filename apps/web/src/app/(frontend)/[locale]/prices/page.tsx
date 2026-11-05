@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { ApplianceHubView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
 import { getPhones } from '@/lib/phones/queries'
-import { categorySummaries, hubFaqs } from '@/lib/appliances/logic'
+import { categorySummaries, hubFaqs, monthYear, trendingItems } from '@/lib/appliances/logic'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -11,11 +11,10 @@ export const revalidate = 1800
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const locale = parseLocale((await params).locale)
   const all = await getAppliances()
-  const year = new Date().getFullYear()
   return buildPageMetadata({
     locale,
-    title: `Prices in Pakistan Today ${year}: Mobiles, AC, Fridge, Geyser, Petrol, Gold`,
-    description: `All prices in one place: mobile phones and ${all.length || 'the latest'} home appliances (AC, fridge, washing machine, geyser, heater) from the brands' own stores, plus today's petrol, gold, dollar and chicken rates.`,
+    title: `Prices in Pakistan Today (${monthYear()}): Atta, Sugar, Bikes, Cars, Mobiles, AC, Petrol, Gold`,
+    description: `Official prices in one place: atta, sugar, ghee, milk, eggs and LPG in 17 cities, Honda bike and Toyota car prices, mobile phones, ${all.length || 'hundreds of'} items from the brands' own stores, plus today's petrol, gold and dollar rates.`,
     enPath: '/prices',
     absoluteTitle: true,
   })
@@ -30,5 +29,5 @@ export default async function PricesHub({ params }: { params: Promise<{ locale: 
   const latest = all
     .filter((a) => a.pricePkr && a.priceHistory.length > 1 && Date.parse(a.priceHistory[0]!.date) > weekAgo)
     .slice(0, 10)
-  return <ApplianceHubView summaries={categorySummaries(all)} latest={latest} faqs={hubFaqs(all.length)} phones={phoneSummary} />
+  return <ApplianceHubView summaries={categorySummaries(all)} latest={latest} trending={trendingItems(all, 10)} faqs={hubFaqs(all.length)} phones={phoneSummary} />
 }

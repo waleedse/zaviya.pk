@@ -1,4 +1,4 @@
-import { applianceSlug, type ApplianceImportInput, type ApplianceSpec } from '@zaviya/shared'
+import { applianceSlug, type ApplianceImportInput, type ApplianceSpec, type CityPrice } from '@zaviya/shared'
 
 /**
  * Importer core for appliances: merges one item read from a brand store into what is stored. Pure, tested on its own.
@@ -7,6 +7,8 @@ import { applianceSlug, type ApplianceImportInput, type ApplianceSpec } from '@z
  *  - a jump of more than MAX_JUMP in one step is not applied (store glitch guard) and reported as skipped
  *  - a "was" price that is not above the price, or more than 3x it, is ignored (Nasgas lists Rs500,000 "was" prices)
  *  - name, image, specs and summary only fill what is empty, so admin edits stay
+ *  - official statistics ("trusted", PBS weekly prices) skip the jump guard: tomatoes do double in a week;
+ *    their specs and per-city prices are replaced on every release
  */
 
 export const MAX_JUMP = 0.6
@@ -27,6 +29,9 @@ export interface StoredAppliance {
   inStock?: boolean | null
   priceUpdatedAt?: string | null
   specs?: ApplianceSpec[] | null
+  nameUr?: string | null
+  unit?: string | null
+  cityPrices?: CityPrice[] | null
   priceHistory?: { date: string; pricePkr: number; sourceUrl?: string | null }[] | null
 }
 
@@ -69,7 +74,10 @@ export function mergeAppliance(existing: StoredAppliance | null, item: Appliance
 
   if (empty(data.model) && item.model) data.model = item.model
   if (empty(data.imageUrl) && item.imageUrl) data.imageUrl = item.imageUrl
-  if (empty(data.specs) && item.specs?.length) data.specs = item.specs
+  if ((empty(data.specs) || item.trusted) && item.specs?.length) data.specs = item.specs
+  if (item.nameUr) data.nameUr = item.nameUr
+  if (item.unit) data.unit = item.unit
+  if (item.cityPrices?.length) data.cityPrices = item.cityPrices
   if ((empty(data.popularity) || data.popularity === 0) && item.popularity) data.popularity = item.popularity
   // Category comes from our own rules on the store's title, so a better rule fixes stored items too
   data.category = item.category
@@ -82,7 +90,7 @@ export function mergeAppliance(existing: StoredAppliance | null, item: Appliance
   const price = item.pricePkr ?? null
   if (price != null) {
     const old = data.pricePkr ?? null
-    if (old != null && old !== price && Math.abs(price - old) / old > MAX_JUMP) {
+    if (!item.trusted && old != null && old !== price && Math.abs(price - old) / old > MAX_JUMP) {
       skipped = { slug, from: old, to: price }
     } else {
       if (old !== price) {

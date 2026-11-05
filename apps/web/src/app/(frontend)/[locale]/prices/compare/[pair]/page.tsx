@@ -1,7 +1,7 @@
 import { notFound, permanentRedirect } from 'next/navigation'
 import { ApplianceCompareView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
-import { applianceIndexable, findComparePair } from '@/lib/appliances/logic'
+import { applianceIndexable, findComparePair, fullName, monthYear } from '@/lib/appliances/logic'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -13,11 +13,11 @@ export async function generateMetadata({ params }: Params) {
   const { locale: raw, pair } = await params
   const r = findComparePair(pair, await getAppliances())
   if (!r) return { title: 'Not found', robots: { index: false } }
-  const label = `${r.a.brand.name} ${r.a.name} vs ${r.b.brand.name} ${r.b.name}`
+  const label = `${fullName(r.a)} vs ${fullName(r.b)}`
   return buildPageMetadata({
     locale: parseLocale(raw),
-    title: `${label}: Price & Specs Compared`,
-    description: `${label}: official prices in Pakistan and specs side by side, with links to buy from each brand's store.`.slice(0, 300),
+    title: `${label}: Price in Pakistan Compared (${monthYear()})`,
+    description: `${label}: official prices in Pakistan and details side by side, which is cheaper, and links to the official source.`.slice(0, 300),
     enPath: `/prices/compare/${r.key}`,
     noindex: !applianceIndexable(r.a) || !applianceIndexable(r.b),
   })

@@ -1,13 +1,17 @@
-import { APPLIANCE_BRANDS, APPLIANCE_CATEGORIES, formatPkr } from '@zaviya/shared'
+import { APPLIANCE_BRANDS, APPLIANCE_CATEGORIES, PRICE_GROUPS, formatPkr, type CityPrice, type PriceGroupSlug, type PriceSourceKind } from '@zaviya/shared'
 
-/** An appliance as the pages use it (plain data) */
+/** An item on /prices as the pages use it (plain data): appliance, motorcycle, car or weekly grocery price */
 export interface ApplianceView {
   id: string | number
   slug: string
   name: string
+  nameUr?: string
   model?: string
-  brand: { slug: string; name: string }
-  category: { slug: string; name: string; singular: string; ur: string }
+  unit?: string
+  brand: { slug: string; name: string; kind: PriceSourceKind }
+  category: { slug: string; name: string; singular: string; ur: string; group: PriceGroupSlug }
+  cityPrices: CityPrice[]
+  hotScore: number
   pricePkr: number | null
   listPricePkr: number | null
   inStock: boolean | null
@@ -28,6 +32,34 @@ export const MIN_INDEXABLE_APPLIANCE_LIST = 3
 
 export const categoryBySlug = (slug: string): CategoryDef | undefined => APPLIANCE_CATEGORIES.find((c) => c.slug === slug)
 export const brandName = (slug: string): string => APPLIANCE_BRANDS.find((b) => b.slug === slug)?.name ?? slug
+export const brandKind = (slug: string): PriceSourceKind => APPLIANCE_BRANDS.find((b) => b.slug === slug)?.kind ?? 'store'
+export const groupBySlug = (slug: string) => PRICE_GROUPS.find((g) => g.slug === slug)
+
+/** "Honda CD 70", "Toyota Yaris GLI 1.3 MT"; a statistics item has no brand: "Atta (Wheat Flour) 20 kg Bag" */
+export function fullName(a: Pick<ApplianceView, 'name' | 'brand'>): string {
+  if (a.brand.kind === 'source') return a.name
+  return a.name.toLowerCase().startsWith(a.brand.name.toLowerCase()) ? a.name : `${a.brand.name} ${a.name}`
+}
+
+/** Month and year for titles: "November 2026" (prices change; searches carry the month) */
+export function monthYear(d = new Date()): string {
+  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Karachi' })
+}
+
+/** Where the price comes from, in words, for the page and the FAQs */
+export function sourceText(a: Pick<ApplianceView, 'brand' | 'category'>): string {
+  if (a.brand.kind === 'source') return "the Pakistan Bureau of Statistics' weekly price survey (17 cities)"
+  if (a.brand.kind === 'maker') return `${a.brand.name} Pakistan's own price list`
+  return `the official ${a.brand.name} store`
+}
+
+/** Most searched and most viewed first: the "Trending prices" row */
+export function trendingItems(all: ApplianceView[], max = 12): ApplianceView[] {
+  return all
+    .filter((a) => applianceIndexable(a) && a.hotScore > 0)
+    .sort((a, b) => b.hotScore - a.hotScore || b.popularity - a.popularity)
+    .slice(0, max)
+}
 
 /** An appliance page is indexed only with an official price (the same rule as phones, 5 Nov 2026) */
 export function applianceIndexable(a: { pricePkr: number | null }): boolean {
@@ -64,8 +96,8 @@ export interface CategorySummary {
   brands: string[]
 }
 
-export function categorySummaries(all: ApplianceView[]): CategorySummary[] {
-  return APPLIANCE_CATEGORIES.map((category) => {
+export function categorySummaries(all: ApplianceView[], group?: PriceGroupSlug): CategorySummary[] {
+  return APPLIANCE_CATEGORIES.filter((c) => !group || c.group === group).map((category) => {
     const items = all.filter((a) => a.category.slug === category.slug)
     const prices = items.map((a) => a.pricePkr).filter((p): p is number => typeof p === 'number' && p > 0)
     return {
@@ -114,7 +146,8 @@ export function findComparePair(key: string, all: ApplianceView[]): { a: Applian
 export function comparePairs(all: ApplianceView[], max = 200): { key: string; a: string; b: string }[] {
   const seen = new Set<string>()
   const out: { key: string; a: string; b: string }[] = []
-  const priced = all.filter(applianceIndexable).sort((x, y) => y.popularity - x.popularity)
+  // most searched and viewed first, so the pairs people look for are always in the sitemap
+  const priced = all.filter(applianceIndexable).sort((x, y) => y.hotScore - x.hotScore || y.popularity - x.popularity)
   for (const a of priced) {
     for (const b of similarAppliances(a, all, 2)) {
       const key = compareKey(a.slug, b.slug)
@@ -130,7 +163,9 @@ export function comparePairs(all: ApplianceView[], max = 200): { key: string; a:
 
 /** Spec rows side by side: union of labels, "—" where a product does not list one */
 export function compareSpecRows(a: ApplianceView, b: ApplianceView): { label: string; a: string; b: string }[] {
-  const rows = [{ label: 'Price in Pakistan', a: priceText(a), b: priceText(b) }, { label: 'Brand', a: a.brand.name, b: b.brand.name }]
+  const rows = [{ label: 'Price in Pakistan', a: priceText(a), b: priceText(b) }]
+  if (a.brand.kind !== 'source' || b.brand.kind !== 'source') rows.push({ label: 'Brand', a: a.brand.name, b: b.brand.name })
+  if (a.unit || b.unit) rows.push({ label: 'Price for', a: a.unit ?? '—', b: b.unit ?? '—' })
   if (a.model || b.model) rows.push({ label: 'Model', a: a.model ?? '—', b: b.model ?? '—' })
   const labels = [...new Set([...a.specs.map((s) => s.label), ...b.specs.map((s) => s.label)])]
   for (const label of labels) {
@@ -142,17 +177,24 @@ export function compareSpecRows(a: ApplianceView, b: ApplianceView): { label: st
 export function compareVerdict(a: ApplianceView, b: ApplianceView): string {
   if (a.pricePkr && b.pricePkr && a.pricePkr !== b.pricePkr) {
     const [cheap, dear] = a.pricePkr < b.pricePkr ? [a, b] : [b, a]
-    return `${cheap.brand.name} ${cheap.name} is ${formatPkr(dear.pricePkr! - cheap.pricePkr!)} cheaper than ${dear.brand.name} ${dear.name} at the brands' official prices.`
+    return `${fullName(cheap)} is ${formatPkr(dear.pricePkr! - cheap.pricePkr!)} cheaper than ${fullName(dear)} at the official prices.`
   }
-  return `Both are listed in ${a.category.name.toLowerCase()} on the brands' official Pakistan stores; compare the specs below.`
+  return `Both are listed in ${a.category.name.toLowerCase()} with official Pakistan prices; compare the details below.`
 }
 
 /** Our own short summary when the editor wrote none */
 export function applianceSummary(a: ApplianceView): string {
   if (a.summary) return a.summary
-  const bits = a.specs.slice(0, 3).map((s) => `${s.label.toLowerCase()} ${s.value}`)
-  const price = a.pricePkr ? `costs ${formatPkr(a.pricePkr)} on the official ${a.brand.name} store` : `is listed on the official ${a.brand.name} store without a price`
-  return `The ${a.brand.name} ${a.name} ${price}.${bits.length ? ` Key specs: ${bits.join(', ')}.` : ''}`
+  if (a.brand.kind === 'source') {
+    const cities = a.cityPrices.length
+    return a.pricePkr
+      ? `${a.name} costs ${formatPkr(a.pricePkr)} on average in Pakistan this week${a.unit ? ` (${a.unit})` : ''}, from ${sourceText(a)}${cities ? `, with the price in each of ${cities} cities below` : ''}.`
+      : `${a.name}: no average price this week.`
+  }
+  const bits = a.specs.filter((s) => !/^price type$/i.test(s.label)).slice(0, 3).map((s) => `${s.label.toLowerCase()} ${s.value}`)
+  const what = a.category.group === 'vehicles' && a.brand.kind === 'maker' ? 'ex-factory price' : 'price'
+  const price = a.pricePkr ? `has an official ${what} of ${formatPkr(a.pricePkr)} on ${sourceText(a)}` : `is listed on ${sourceText(a)} without a price`
+  return `The ${fullName(a)} ${price}.${bits.length ? ` Key specs: ${bits.join(', ')}.` : ''}`
 }
 
 // ---------- FAQs (built only from the data we list) ----------
@@ -165,34 +207,64 @@ export interface Faq {
 export function hubFaqs(total: number): Faq[] {
   return [
     {
-      q: 'Where do these appliance prices come from?',
-      a: "From each brand's own Pakistan online store, read every day. Every product page links to the official page where you can buy it. We never copy prices from shops or other websites.",
+      q: 'Where do these prices come from?',
+      a: "Only from official sources: each brand's own Pakistan store for appliances and motorcycles, the makers' own price lists for cars, and the Pakistan Bureau of Statistics' weekly survey of 17 cities for atta, sugar, ghee, milk, eggs, LPG and other groceries. Every page links to its source. We never copy prices from shops or other websites.",
+    },
+    {
+      q: 'How often are prices updated?',
+      a: 'Brand stores and car and bike price lists are checked every day; grocery prices every week when PBS publishes its survey. Every change is kept in the price history.',
     },
     {
       q: 'Why is my brand not listed?',
-      a: 'Some brands do not show prices on their own website, so we cannot list an official price for them. We add a brand as soon as its Pakistan store publishes prices.',
+      a: 'Some brands do not show prices on their own website, so we cannot list an official price for them. We add a brand as soon as it publishes prices.',
     },
-    ...(total ? [{ q: 'How many appliances are listed?', a: `${total} models across ACs, fridges, washing machines, geysers, heaters, coolers and kitchen appliances, and the list grows as brands add products.` }] : []),
+    ...(total ? [{ q: 'How many prices are listed?', a: `${total} items across groceries, motorcycles, cars, ACs, fridges, washing machines, geysers, heaters, fans and kitchen appliances, and the list grows every month.` }] : []),
   ]
 }
 
-export function categoryFaqs(cat: { name: string; singular: string }, items: ApplianceView[], brandLabel?: string): Faq[] {
+export function categoryFaqs(cat: { name: string; singular: string; group?: PriceGroupSlug }, items: ApplianceView[], brandLabel?: string): Faq[] {
   const priced = sortByPrice(items.filter(applianceIndexable))
   const who = brandLabel ? `${brandLabel} ${cat.name.toLowerCase()}` : cat.name.toLowerCase()
   const faqs: Faq[] = []
+  if (cat.group === 'groceries') {
+    for (const a of [...priced].sort((x, y) => y.popularity - x.popularity).slice(0, 4)) {
+      const cheapest = [...a.cityPrices].sort((x, y) => x.avg - y.avg)[0]
+      faqs.push({ q: `What is the price of ${a.name.toLowerCase()} in Pakistan today?`, a: `${formatPkr(a.pricePkr!)} on average this week${cheapest ? `; the lowest city average is ${formatPkr(Math.round(cheapest.avg))} in ${cheapest.city}` : ''} (Pakistan Bureau of Statistics weekly survey).` })
+    }
+    faqs.push({ q: 'Where do these grocery prices come from?', a: "From the Pakistan Bureau of Statistics' Sensitive Price Indicator, collected every week in 50 markets of 17 cities. We show the national average and the lowest, average and highest price in each city." })
+    faqs.push({ q: 'How often are they updated?', a: 'Every week, the day PBS publishes the new survey (usually Friday). Older weeks stay in the price history.' })
+    return faqs
+  }
   if (priced.length) {
     const lo = priced[0]!
     const hi = priced[priced.length - 1]!
-    faqs.push({ q: `What is the price of ${who} in Pakistan?`, a: `On the brands' official stores, ${who} start at ${formatPkr(lo.pricePkr!)} (${lo.brand.name} ${lo.name})${hi !== lo ? ` and go up to ${formatPkr(hi.pricePkr!)} (${hi.brand.name} ${hi.name})` : ''}.` })
-    faqs.push({ q: `Which is the cheapest ${cat.singular.toLowerCase()} listed?`, a: `${lo.brand.name} ${lo.name} at ${formatPkr(lo.pricePkr!)}, the lowest official price we found today.` })
+    const where = cat.group === 'vehicles' ? 'the makers\' official price lists' : "the brands' official stores"
+    faqs.push({ q: `What is the price of ${who} in Pakistan?`, a: `On ${where}, ${who} start at ${formatPkr(lo.pricePkr!)} (${fullName(lo)})${hi !== lo ? ` and go up to ${formatPkr(hi.pricePkr!)} (${fullName(hi)})` : ''}.` })
+    faqs.push({ q: `Which is the cheapest ${cat.singular.toLowerCase()} listed?`, a: `${fullName(lo)} at ${formatPkr(lo.pricePkr!)}, the lowest official price we found today.` })
   }
-  faqs.push({ q: 'How often are prices updated?', a: 'Every day. When a brand changes a price we record the old and new price in the price history on the product page.' })
+  if (cat.group === 'vehicles') faqs.push({ q: 'Are these on-road prices?', a: 'No. Car makers publish ex-factory prices; registration, withholding tax (higher for non-filers) and freight are added by the dealer. Motorcycle prices are the retail prices on the maker\'s own store.' })
+  faqs.push({ q: 'How often are prices updated?', a: 'Every day. When a price changes we record the old and new price in the price history on the product page.' })
   return faqs
 }
 
 export function productFaqs(a: ApplianceView): Faq[] {
-  const full = `${a.brand.name} ${a.name}`
+  const full = fullName(a)
   const faqs: Faq[] = []
+  if (a.brand.kind === 'source') {
+    if (a.pricePkr) faqs.push({ q: `What is the price of ${a.name.toLowerCase()} in Pakistan today?`, a: `${formatPkr(a.pricePkr)} on average across ${a.cityPrices.length} cities this week, from the Pakistan Bureau of Statistics weekly price survey.` })
+    const sorted = [...a.cityPrices].sort((x, y) => x.avg - y.avg)
+    if (sorted.length > 1) faqs.push({ q: `Where is ${a.name.toLowerCase()} cheapest?`, a: `${sorted[0]!.city} (${formatPkr(Math.round(sorted[0]!.avg))} average) and most expensive in ${sorted[sorted.length - 1]!.city} (${formatPkr(Math.round(sorted[sorted.length - 1]!.avg))}).` })
+    for (const city of ['Lahore', 'Karachi', 'Islamabad']) {
+      const c = a.cityPrices.find((x) => x.city.toLowerCase() === city.toLowerCase())
+      if (c) faqs.push({ q: `What is the ${a.name.toLowerCase()} price in ${city}?`, a: `${formatPkr(Math.round(c.avg))} on average${c.min && c.max && c.min !== c.max ? ` (from ${formatPkr(Math.round(c.min))} to ${formatPkr(Math.round(c.max))} in different markets)` : ''} this week.` })
+    }
+    return faqs
+  }
+  if (a.category.group === 'vehicles' && a.brand.kind === 'maker') {
+    if (a.pricePkr) faqs.push({ q: `What is the price of ${full} in Pakistan?`, a: `The official ex-factory price is ${formatPkr(a.pricePkr)}${a.priceUpdatedAt ? `, as listed by ${a.brand.name} Pakistan on ${new Date(a.priceUpdatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Karachi' })}` : ''}. Registration, taxes and freight are extra.` })
+    faqs.push({ q: `Where can I book the ${full}?`, a: `At an authorised ${a.brand.name} dealership. The button on this page opens ${a.brand.name} Pakistan's own website with the current price list.` })
+    return faqs
+  }
   if (a.pricePkr) faqs.push({ q: `What is the price of ${full} in Pakistan?`, a: `${formatPkr(a.pricePkr)} on the official ${a.brand.name} store${a.priceUpdatedAt ? `, checked on ${new Date(a.priceUpdatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Karachi' })}` : ''}.` })
   faqs.push({ q: `Where can I buy the ${full}?`, a: `From the official ${a.brand.name} Pakistan store; the button on this page opens the product page. Authorised dealers may charge a different price.` })
   return faqs

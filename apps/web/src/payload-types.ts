@@ -88,6 +88,7 @@ export interface Config {
     'phone-brands': PhoneBrand;
     phones: Phone;
     appliances: Appliance;
+    'price-demand': PriceDemand;
     'result-boards': ResultBoard;
     'result-exams': ResultExam;
     'vacation-notices': VacationNotice;
@@ -120,6 +121,7 @@ export interface Config {
     'phone-brands': PhoneBrandsSelect<false> | PhoneBrandsSelect<true>;
     phones: PhonesSelect<false> | PhonesSelect<true>;
     appliances: AppliancesSelect<false> | AppliancesSelect<true>;
+    'price-demand': PriceDemandSelect<false> | PriceDemandSelect<true>;
     'result-boards': ResultBoardsSelect<false> | ResultBoardsSelect<true>;
     'result-exams': ResultExamsSelect<false> | ResultExamsSelect<true>;
     'vacation-notices': VacationNoticesSelect<false> | VacationNoticesSelect<true>;
@@ -857,35 +859,35 @@ export interface Appliance {
   id: number;
   name: string;
   slug: string;
-  brand: 'samsung' | 'nasgas' | 'anex' | 'westpoint';
-  category:
-    | 'air-conditioners'
-    | 'refrigerators'
-    | 'washing-machines'
-    | 'water-heaters'
-    | 'room-heaters'
-    | 'air-coolers'
-    | 'water-dispensers'
-    | 'microwave-ovens'
-    | 'cooking-ranges'
-    | 'kitchen-hoods'
-    | 'dishwashers'
-    | 'air-fryers'
-    | 'blenders'
-    | 'kettles'
-    | 'irons'
-    | 'fans'
-    | 'cookers'
-    | 'toasters-sandwich-makers';
+  /**
+   * One of: samsung, nasgas, anex, westpoint, gfc, honda, toyota, hyundai, pbs
+   */
+  brand: string;
+  /**
+   * One of: air-conditioners, refrigerators, washing-machines, water-heaters, room-heaters, air-coolers, water-dispensers, microwave-ovens, cooking-ranges, kitchen-hoods, dishwashers, air-fryers, blenders, kettles, irons, fans, cookers, toasters-sandwich-makers, motorcycles, cars, atta-rice, meat-chicken-eggs, milk-dairy, cooking-oil-ghee, vegetables-fruits, daal-pulses, sugar-tea-spices, lpg-fuel-household
+   */
+  category: string;
+  /**
+   * Urdu name (groceries)
+   */
+  nameUr?: string | null;
   model?: string | null;
+  /**
+   * What the price is for: "20 kg bag", "Ex-factory price"
+   */
+  unit?: string | null;
   /**
    * Keep out of the site and the sitemap
    */
   hidden?: boolean | null;
   popularity?: number | null;
+  /**
+   * Views in the last 7 days plus search demand (POST /api/pipeline/prices/hot, daily)
+   */
+  hotScore?: number | null;
   imageUrl?: string | null;
   /**
-   * The product page on the brand's own store (the Buy button)
+   * The product page on the brand's own store (the Buy button), the maker's price list, or the official release
    */
   officialUrl: string;
   summary?: string | null;
@@ -904,6 +906,18 @@ export interface Appliance {
       }[]
     | null;
   /**
+   * Per-city prices from an official release (PBS weekly SPI: lowest, average, highest)
+   */
+  cityPrices?:
+    | {
+        city: string;
+        min?: number | null;
+        avg: number;
+        max?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
    * One row per official price change (written by the daily refresh)
    */
   priceHistory?:
@@ -914,6 +928,32 @@ export interface Appliance {
         id?: string | null;
       }[]
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-demand".
+ */
+export interface PriceDemand {
+  id: number;
+  query: string;
+  /**
+   * One of: air-conditioners, refrigerators, washing-machines, water-heaters, room-heaters, air-coolers, water-dispensers, microwave-ovens, cooking-ranges, kitchen-hoods, dishwashers, air-fryers, blenders, kettles, irons, fans, cookers, toasters-sandwich-makers, motorcycles, cars, atta-rice, meat-chicken-eggs, milk-dairy, cooking-oil-ghee, vegetables-fruits, daal-pulses, sugar-tea-spices, lpg-fuel-household
+   */
+  category?: string | null;
+  priority: number;
+  origin?: string | null;
+  /**
+   * Official site that could give this price
+   */
+  sourceHint?: string | null;
+  note?: string | null;
+  /**
+   * How many listed items match this search (0 = not covered yet)
+   */
+  matched?: number | null;
+  matchedSlugs?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1206,6 +1246,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'appliances';
         value: number | Appliance;
+      } | null)
+    | ({
+        relationTo: 'price-demand';
+        value: number | PriceDemand;
       } | null)
     | ({
         relationTo: 'result-boards';
@@ -1804,9 +1848,12 @@ export interface AppliancesSelect<T extends boolean = true> {
   slug?: T;
   brand?: T;
   category?: T;
+  nameUr?: T;
   model?: T;
+  unit?: T;
   hidden?: T;
   popularity?: T;
+  hotScore?: T;
   imageUrl?: T;
   officialUrl?: T;
   summary?: T;
@@ -1821,6 +1868,15 @@ export interface AppliancesSelect<T extends boolean = true> {
         value?: T;
         id?: T;
       };
+  cityPrices?:
+    | T
+    | {
+        city?: T;
+        min?: T;
+        avg?: T;
+        max?: T;
+        id?: T;
+      };
   priceHistory?:
     | T
     | {
@@ -1829,6 +1885,22 @@ export interface AppliancesSelect<T extends boolean = true> {
         sourceUrl?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "price-demand_select".
+ */
+export interface PriceDemandSelect<T extends boolean = true> {
+  query?: T;
+  category?: T;
+  priority?: T;
+  origin?: T;
+  sourceHint?: T;
+  note?: T;
+  matched?: T;
+  matchedSlugs?: T;
   updatedAt?: T;
   createdAt?: T;
 }

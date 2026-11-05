@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { getPayloadClient } from '@/lib/payload'
-import { brandName, categoryBySlug, type ApplianceView } from './logic'
+import { brandKind, brandName, categoryBySlug, type ApplianceView } from './logic'
 
 /**
  * Data access for /prices. As with phones: during `next build` the table may not exist yet (the migration runs on boot),
@@ -29,9 +29,15 @@ export function toApplianceView(doc: Record<string, any>): ApplianceView | null 
     id: doc.id,
     slug: String(doc.slug),
     name: String(doc.name),
+    nameUr: str(doc.nameUr),
     model: str(doc.model),
-    brand: { slug: String(doc.brand), name: brandName(String(doc.brand)) },
-    category: { slug: cat.slug, name: cat.name, singular: cat.singular, ur: cat.ur },
+    unit: str(doc.unit),
+    brand: { slug: String(doc.brand), name: brandName(String(doc.brand)), kind: brandKind(String(doc.brand)) },
+    category: { slug: cat.slug, name: cat.name, singular: cat.singular, ur: cat.ur, group: cat.group },
+    cityPrices: ((doc.cityPrices ?? []) as Record<string, any>[])
+      .map((r) => ({ city: String(r.city), avg: num(r.avg) ?? 0, min: num(r.min), max: num(r.max) }))
+      .filter((r) => r.avg > 0),
+    hotScore: num(doc.hotScore) ?? 0,
     pricePkr: num(doc.pricePkr),
     listPricePkr: num(doc.listPricePkr),
     inStock: typeof doc.inStock === 'boolean' ? doc.inStock : null,
