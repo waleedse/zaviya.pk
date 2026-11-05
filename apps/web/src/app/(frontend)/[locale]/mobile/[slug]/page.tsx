@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { PhonePageView, pairLabel } from '@/components/phones/PhoneViews'
 import { getPhoneBySlug, getPhones } from '@/lib/phones/queries'
 import { findPhone } from '@/lib/phones/pages'
-import { fromPriceText, phoneSummary, popularPairs, relatedPhones } from '@/lib/phones/logic'
+import { fromPriceText, phoneIndexable, phoneSummary, popularPairs, relatedPhones } from '@/lib/phones/logic'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: Params) {
     enPath: `/mobile/${slug}`,
     ogImage: phone.imageUrl,
     absoluteTitle: false,
+    noindex: !phoneIndexable(phone),
   })
 }
 

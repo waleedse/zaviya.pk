@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { PRICE_BANDS } from '@zaviya/shared'
 import { getBrands, getPhones } from './queries'
-import { MIN_INDEXABLE_LIST, bandSlug, phonesUnder, popularPairs } from './logic'
+import { MIN_INDEXABLE_LIST, bandSlug, phoneIndexable, phonesUnder, popularPairs } from './logic'
 
 type Entry = MetadataRoute.Sitemap[number]
 
@@ -22,8 +22,10 @@ export async function phoneSitemapEntries(siteUrl: string): Promise<Entry[]> {
       // thin lists are noindex (see the page) and stay out of the sitemap
       if (phonesUnder(phones, band).length >= MIN_INDEXABLE_LIST) entries.push({ url: `${siteUrl}/mobile-prices/${bandSlug(band)}`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
     }
-    for (const p of phones) entries.push({ url: `${siteUrl}/mobile/${p.slug}`, lastModified: p.priceUpdatedAt ?? p.updatedAt, changeFrequency: 'daily', priority: 0.7 })
-    for (const pair of popularPairs(phones, 60)) entries.push({ url: `${siteUrl}/compare/${pair.key}`, lastModified: newest, changeFrequency: 'weekly', priority: 0.6 })
+    // Phones with no official price are noindex (thin) and stay out
+    for (const p of phones.filter(phoneIndexable)) entries.push({ url: `${siteUrl}/mobile/${p.slug}`, lastModified: p.priceUpdatedAt ?? p.updatedAt, changeFrequency: 'daily', priority: 0.7 })
+    const bySlug = new Map(phones.map((p) => [p.slug, p]))
+    for (const pair of popularPairs(phones, 60).filter((x) => phoneIndexable(bySlug.get(x.a) ?? {}) && phoneIndexable(bySlug.get(x.b) ?? {}))) entries.push({ url: `${siteUrl}/compare/${pair.key}`, lastModified: newest, changeFrequency: 'weekly', priority: 0.6 })
     return entries
   } catch (err) {
     console.error('phone sitemap failed', err)

@@ -302,3 +302,8 @@ export function itemListJsonLd(name: string, items: { name: string; url: string 
     itemListElement: items.map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, url: it.url })),
   }
 }
+
+/** A phone page without an official PKR price is thin: noindex and out of the sitemap (5 Nov 2026, quality over volume). */
+export function phoneIndexable(p: { pricePkr?: number | null }): boolean {
+  return typeof p.pricePkr === 'number' && p.pricePkr > 0
+}
