@@ -87,6 +87,16 @@ describe('price engine: demand and hot items', () => {
     expect(matchSearch('flour 20 kg price lahore', items).map((i) => i.slug)).toEqual(['atta-20kg-price'])
     expect(matchSearch('cheeni rate today', items).map((i) => i.slug)).toEqual(['sugar-price'])
     expect(matchSearch('price in pakistan', items)).toEqual([])
+    // the category name ("Atta, Rice & Bread") does not make rice an answer to "atta price"
+    const rice = { slug: 'basmati-rice-price', name: 'Basmati Rice (Broken) 1 kg', brandName: 'Pakistan Bureau of Statistics', categoryName: 'Atta, Rice & Bread', categorySlug: 'atta-rice' }
+    expect(matchSearch('atta price today', [...items, rice]).map((i) => i.slug)).toEqual(['atta-20kg-price'])
+    // a kind-of-product word matches the category: "honda bike price" finds every Honda motorcycle
+    expect(matchSearch('honda bike price', items)).toHaveLength(3)
+    const fan = { slug: 'gfc-atlas-ac-dc', name: 'Atlas AC/DC', brandName: 'GFC', categoryName: 'Fans', categorySlug: 'fans' }
+    const geyser = { slug: 'gfc-gf-606in', name: 'GF-606IN Instant Geysers (LPG & Natural)', brandName: 'GFC', categoryName: 'Geysers & Water Heaters', categorySlug: 'water-heaters' }
+    const lpg = { slug: 'lpg-cylinder-price', name: 'LPG Cylinder 11.67 kg', brandName: 'Pakistan Bureau of Statistics', categoryName: 'LPG, Firewood & Soap', categorySlug: 'lpg-fuel-household' }
+    expect(matchSearch('ac dc fan price', [fan, geyser]).map((i) => i.slug)).toEqual(['gfc-atlas-ac-dc'])
+    expect(matchSearch('gas cylinder price', [fan, geyser, lpg]).map((i) => i.slug)).toEqual(['lpg-cylinder-price'])
   })
   it('scores visitors and the strongest search', () => {
     const { scores, matches } = hotScores(items, new Map([['honda-cg-125', 3]]), [

@@ -24,7 +24,8 @@ export function categoryCopy(cat: CategoryDef, items: ApplianceView[], when: str
   if (cat.group === 'vehicles') {
     const what = cat.slug === 'cars' ? 'ex-factory prices from the makers\' own price lists' : 'retail prices from the maker\'s own store'
     return {
-      metaTitle: `${cat.name} Prices in Pakistan ${when}: ${top.map((a) => a.name).slice(0, 3).join(', ') || 'Latest Price List'}`,
+      // "Car Prices in Pakistan", "Motorcycle Prices in Pakistan": the phrase people search
+      metaTitle: `${cat.singular} Prices in Pakistan ${when}: ${[...new Set(top.map((a) => a.name))].slice(0, 3).join(', ') || 'Latest Price List'}`,
       metaDescription: `${kw}: ${named || 'latest official prices'}. ${items.length} ${cat.name.toLowerCase()} with ${what}${brands.length ? ` (${brands.join(', ')})` : ''}, checked every day, with price history.`.slice(0, 300),
       h1: `${cat.name} prices in Pakistan (${when})`,
       intro: `Official ${what} for ${items.length} ${cat.name.toLowerCase()}${brands.length ? ` from ${brands.join(', ')}` : ''}, cheapest first and checked every day.${cat.slug === 'cars' ? ' Registration, taxes and freight are extra.' : ''}`,
