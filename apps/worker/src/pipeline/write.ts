@@ -10,6 +10,8 @@ import { extractUrls, dropUnsupportedFaqs } from './qa-checks.js'
 import { logger } from '../logger.js'
 import type { WorkerEnv } from '../config.js'
 import type { Redis } from 'ioredis'
+import { fetchArticleText } from '../ingest/extract.js'
+import { isAllowedByRobots } from '../ingest/robots.js'
 import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 import { scrubWriterCopy } from './seo-scrub.js'
 import { opinionCue, pageFromWrongOutlet, pageUnrelatedToHeadline } from './story-kind.js'
@@ -171,6 +173,37 @@ export async function enrichFromExtension(
   return saved
 }
 
+/**
+ * ZAV-285: an item that was thin at ingest (fetch failed or timed out) may read fine now. Before an approved cluster is
+ * skipped for lack of text, fetch up to three thin items again server-side (robots.txt respected, no extension needed).
+ * True when any text was saved.
+ */
+export async function refetchThinItems(
+  items: { id?: string; title: string; summary?: string; contentText?: string; url: string }[],
+  payload: Pick<PayloadClient, 'patchSourceItem'>,
+  clusterId: string,
+  deps: { fetchText?: (url: string) => Promise<string | null>; allowed?: (url: string) => Promise<boolean> } = {},
+  max = 3,
+): Promise<boolean> {
+  const fetchText = deps.fetchText ?? ((u: string) => fetchArticleText(u))
+  const allowed = deps.allowed ?? ((u: string) => isAllowedByRobots(u).catch(() => false))
+  const thin = items.filter((it) => it.id && !/news\.google\.com/.test(it.url) && sourceTextChars([it]) < 300).slice(0, max)
+  let saved = false
+  for (const it of thin) {
+    try {
+      if (!(await allowed(it.url))) continue
+      const text = await fetchText(it.url)
+      if (!text || text.length < 300) continue
+      await payload.patchSourceItem(it.id!, { contentText: text })
+      saved = true
+      logger.info({ clusterId, itemId: it.id, chars: text.length }, 'source text re-fetched server-side')
+    } catch (e) {
+      logger.warn({ clusterId, itemId: it.id, err: e instanceof Error ? e.message : e }, 'source text re-fetch failed')
+    }
+  }
+  return saved
+}
+
 /** Characters of real reporting in the sources (summary + extracted text, not titles). */
 export function sourceTextChars(items: { title: string; summary?: string; contentText?: string }[]): number {
   return items.reduce((n, it) => {
@@ -199,6 +232,9 @@ export async function processWriteJob(
     if (await enrichFromExtension(cluster.items, deps.payload, deps.bridge, data.clusterId)) {
       cluster = await deps.payload.getCluster(data.clusterId)
     }
+  }
+  if (sourceTextChars(cluster.items) < deps.env.MIN_SOURCE_CHARS && (await refetchThinItems(cluster.items, deps.payload, data.clusterId))) {
+    cluster = await deps.payload.getCluster(data.clusterId)
   }
   // An editorial or column is not a news report (ZAV-155); the text read just now may reveal one
   const opinion = opinionCue(cluster.items)
