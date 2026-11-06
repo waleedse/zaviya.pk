@@ -49,6 +49,36 @@ export const DEFAULT_DAILY_ARTICLE_CAP = 40
 export function dailyArticleCap(settings: { dailyCaps?: Record<string, number | null | undefined> | null }): number {
   return settings.dailyCaps?.articles ?? settings.dailyCaps?.publish ?? DEFAULT_DAILY_ARTICLE_CAP
 }
+/** Extra stories the schedule allows ahead of the clock, so a good hour is not starved. */
+export const CAP_BURST = 4
+/** The cap-exempt desk (quotaOverdue) may add at most this many stories beyond the daily cap. */
+export const QUOTA_EXTRA_PER_DAY = 6
+/** Quiet hours in PKT: almost nobody reads, so at most OVERNIGHT_PER_HOUR stories an hour. */
+export const OVERNIGHT_END_MIN = 7 * 60
+export const OVERNIGHT_PER_HOUR = 2
+
+/**
+ * How many normal stories may have gone out by now (PKT): the cap spread over the day with one
+ * hour of head start and a small burst, never above the cap. 00:00-07:00 PKT is limited to
+ * OVERNIGHT_PER_HOUR an hour so the cap is not spent while nobody reads (6 Nov: 38 of 56 stories
+ * went out before 05:00).
+ */
+export function dailyAllowance(cap: number, now: Date): number {
+  const { minutesSinceMidnight: m } = pktParts(now)
+  let allowance = Math.ceil((cap * (m + 60)) / 1440) + CAP_BURST
+  if (m < OVERNIGHT_END_MIN) allowance = Math.min(allowance, OVERNIGHT_PER_HOUR * (Math.floor(m / 60) + 1))
+  return Math.min(cap, allowance)
+}
+
+/** 0 when a normal story may publish now; else ms until the allowance next grows (10 to 60 minutes). */
+export function capSlotWaitMs(published: number, cap: number, now: Date): number {
+  if (published < dailyAllowance(cap, now)) return 0
+  for (let step = 5; step <= 60; step += 5) {
+    if (published < dailyAllowance(cap, new Date(now.getTime() + step * 60_000))) return Math.max(step, 10) * 60_000
+  }
+  return 60 * 60_000
+}
+
 export function effectiveIntervalMin(settings: { minIntervalMin?: number }): number {
   return Math.min(settings.minIntervalMin ?? MAX_PUBLISH_INTERVAL_MIN, MAX_PUBLISH_INTERVAL_MIN)
 }
@@ -170,13 +200,16 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
   const dailyCap = dailyArticleCap(ctx.settings)
   const publishedToday = ctx.articlesPublishedToday ?? 0
   const wouldPublish = triage.decision !== 'reject' && weightedScore >= publishThreshold && triage.decision === 'publish'
-  if (wouldPublish && !isBreaking && !ctx.quotaOverdue && publishedToday >= dailyCap) {
+  // Normal stories follow the day's schedule; the overdue desk may use the hard cap plus a few extras; breaking is exempt.
+  const capSlotWait = capSlotWaitMs(publishedToday, dailyCap, now)
+  const overBudget = ctx.quotaOverdue ? publishedToday >= dailyCap + QUOTA_EXTRA_PER_DAY : capSlotWait > 0
+  if (wouldPublish && !isBreaking && overBudget) {
     return {
       outcome: 'defer',
-      reason: `Daily publish cap reached (${dailyCap})`,
+      reason: `Daily publish pace reached (${publishedToday} of ${dailyAllowance(dailyCap, now)} allowed by now, cap ${dailyCap})`,
       weightedScore,
       modelDecision: triage.decision,
-      retryInMs: 60 * 60_000,
+      retryInMs: ctx.quotaOverdue ? 60 * 60_000 : capSlotWait + Math.floor(Math.random() * 3 * 60_000),
     }
   }
 
