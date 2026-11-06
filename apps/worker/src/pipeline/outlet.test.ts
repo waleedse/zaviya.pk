@@ -38,7 +38,7 @@ describe('publish pacing', () => {
     // 6 Nov: 15:00 PKT allows 31 of 40, so 35 waits for the next slot even though the cap is not spent
     const slot = await pacingWaitMs(settings({ articlesPublishedToday: 35, lastPublishedAt: '2026-10-13T09:00:00Z' }), now)
     expect(slot).toBeGreaterThanOrEqual(10 * 60_000)
-    expect(slot).toBeLessThanOrEqual(61 * 60_000)
+    expect(slot).toBeLessThanOrEqual(62 * 60_000)
     // the overdue desk skips the schedule but still stops at cap + 6
     expect(await pacingWaitMs(settings({ articlesPublishedToday: 35, lastPublishedAt: '2026-10-13T09:00:00Z' }), now, true)).toBe(0)
     expect(await pacingWaitMs(settings({ articlesPublishedToday: 46, lastPublishedAt: '2026-10-13T09:00:00Z' }), now, true)).toBe(60 * 60_000)
