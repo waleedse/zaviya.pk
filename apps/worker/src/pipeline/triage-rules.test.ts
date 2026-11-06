@@ -79,7 +79,24 @@ describe('applyTriageRules', () => {
   it('ZAV-237: the daily cap holds a normal story but not an overdue Jobs/AI desk', () => {
     const ctx = { maxTier: 1 as const, distinctSources: 3, settings: { dailyCaps: { articles: 120 } }, articlesPublishedToday: 130 }
     expect(applyTriageRules(baseTriage, ctx).outcome).toBe('defer')
-    expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, { ...ctx, quotaOverdue: true }).outcome).toBe('publish')
+    expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, { ...ctx, quotaOverdue: true }).outcome).toBe('defer')
+    const ok = { ...ctx, settings: { dailyCaps: { articles: 40 } }, articlesPublishedToday: 41 }
+    expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, { ...ok, quotaOverdue: true }).outcome).toBe('publish')
+    expect(applyTriageRules({ ...baseTriage, category: 'education-jobs' }, { ...ok, articlesPublishedToday: 46, quotaOverdue: true }).outcome).toBe('defer')
+    expect(applyTriageRules({ ...baseTriage, suggestedPriority: 'breaking' }, { ...ok, articlesPublishedToday: 60 }).outcome).toBe('publish')
+  })
+
+  it('6 Nov: spreads the cap over the PKT day and defers with a retry', () => {
+    // 00:30 PKT = 19:30Z the day before; 14 stories already out (the night flood)
+    const night = new Date('2026-11-05T19:30:00.000Z')
+    const d = applyTriageRules(baseTriage, { maxTier: 1, distinctSources: 3, settings: {}, now: night, articlesPublishedToday: 14 })
+    expect(d.outcome).toBe('defer')
+    expect(d.reason).toMatch(/pace/)
+    expect(d.retryInMs).toBeGreaterThanOrEqual(10 * 60_000)
+    // 10:00 PKT with 15 out is on pace
+    const morning = new Date('2026-11-06T05:00:00.000Z')
+    const ctx = { maxTier: 1 as const, distinctSources: 3, settings: {}, now: morning }
+    expect(applyTriageRules(baseTriage, { ...ctx, articlesPublishedToday: 15 }).outcome).toBe('publish')
   })
 
   it('does not block on "unverified" when credible sources exist', () => {
@@ -134,3 +151,19 @@ describe('daily article cap (5 Nov)', () => {
     expect(dailyArticleCap({ dailyCaps: { articles: 60 } })).toBe(60)
   })
 })
+
+describe('dailyAllowance (6 Nov pacing)', () => {
+  it('grows through the PKT day, is slow overnight and never passes the cap', async () => {
+    const { dailyAllowance, capSlotWaitMs } = await import('./triage-rules.js')
+    const at = (h: number, m = 0) => new Date(Date.UTC(2026, 10, 5, h - 5, m)) // PKT is UTC+5
+    expect(dailyAllowance(40, at(0, 0))).toBe(2)
+    expect(dailyAllowance(40, at(5, 0))).toBe(12)
+    expect(dailyAllowance(40, at(7, 0))).toBe(18)
+    expect(dailyAllowance(40, at(12, 0))).toBe(ceil(40 * 780 / 1440) + 4)
+    expect(dailyAllowance(40, at(23, 59))).toBe(40)
+    expect(capSlotWaitMs(5, 40, at(12))).toBe(0)
+    expect(capSlotWaitMs(40, 40, at(12))).toBe(60 * 60_000)
+    expect(capSlotWaitMs(26, 40, at(12))).toBeGreaterThanOrEqual(10 * 60_000)
+  })
+})
+function ceil(n: number) { return Math.ceil(n) }

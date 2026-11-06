@@ -8,7 +8,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
-import { dailyArticleCap, effectiveIntervalMin } from './triage-rules.js'
+import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 
@@ -226,18 +226,28 @@ export async function categoryOverdue(payload: PayloadClient, category: string, 
   return now - last > QUOTA_WINDOW_MS
 }
 
-/** The day's story cap is used up (Settings.dailyCaps.articles, else DEFAULT_DAILY_ARTICLE_CAP). */
-export async function dailyCapReached(payload: Pick<PayloadClient, 'getSettings'>): Promise<boolean> {
+/** No slot for a normal story right now: the day's pace (Settings.dailyCaps.articles, else DEFAULT_DAILY_ARTICLE_CAP) is used up. */
+export async function dailyCapReached(payload: Pick<PayloadClient, 'getSettings'>, now = Date.now()): Promise<boolean> {
   const settings = await payload.getSettings()
-  return (settings.articlesPublishedToday ?? 0) >= dailyArticleCap(settings)
+  return capSlotWaitMs(settings.articlesPublishedToday ?? 0, dailyArticleCap(settings), new Date(now)) > 0
 }
 
-/** How long a normal story must wait for its publishing slot (min interval and daily cap from Settings). */
-export async function pacingWaitMs(payload: PayloadClient, now = Date.now()): Promise<number> {
+/**
+ * How long a normal story must wait for its publishing slot (min interval and the daily pace from Settings).
+ * quotaOverdue (the 4 h desk): skips the schedule but not the hard cap plus QUOTA_EXTRA_PER_DAY, nor the interval.
+ */
+export async function pacingWaitMs(payload: PayloadClient, now = Date.now(), quotaOverdue = false): Promise<number> {
   const settings = await payload.getSettings()
   // Never slower than one story every MAX_PUBLISH_INTERVAL_MIN minutes (10 since ZAV-201, was 15)
   const minIntervalMs = effectiveIntervalMin(settings) * 60_000
-  if (await dailyCapReached(payload)) return 60 * 60_000
+  const published = settings.articlesPublishedToday ?? 0
+  const cap = dailyArticleCap(settings)
+  if (quotaOverdue) {
+    if (published >= cap + QUOTA_EXTRA_PER_DAY) return 60 * 60_000
+  } else {
+    const slot = capSlotWaitMs(published, cap, new Date(now))
+    if (slot > 0) return slot + Math.floor(Math.random() * 90_000)
+  }
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
   const gap = now - last
   // A little jitter so several waiting stories do not all wake at the same second
@@ -291,8 +301,8 @@ export async function processPublishJob(
   const overdueCategory = triage?.category && QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
     : false
-  if (!gated && deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !overdueCategory) {
-    const wait = await pacingWaitMs(deps.payload).catch(() => 0)
+  if (!gated && deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
+    const wait = await pacingWaitMs(deps.payload, Date.now(), overdueCategory).catch(() => 0)
     if (wait > 0) {
       await deps.publishQueue.add('publish', data, { delay: wait, priority: 5 })
       logger.info({ clusterId: data.clusterId, waitMin: Math.round(wait / 60_000) }, 'publish paced: waiting for the next slot')
