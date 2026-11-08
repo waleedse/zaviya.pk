@@ -1,8 +1,11 @@
 /**
  * Prize bond draw results, read from the official National Savings lists (savings.gov.pk publishes every draw as a
  * .txt file on its denomination page). Nothing is copied from other sites. Pages show the source link, and the
- * lists are cached (fetch revalidate), so savings.gov.pk sees a few requests an hour at most.
+ * lists are cached in memory, so savings.gov.pk sees a few requests an hour at most.
  */
+import https from 'node:https'
+import tls from 'node:tls'
+import { GOGETSSL_RSA_DV_SSL_CA_2 } from './certs'
 
 export const RESULT_DENOMINATIONS = [100, 200, 750, 1500] as const
 export type ResultDenomination = (typeof RESULT_DENOMINATIONS)[number]
@@ -39,14 +42,30 @@ export function denominationFromSlug(slug: string): ResultDenomination | null {
   return (RESULT_DENOMINATIONS as readonly number[]).includes(n) ? (n as ResultDenomination) : null
 }
 
+const isoDate = (day: number, month: number, year: number): string | null =>
+  day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2015 && year <= 2099 ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
+
+/** "16-02-2026 (txt file)" */
+function dateFromText(text: string): string | null {
+  const d = /(\d{1,2})-(\d{1,2})-(20\d\d)/.exec(text)
+  return d ? isoDate(Number(d[1]), Number(d[2]), Number(d[3])) : null
+}
+
+/** Newer files are named by date only: 100_170826.txt, 750_15102026-1.txt (link text "100_170826_Txt") */
+function dateFromFile(url: string): string | null {
+  const d = /_(\d{2})(\d{2})(\d{4}|\d{2})(?=\D)/.exec(url.split('/').pop() ?? '')
+  if (!d) return null
+  const y = d[3]!.length === 2 ? 2000 + Number(d[3]) : Number(d[3])
+  return isoDate(Number(d[1]), Number(d[2]), y)
+}
+
 /** .txt draw lists on an official denomination page, newest first, one per date */
 export function parseDrawLinks(html: string): DrawLink[] {
   const out = new Map<string, DrawLink>()
   const re = /<a[^>]+href="(https?:\/\/(?:www\.)?savings\.gov\.pk\/wp-content\/uploads\/[^"]+\.txt)"[^>]*>([^<]*)/gi
   for (const m of html.matchAll(re)) {
-    const d = /(\d{1,2})-(\d{1,2})-(20\d\d)/.exec(m[2] ?? '')
-    if (!d) continue
-    const date = `${d[3]}-${d[2]!.padStart(2, '0')}-${d[1]!.padStart(2, '0')}`
+    const date = dateFromText(m[2] ?? '') ?? dateFromFile(m[1]!)
+    if (!date) continue
     if (!out.has(date)) out.set(date, { date, url: m[1]! })
   }
   return [...out.values()].sort((a, b) => b.date.localeCompare(a.date))
@@ -80,6 +99,12 @@ export function parseDrawText(text: string, denomination: ResultDenomination, da
     }
     const tier = tiers[tiers.length - 1]
     if (!tier) continue
+    // A line of numbers only may have lost leading zeros in the official file ("7447" is bond 007447)
+    const tokens = line.split(/\s+/)
+    if (tokens.every((t) => /^\d{4,6}$/.test(t))) {
+      for (const t of tokens) tier.numbers.push(t.padStart(6, '0'))
+      continue
+    }
     for (const n of line.match(/(?<![\d,.-])\d{6}(?![\d,.-])/g) ?? []) tier.numbers.push(n)
   }
   const kept = tiers.filter((t) => t.numbers.length > 0).map((t, i) => ({ ...t, rank: i + 1 }))
@@ -88,13 +113,45 @@ export function parseDrawText(text: string, denomination: ResultDenomination, da
   return { denomination, date, drawNo, tiers: kept, sourceUrl }
 }
 
-async function fetchText(url: string, revalidate: number): Promise<string | null> {
-  try {
-    const res = await fetch(url, { headers: UA, next: { revalidate }, signal: AbortSignal.timeout(15_000) })
-    return res.ok ? await res.text() : null
-  } catch {
-    return null
+/** Trusted roots plus the intermediate savings.gov.pk forgets to send */
+let caBundle: string[] | null = null
+const cache = new Map<string, { at: number; text: string }>()
+
+function get(url: string, redirects = 3): Promise<string | null> {
+  return new Promise((resolve) => {
+    caBundle ??= [...tls.rootCertificates, GOGETSSL_RSA_DV_SSL_CA_2]
+    const req = https.get(url, { ca: caBundle, headers: UA, timeout: 15_000 }, (res) => {
+      const loc = res.headers.location
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && loc && redirects > 0) {
+        res.resume()
+        resolve(get(new URL(loc, url).toString(), redirects - 1))
+        return
+      }
+      if (res.statusCode !== 200) {
+        res.resume()
+        resolve(null)
+        return
+      }
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('latin1')))
+      res.on('error', () => resolve(null))
+    })
+    req.on('timeout', () => req.destroy())
+    req.on('error', () => resolve(null))
+  })
+}
+
+/** Cached in memory for `ttl` seconds; a failed refresh keeps serving the last good copy */
+async function fetchText(url: string, ttl: number): Promise<string | null> {
+  const hit = cache.get(url)
+  if (hit && Date.now() - hit.at < ttl * 1000) return hit.text
+  const text = await get(url)
+  if (text) {
+    cache.set(url, { at: Date.now(), text })
+    return text
   }
+  return hit?.text ?? null
 }
 
 /** Official draw dates for a denomination, newest first */
