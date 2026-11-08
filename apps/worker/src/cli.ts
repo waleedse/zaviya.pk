@@ -12,7 +12,7 @@ import { triageSystemPrompt, triageUserPrompt } from './prompts/triage.js'
 import { logger } from './logger.js'
 import { Queue } from 'bullmq'
 import { createConnection } from './queues.js'
-import { queueHeroBackfill } from './pipeline/hero-backfill.js'
+import { queueHeroBackfill, backfillRealPhotos } from './pipeline/hero-backfill.js'
 
 const cmd = process.argv[2]
 
@@ -29,6 +29,15 @@ async function run() {
     const res = await queueHeroBackfill(payload, mediaQueue, { dryRun: process.argv.includes('--dry-run'), ids: idsArg?.slice(6).split(',') })
     console.log(JSON.stringify(res))
     await mediaQueue.close()
+    return
+  }
+
+  // Swap real Wikimedia Commons photos into recent stories with AI heroes (old media kept):
+  //   backfill-real-photos [--days=7] [--limit=50] [--dry-run]
+  if (cmd === 'backfill-real-photos') {
+    const arg = (n: string) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split('=')[1]
+    const res = await backfillRealPhotos(payload, { days: Number(arg('days') ?? 7), limit: arg('limit') ? Number(arg('limit')) : undefined, dryRun: process.argv.includes('--dry-run') })
+    console.log(JSON.stringify(res, null, 1))
     return
   }
 

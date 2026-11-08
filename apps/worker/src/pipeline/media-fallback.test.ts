@@ -6,12 +6,14 @@ vi.mock('./social-card.js', () => ({
   photoDataUrl: vi.fn(async () => null),
 }))
 vi.mock('./post-card.js', () => ({ renderPostCard: vi.fn(async () => null) }))
-vi.mock('./real-photo.js', () => ({ findRealPhoto: vi.fn(async () => null) }))
+vi.mock('./real-photo.js', () => ({ findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
 vi.mock('./reference.js', () => ({ describeReferenceScene: vi.fn(async () => null) }))
 vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b }))
 vi.mock('./zimage.js', () => ({ generateViaZImage: vi.fn(async () => null) }))
 
 import { heroMaxTries, processMediaJob } from './media.js'
+import * as realPhoto from './real-photo.js'
+import * as socialCard from './social-card.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './hero-backfill.js'
 import { processPublishJob } from './publish.js'
 
@@ -113,5 +115,29 @@ describe('fallback story gets its real hero later', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     await run
     expect(payload.request).toHaveBeenCalledWith('PATCH', '/api/articles/77?locale=en', { heroImage: 99 })
+  })
+})
+
+describe('real photo first, AI only as a last resort', () => {
+  const meta = { subject: 'United States Capitol', file: 'US Capitol east side.JPG', author: 'Martin Falbisoner', licence: 'CC BY-SA 3.0', creditLine: 'Photo: Martin Falbisoner / CC BY-SA 3.0 / Wikimedia Commons', sourceUrl: 'https://commons.wikimedia.org/wiki/File:US_Capitol_east_side.JPG', mediaCredit: 'Photo: Martin Falbisoner / CC BY-SA 3.0 / Wikimedia Commons | https://commons.wikimedia.org/wiki/File:US_Capitol_east_side.JPG' }
+  const photo = { dataUrl: 'data:image/jpeg;base64,AAAA', credit: meta.creditLine, bytes: Buffer.alloc(30_000, 1), mime: 'image/jpeg', meta }
+
+  it('uses a Commons photo as the hero with its credit, never calls Gemini, and puts it on the social cards', async () => {
+    vi.mocked(realPhoto.findHeroPhoto).mockResolvedValueOnce(photo)
+    const d = deps()
+    const bridge = { isOnline: () => true, send: vi.fn() }
+    await processMediaJob({ clusterId: '1', write, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
+    expect(bridge.send).not.toHaveBeenCalled()
+    expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'wikimedia', isAiGenerated: false, credit: meta.mediaCredit }))
+    expect(d.publishQueue.add.mock.calls[0][1].heroFallback).toBeUndefined()
+    expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: photo.dataUrl })
+  })
+
+  it('an AI hero is labelled and never reaches the social cards', async () => {
+    const d = deps()
+    const bridge = { isOnline: () => true, send: vi.fn(async () => ({ base64: Buffer.alloc(200, 1).toString('base64'), mimeType: 'image/png', width: 1, height: 1 })) }
+    await processMediaJob({ clusterId: '1', write, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
+    expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI illustration)' }))
+    expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: null })
   })
 })

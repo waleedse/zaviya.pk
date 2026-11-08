@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { findRealPhoto, subjectsFor } from './real-photo.js'
+import { acceptable, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, plainAuthor, subjectsFor } from './real-photo.js'
+import { topicSubjects } from './photo-topics.js'
 
-describe('real photo', () => {
+describe('real photo subjects', () => {
   it('only tries entities named in the headline, most specific first', () => {
     expect(subjectsFor('Imran Khan meets IMF team in Lahore', ['IMF', 'Imran Khan', 'Karachi', 'Lahore'])).toEqual(['Imran Khan', 'Lahore', 'IMF'])
   })
@@ -12,18 +13,113 @@ describe('real photo', () => {
     expect(subjectsFor('State of the economy', ['State Bank of Pakistan'])).toEqual([])
   })
 
-  it('accepts a big free Commons image of the right page and rejects the rest', async () => {
-    const pages = (title: string, source: string, width = 2000) => ({ query: { pages: { 1: { title, index: 1, original: { source, width, height: 1000 } } } } })
-    const mk = (json: unknown) =>
-      (async (u: string) =>
-        String(u).includes('api.php')
-          ? new Response(JSON.stringify(json))
-          : new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } })) as unknown as typeof fetch
-    const ok = await findRealPhoto('Shehbaz Sharif addresses nation', ['Shehbaz Sharif'], mk(pages('Shehbaz Sharif', 'https://upload.wikimedia.org/wikipedia/commons/a/ab/S.jpg')))
-    expect(ok?.credit).toContain('Wikimedia')
-    // a non-Commons (fair-use) file, a small file, and a different page are all skipped
-    expect(await findRealPhoto('Shehbaz Sharif addresses nation', ['Shehbaz Sharif'], mk(pages('Shehbaz Sharif', 'https://upload.wikimedia.org/wikipedia/en/a/ab/S.jpg')))).toBeNull()
-    expect(await findRealPhoto('Shehbaz Sharif addresses nation', ['Shehbaz Sharif'], mk(pages('Shehbaz Sharif', 'https://upload.wikimedia.org/wikipedia/commons/a/ab/S.jpg', 400)))).toBeNull()
-    expect(await findRealPhoto('Shehbaz Sharif addresses nation', ['Shehbaz Sharif'], mk(pages('Nawaz Sharif', 'https://upload.wikimedia.org/wikipedia/commons/a/ab/S.jpg')))).toBeNull()
+  it('maps indirect topics to a place: US election -> Capitol, Fed -> Eccles Building, PSX, SBP, cricket, OpenAI', () => {
+    expect(topicSubjects('Midterm elections results: Democrats take Congress')).toEqual(['United States Capitol'])
+    expect(topicSubjects('US election results live: Democrats win House as gas prices bite')).toContain('United States Capitol')
+    expect(topicSubjects('Fed holds rates steady')[0]).toBe('Eccles Building')
+    expect(topicSubjects('PSX closes 800 points higher')[0]).toBe('Pakistan Stock Exchange')
+    expect(topicSubjects('SBP keeps policy rate at 11%')).toContain('State Bank of Pakistan')
+    expect(topicSubjects('PCB names squad for the Karachi Test')).toContain('Gaddafi Stadium')
+    expect(topicSubjects('ChatGPT gets a new voice mode')).toEqual(['OpenAI', 'Sam Altman'])
+    expect(topicSubjects('National Assembly passes the budget, Pakistan')).toContain('Parliament House, Islamabad')
+  })
+
+  it('does not misapply a topic: Pakistan Senate is not the Capitol, Indian Congress is not Congress, UK parliament is not Islamabad', () => {
+    expect(topicSubjects('Pakistan Senate elects new chairman')).not.toContain('United States Capitol')
+    expect(topicSubjects('Congress party leader Rahul Gandhi in Kerala')).toEqual([])
+    expect(topicSubjects('UK parliament votes on the bill')).not.toContain('Parliament House, Islamabad')
+    expect(topicSubjects('Petrol price cut announced')).toEqual([])
+  })
+
+  it('hero order: named multi-word entity, then topic place, then single names', () => {
+    expect(heroSubjects({ title: 'Sam Altman says OpenAI will double compute', tags: ['Sam Altman', 'OpenAI'] })).toEqual(['Sam Altman', 'OpenAI'])
+    expect(heroSubjects({ title: 'Democrats take Congress in midterms', tags: ['Democrats', 'Congress', 'Midterms'] })[0]).toBe('United States Capitol')
+    // an entity only the brief mentions is a last resort
+    const s = heroSubjects({ title: 'Markets rally', brief: 'Shehbaz Sharif at a press conference', tags: ['Shehbaz Sharif'] })
+    expect(s).toEqual(['Shehbaz Sharif'])
+  })
+})
+
+describe('licence checks', () => {
+  it('accepts free licences and rejects NC/ND and fair use', () => {
+    for (const ok of ['Public domain', 'CC0', 'CC BY 2.0', 'CC BY-SA 4.0', 'CC BY-SA 3.0']) expect(licenceOk(ok)).toBe(true)
+    for (const bad of ['CC BY-NC 4.0', 'CC BY-ND 2.0', 'CC BY-NC-SA 3.0', 'Fair use', 'Copyrighted', 'GODL-India', '']) expect(licenceOk(bad)).toBe(false)
+  })
+
+  it('turns the Artist html into a short plain name', () => {
+    expect(plainAuthor('<bdi>Martin Falbisoner</bdi>')).toBe('Martin Falbisoner')
+    expect(plainAuthor('<a href="//commons.wikimedia.org/wiki/User:A" title="User:A">Alice &amp; Bob</a>')).toBe('Alice & Bob')
+    expect(plainAuthor('Unknown author')).toBe('')
+    expect(plainAuthor(undefined)).toBe('')
+  })
+
+  it('needs a Commons page, a jpeg/png and a landscape-enough size for a hero', () => {
+    const o = { minWidth: 1000, minAspect: 1.0 }
+    const info = { url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg', descriptionurl: 'https://commons.wikimedia.org/wiki/File:X.jpg', mime: 'image/jpeg', width: 3000, height: 2000, extmetadata: { LicenseShortName: { value: 'CC BY 4.0' } } }
+    expect(acceptable('X.jpg', info, o)).toBe(true)
+    expect(acceptable('X.jpg', { ...info, width: 800, height: 500 }, o)).toBe(false)
+    expect(acceptable('X.jpg', { ...info, width: 1200, height: 1800 }, o)).toBe(false)
+    expect(acceptable('X.jpg', { ...info, descriptionurl: 'https://en.wikipedia.org/wiki/File:X.jpg', url: 'https://upload.wikimedia.org/wikipedia/en/a/ab/X.jpg' }, o)).toBe(false)
+    expect(acceptable('X.jpg', { ...info, extmetadata: { LicenseShortName: { value: 'Fair use' } } }, o)).toBe(false)
+    expect(acceptable('X.jpg', { ...info, extmetadata: { LicenseShortName: { value: 'CC BY 4.0' }, NonFree: { value: 'true' } } }, o)).toBe(false)
+  })
+})
+
+/** Fake Wikipedia API: a lead image for one page, its Commons file info, and image bytes */
+function fakeWiki(opts: { leadWidth?: number; licence?: string; page?: string; searchFiles?: { title: string; width: number; height: number }[] } = {}) {
+  const page = opts.page ?? 'United States Capitol'
+  const info = (name: string, width: number, height: number) => ({
+    url: `https://upload.wikimedia.org/wikipedia/commons/9/9f/${encodeURIComponent(name)}`,
+    thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/${encodeURIComponent(name)}/2000px-x.jpg`,
+    descriptionurl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(name)}`,
+    mime: 'image/jpeg',
+    width,
+    height,
+    extmetadata: { LicenseShortName: { value: opts.licence ?? 'CC BY-SA 3.0' }, Artist: { value: '<bdi>Martin Falbisoner</bdi>' } },
+  })
+  const calls: string[] = []
+  const fn = (async (u: string) => {
+    const url = String(u)
+    calls.push(url)
+    if (!url.includes('api.php')) return new Response(new Uint8Array(40_000), { headers: { 'content-type': 'image/jpeg' } })
+    if (url.includes('prop=pageimages')) {
+      const w = opts.leadWidth ?? 4515
+      return new Response(JSON.stringify({ query: { pages: { 1: { title: page, index: 1, pageimage: 'Lead.JPG', original: { source: 'https://upload.wikimedia.org/wikipedia/commons/9/9f/Lead.JPG', width: w, height: 2397 } } } } }))
+    }
+    if (url.includes('titles=')) return new Response(JSON.stringify({ query: { pages: { 1: { title: 'File:Lead.JPG', imageinfo: [info('Lead.JPG', opts.leadWidth ?? 4515, 2397)] } } } }))
+    const files = opts.searchFiles ?? []
+    return new Response(JSON.stringify({ query: { pages: Object.fromEntries(files.map((f, i) => [i + 1, { title: `File:${f.title}`, index: i + 1, imageinfo: [info(f.title, f.width, f.height)] }])) } }))
+  }) as unknown as typeof fetch
+  return { fn, calls }
+}
+
+describe('findHeroPhoto', () => {
+  it('finds the Capitol for a US election story that names no entity, with author, licence and file page', async () => {
+    const { fn } = fakeWiki()
+    const hit = await findHeroPhoto({ title: 'Midterm elections results: Democrats take Congress', tags: ['Democrats'] }, fn)
+    expect(hit?.meta.subject).toBe('United States Capitol')
+    expect(hit?.meta.creditLine).toBe('Photo: Martin Falbisoner / CC BY-SA 3.0 / Wikimedia Commons')
+    expect(hit?.meta.sourceUrl).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/)
+    expect(hit?.meta.mediaCredit).toBe(`${hit?.meta.creditLine} | ${hit?.meta.sourceUrl}`)
+    expect(hit?.mime).toBe('image/jpeg')
+  })
+
+  it('rejects non-free or non-attributable files, and returns null so the AI fallback can run', async () => {
+    expect(await findHeroPhoto({ title: 'Democrats take Congress', tags: [] }, fakeWiki({ licence: 'CC BY-NC 4.0' }).fn)).toBeNull()
+    expect(await findHeroPhoto({ title: 'Petrol price cut announced', tags: [] }, fakeWiki().fn)).toBeNull()
+  })
+
+  it('falls back to a landscape Commons file named after the subject when the lead is too small', async () => {
+    const { fn } = fakeWiki({ leadWidth: 390, page: 'Sam Altman', searchFiles: [{ title: 'Sam Altman portrait.jpg', width: 1500, height: 2400 }, { title: 'Sam Altman speaking at event.jpg', width: 3000, height: 2000 }, { title: 'Sam Altman autograph.jpg', width: 3000, height: 1200 }] })
+    const hit = await findHeroPhoto({ title: 'Sam Altman says compute will double', tags: ['Sam Altman'] }, fn)
+    expect(hit?.meta.file).toBe('Sam Altman speaking at event.jpg')
+  })
+})
+
+describe('findRealPhoto (social cards)', () => {
+  it('only uses entities named in the headline and keeps the credit', async () => {
+    const ok = await findRealPhoto('United States Capitol evacuated', ['United States Capitol'], fakeWiki().fn)
+    expect(ok?.credit).toContain('Wikimedia Commons')
+    expect(await findRealPhoto('Something else happened', ['United States Capitol'], fakeWiki().fn)).toBeNull()
   })
 })

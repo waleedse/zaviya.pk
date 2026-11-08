@@ -1,22 +1,48 @@
 import { logger } from '../logger.js'
+import { topicSubjects } from './photo-topics.js'
 
 /**
- * A real photo of the person, place or thing the story is about, for social cards only (articles keep their own hero).
- * Source: lead images of Wikipedia articles that are hosted on Wikimedia Commons (free licences), so no outlet's photos.
- * Only entities named in the headline are tried, so a card never shows an unrelated face.
+ * A real photo of the person, place or thing a story is about: for article heroes and social cards.
+ * Source: free-licence files on Wikimedia Commons (found through Wikipedia lead images, then a Commons file search).
+ * Only licences that allow reuse with attribution are accepted (public domain, CC0, CC BY, CC BY-SA); the author,
+ * licence and file page are kept so the credit can be shown. Never photos from news outlets or agencies (copyright).
  */
+export interface PhotoMeta {
+  subject: string
+  file: string
+  author: string
+  licence: string
+  /** What readers see: "Photo: Author / CC BY-SA 4.0 / Wikimedia Commons" */
+  creditLine: string
+  /** Commons file page */
+  sourceUrl: string
+  /** creditLine plus the file page, as stored in Media.credit (`creditParts` in the web app splits it again) */
+  mediaCredit: string
+}
+
 export interface RealPhoto {
   dataUrl: string
   credit: string
+  bytes: Buffer
+  mime: string
+  meta: PhotoMeta
+}
+
+export interface PhotoOpts {
+  /** Minimum width in px (default 900) */
+  minWidth?: number
+  /** Minimum width/height: heroes are shown 16:9 and cropped from the middle, so they need a landscape-ish photo */
+  minAspect?: number
 }
 
 const API = 'https://en.wikipedia.org/w/api.php'
-const MIN_WIDTH = 900
 const UA = { 'user-agent': 'ZaviyaBot/1.0 (https://zaviya.pk; ops@zaviya.pk)' }
+const SOCIAL: Required<PhotoOpts> = { minWidth: 900, minAspect: 0.7 }
+const HERO: Required<PhotoOpts> = { minWidth: 1000, minAspect: 1.0 }
 
 const GENERIC_FIRST = new Set(['state', 'prime', 'supreme', 'federal', 'national', 'pakistan', 'islamabad', 'punjab', 'sindh', 'chief', 'finance', 'foreign', 'central', 'general', 'united', 'world', 'north', 'south', 'east', 'west', 'high', 'court'])
 
-/** Does the headline name this entity? The full tag, or for a person-style tag ("Shehbaz Sharif") its given name as a word ("PM Shehbaz ..."). */
+/** Does the text name this entity? The full tag, or for a person-style tag ("Shehbaz Sharif") its given name as a word ("PM Shehbaz ..."). */
 export function namedIn(title: string, tag: string): boolean {
   const t = title.toLowerCase()
   const full = tag.trim().toLowerCase()
@@ -36,20 +62,51 @@ export function subjectsFor(title: string, tags: string[], max = 3): string[] {
     .slice(0, max)
 }
 
+/**
+ * Subjects for an article hero, best first: named people/organisations/places of two or more words, then the topic
+ * fallbacks (US Congress -> the Capitol), then single-word entities the headline names. Entities that only the dek or
+ * the image brief name are tried last, so a hero never shows a face the story is not about.
+ */
+export function heroSubjects(input: { title: string; dek?: string; brief?: string; tags: string[] }, max = 5): string[] {
+  const body = [input.dek, input.brief].filter(Boolean).join(' ')
+  const all = `${input.title} ${body} ${input.tags.join(' ')}`
+  const named = subjectsFor(input.title, input.tags, 4)
+  const multi = named.filter((s) => s.includes(' '))
+  const single = named.filter((s) => !s.includes(' '))
+  const inBody = subjectsFor(body, input.tags, 2).filter((s) => !named.includes(s) && s.includes(' '))
+  const out: string[] = []
+  for (const s of [...multi, ...topicSubjects(all), ...single, ...inBody]) if (!out.some((o) => o.toLowerCase() === s.toLowerCase())) out.push(s)
+  return out.slice(0, max)
+}
+
 interface WikiPage {
   title?: string
   index?: number
+  pageimage?: string
   original?: { source: string; width: number; height: number }
-  imageinfo?: { url: string; thumburl?: string; width: number; height: number }[]
+  imageinfo?: ImageInfo[]
+}
+
+interface ImageInfo {
+  url: string
+  thumburl?: string
+  descriptionurl?: string
+  mime?: string
+  width: number
+  height: number
+  extmetadata?: Record<string, { value?: string } | undefined>
 }
 
 /** Files that are not photos of the subject */
-const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|diagram|emblem|icon|signature|poster|stamp/i
+const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|diagram|emblem|icon|signature|poster|stamp|autograph|screenshot|banner|cartoon|caricature|painting|drawing/i
 
 const FREE_FILE = /\/wikipedia\/commons\/[^?]+\.(jpe?g|png)(\?|$)/i
 
+const EXT_FIELDS = 'Artist|LicenseShortName|NonFree'
+const INFO = `prop=imageinfo&iiprop=url|size|mime|extmetadata&iiextmetadatafilter=${EXT_FIELDS}&iiurlwidth=2000`
+
 async function query(fetchFn: typeof fetch, params: string): Promise<WikiPage[]> {
-  const res = await fetchFn(`${API}?action=query&format=json&${params}`, { headers: UA, signal: AbortSignal.timeout(10_000) })
+  const res = await fetchFn(`${API}?action=query&format=json&${params}`, { headers: UA, signal: AbortSignal.timeout(15_000) })
   if (!res.ok) return []
   const json = (await res.json()) as { query?: { pages?: Record<string, WikiPage> } }
   return Object.values(json.query?.pages ?? {}).sort((a, b) => (a.index ?? 9) - (b.index ?? 9))
@@ -60,36 +117,111 @@ function isSpecific(subject: string): boolean {
   return subject.trim().includes(' ') || subject.length >= 6
 }
 
-/** The article's lead image if it is a big free Commons file; else the biggest Commons file named after the subject. */
-async function imageUrlFor(subject: string, fetchFn: typeof fetch): Promise<{ url: string; label: string } | null> {
-  const q = encodeURIComponent(subject)
-  const s = subject.toLowerCase()
-  const lead = (await query(fetchFn, `generator=search&gsrlimit=3&gsrsearch=${q}&prop=pageimages&piprop=original&redirects=1`)).find(
-    (p) => p.title?.toLowerCase() === s && p.original && p.original.width >= MIN_WIDTH && FREE_FILE.test(p.original.source),
-  )
-  if (lead?.original) return { url: lead.original.source, label: lead.title ?? subject }
-  const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=10&gsrsearch=${q}&prop=imageinfo&iiprop=url|size&iiurlwidth=1600`))
-    .map((p) => ({ title: p.title ?? '', info: p.imageinfo?.[0] }))
-    .filter((f) => f.info && f.title.toLowerCase().includes(s) && /\.jpe?g$/i.test(f.title) && !NOT_A_PHOTO.test(f.title) && f.info.width >= MIN_WIDTH && f.info.width >= f.info.height * 0.7 && FREE_FILE.test(f.info.url) && isSpecific(subject))
-    .sort((a, b) => b.info!.width - a.info!.width)
-  return files[0] ? { url: files[0].info!.thumburl ?? files[0].info!.url, label: files[0].title } : null
+/** Licences that allow reuse with attribution. NC/ND variants and fair use are out. */
+export function licenceOk(short: string): boolean {
+  const s = short.trim()
+  if (!s || /\b(nc|nd)\b/i.test(s) || /fair use|non-?free|copyrighted/i.test(s)) return false
+  return /^(public domain|pd\b|cc0|cc[- ]by\b)/i.test(s)
 }
 
-export async function findRealPhoto(title: string, tags: string[], fetchFn: typeof fetch = fetch): Promise<RealPhoto | null> {
-  for (const subject of subjectsFor(title, tags)) {
+const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ' }
+
+/** Artist field is HTML (links, spans): plain text, short */
+export function plainAuthor(html: string | undefined): string {
+  const text = (html ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (m) => ENTITIES[m] ?? m)
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!text || /^(unknown|anonymous|own work|see (page|file) )/i.test(text)) return ''
+  return text.length > 70 ? `${text.slice(0, 67).trimEnd()}...` : text
+}
+
+interface Candidate {
+  url: string
+  info: ImageInfo
+  file: string
+}
+
+/** The file passes every check: free licence on Commons, a real photo, big enough, right shape */
+export function acceptable(file: string, info: ImageInfo | undefined, o: Required<PhotoOpts>, strictName = false): info is ImageInfo {
+  if (!info) return false
+  const short = info.extmetadata?.LicenseShortName?.value ?? ''
+  const nonFree = (info.extmetadata?.NonFree?.value ?? '').toLowerCase() === 'true'
+  return (
+    !nonFree &&
+    licenceOk(short) &&
+    /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/.test(info.descriptionurl ?? '') &&
+    FREE_FILE.test(info.url) &&
+    /^image\/(jpeg|png)$/.test(info.mime ?? 'image/jpeg') &&
+    info.width >= o.minWidth &&
+    info.width >= info.height * o.minAspect &&
+    !(strictName && NOT_A_PHOTO.test(file))
+  )
+}
+
+async function fileInfo(fileName: string, fetchFn: typeof fetch): Promise<ImageInfo | undefined> {
+  const pages = await query(fetchFn, `titles=${encodeURIComponent(`File:${fileName.replace(/_/g, ' ')}`)}&${INFO}`)
+  return pages[0]?.imageinfo?.[0]
+}
+
+/** The article's lead image if it is a free Commons file of the right shape; else the best Commons file named after the subject. */
+async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<PhotoOpts>): Promise<Candidate | null> {
+  const q = encodeURIComponent(subject)
+  const s = subject.toLowerCase()
+  const lead = (await query(fetchFn, `generator=search&gsrlimit=3&gsrsearch=${q}&prop=pageimages&piprop=original|name&redirects=1`)).find(
+    (p) => p.title?.toLowerCase() === s && p.pageimage && p.original && p.original.width >= o.minWidth && p.original.width >= p.original.height * o.minAspect,
+  )
+  if (lead?.pageimage) {
+    const info = await fileInfo(lead.pageimage, fetchFn)
+    if (acceptable(lead.pageimage, info, o)) return { url: info.thumburl ?? info.url, info, file: lead.pageimage }
+  }
+  if (!isSpecific(subject)) return null
+  const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${subject} filetype:bitmap`)}&${INFO}`))
+    .map((p) => ({ title: (p.title ?? '').replace(/^File:/, ''), info: p.imageinfo?.[0], rank: p.index ?? 9 }))
+    .filter((f) => f.title.toLowerCase().includes(s) && acceptable(f.title, f.info, o, true))
+  // Landscape first (they crop least), then search order
+  files.sort((a, b) => Number(b.info!.width >= b.info!.height * 1.3) - Number(a.info!.width >= a.info!.height * 1.3) || a.rank - b.rank)
+  const best = files[0]
+  return best?.info ? { url: best.info.thumburl ?? best.info.url, info: best.info, file: best.title } : null
+}
+
+export function buildMeta(subject: string, c: Candidate): PhotoMeta {
+  const author = plainAuthor(c.info.extmetadata?.Artist?.value)
+  const licence = (c.info.extmetadata?.LicenseShortName?.value ?? '').trim()
+  const creditLine = ['Photo:', [author, licence, 'Wikimedia Commons'].filter(Boolean).join(' / ')].join(' ')
+  const sourceUrl = c.info.descriptionurl ?? ''
+  return { subject, file: c.file, author, licence, creditLine, sourceUrl, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine }
+}
+
+/** Try each subject in turn; the first free-licence photo that downloads wins. */
+export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof fetch = fetch, opts: PhotoOpts = SOCIAL): Promise<RealPhoto | null> {
+  const o = { ...SOCIAL, ...opts }
+  for (const subject of subjects) {
     try {
-      const hit = await imageUrlFor(subject, fetchFn)
+      const hit = await candidateFor(subject, fetchFn, o)
       if (!hit) continue
-      const img = await fetchFn(hit.url, { headers: UA, signal: AbortSignal.timeout(20_000) })
-      const type = img.headers.get('content-type') ?? ''
-      if (!img.ok || !/^image\/(jpeg|png)/.test(type)) continue
-      const buf = Buffer.from(await img.arrayBuffer())
-      if (buf.length > 12_000_000) continue
-      logger.info({ subject, page: hit.label }, 'real photo found for social card')
-      return { dataUrl: `data:${type.split(';')[0]};base64,${buf.toString('base64')}`, credit: 'Photo: Wikimedia Commons' }
+      const img = await fetchFn(hit.url, { headers: UA, signal: AbortSignal.timeout(30_000) })
+      const type = (img.headers.get('content-type') ?? '').split(';')[0] ?? ''
+      if (!img.ok || !/^image\/(jpeg|png)$/.test(type)) continue
+      const bytes = Buffer.from(await img.arrayBuffer())
+      if (bytes.length > 12_000_000 || bytes.length < 20_000) continue
+      const meta = buildMeta(subject, hit)
+      logger.info({ subject, file: hit.file, licence: meta.licence }, 'real photo found')
+      return { dataUrl: `data:${type};base64,${bytes.toString('base64')}`, credit: meta.creditLine, bytes, mime: type, meta }
     } catch (e) {
       logger.debug({ subject, err: e instanceof Error ? e.message : e }, 'real photo lookup failed')
     }
   }
   return null
+}
+
+/** Social cards: entities named in the headline only. */
+export async function findRealPhoto(title: string, tags: string[], fetchFn: typeof fetch = fetch): Promise<RealPhoto | null> {
+  return findPhotoForSubjects(subjectsFor(title, tags), fetchFn, SOCIAL)
+}
+
+/** Article heroes: named entities, then topic fallbacks (US election -> the Capitol). */
+export async function findHeroPhoto(input: { title: string; dek?: string; brief?: string; tags: string[] }, fetchFn: typeof fetch = fetch): Promise<RealPhoto | null> {
+  return findPhotoForSubjects(heroSubjects(input), fetchFn, HERO)
 }

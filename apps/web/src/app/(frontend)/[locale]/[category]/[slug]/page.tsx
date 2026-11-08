@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import { dataPageSlugToKey } from '@/lib/seo'
 import { getArticle, getArticleBySlug, getDuplicateReplacementHref, getRelated, getMostRead, getRatesTicker, getCategoryFeed, getTagStoryCount } from '@/lib/queries'
 import { parseLocale } from '@/lib/locale'
+import { creditParts } from '@/lib/credit'
 import { localePath, t } from '@/lib/i18n'
 import {
   articleKeywords,
@@ -211,7 +212,17 @@ export default async function ArticlePage({ params }: Props) {
                 {(article.image.credit || article.image.alt) && (
                   <figcaption className="mt-2.5 flex flex-wrap justify-between gap-2 text-[13px] text-fg-subtle">
                     <span>{article.image.alt}</span>
-                    {article.image.credit && <span className="rounded-full bg-surface-2 px-2.5 py-0.5 font-semibold">{article.image.credit}</span>}
+                    {article.image.credit && (
+                      <span className="rounded-full bg-surface-2 px-2.5 py-0.5 font-semibold">
+                        {creditParts(article.image.credit).href ? (
+                          <a href={creditParts(article.image.credit).href} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">
+                            {creditParts(article.image.credit).text}
+                          </a>
+                        ) : (
+                          creditParts(article.image.credit).text
+                        )}
+                      </span>
+                    )}
                   </figcaption>
                 )}
               </figure>
