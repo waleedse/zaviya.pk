@@ -196,6 +196,8 @@ export const RATE_LINKS = [
   { href: '/dollar-rate-today-pakistan', label: 'Dollar rate today', ur: 'ڈالر' },
   { href: '/riyal-dirham-rate-pakistan', label: 'Riyal & dirham rate', ur: 'ریال' },
   { href: '/chicken-price-pakistan', label: 'Chicken price today', ur: 'مرغی' },
+  { href: '/prices/cheapest-city', label: 'Cheapest city this week', ur: 'سستا شہر' },
+  { href: '/prize-bond-list/rs-1500', label: 'Prize bond list & checker', ur: 'پرائز بانڈ' },
 ] as const
 
 export interface PhonesSummary {

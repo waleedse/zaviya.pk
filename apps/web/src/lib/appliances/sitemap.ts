@@ -13,7 +13,10 @@ export async function applianceSitemapEntries(siteUrl: string): Promise<Entry[]>
       const t = a.priceUpdatedAt ?? a.updatedAt
       return t && (!m || t > m) ? t : m
     }, undefined)
-    const entries: Entry[] = [{ url: `${siteUrl}/prices`, lastModified: newest, changeFrequency: 'daily', priority: 0.9 }]
+    const entries: Entry[] = [
+      { url: `${siteUrl}/prices`, lastModified: newest, changeFrequency: 'daily', priority: 0.9 },
+      { url: `${siteUrl}/prices/cheapest-city`, lastModified: newest, changeFrequency: 'weekly', priority: 0.9 },
+    ]
     for (const s of categorySummaries(all)) {
       if (s.priced < MIN_INDEXABLE_APPLIANCE_LIST) continue
       entries.push({ url: `${siteUrl}/prices/${s.category.slug}`, lastModified: newest, changeFrequency: 'daily', priority: 0.8 })
