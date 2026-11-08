@@ -48,6 +48,12 @@ describe('prize bond results', () => {
   it('finds the official .txt links with their dates, newest first', () => {
     const html = `<a href="https://savings.gov.pk/wp-content/uploads/2026/02/105.txt">16-02-2026 (txt file)</a><a href="https://savings.gov.pk/wp-content/uploads/2026/02/105.pdf">16-02-2026 (pdf file)</a><a href="https://savings.gov.pk/wp-content/uploads/2026/05/106.txt">15-05-2026</a>`
     expect(parseDrawLinks(html).map((l) => l.date)).toEqual(['2026-05-15', '2026-02-16'])
+    const named = `<a href="https://savings.gov.pk/wp-content/uploads/2026/08/100_170826.txt" target="_blank">100_170826_Txt</a><a href="https://savings.gov.pk/wp-content/uploads/2026/10/750_15102026-1.txt">x</a>`
+    expect(parseDrawLinks(named).map((l) => l.date)).toEqual(['2026-10-15', '2026-08-17'])
+  })
+  it('restores leading zeros the official file lost on a numbers-only line', () => {
+    const t = rs1500.replace('026284      355420        407321', '7447\t827353\t876615')
+    expect(parseDrawText(t, 1500, '2026-10-15', 'x')!.tiers[1]!.numbers).toEqual(['007447', '827353', '876615'])
   })
   it('parses numbers and ranges, and finds wins', () => {
     expect(parseBondInput('24132, 355420\n123400-123402 abc')).toEqual(['024132', '355420', '123400', '123401', '123402'])
