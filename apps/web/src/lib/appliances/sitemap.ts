@@ -1,10 +1,10 @@
 import type { MetadataRoute } from 'next'
 import { getAppliances } from './queries'
-import { MIN_INDEXABLE_APPLIANCE_LIST, applianceIndexable, categorySummaries, comparePairs } from './logic'
+import { MIN_INDEXABLE_APPLIANCE_LIST, applianceIndexable, categorySummaries, comparePairs, sitemapItems } from './logic'
 
 type Entry = MetadataRoute.Sitemap[number]
 
-/** Sitemap entries for /prices. Only priced (indexable) pages; a failure never takes the whole sitemap down. */
+/** Sitemap entries for /prices: hubs, brand lists, the most searched items and compares; a failure never takes the whole sitemap down. */
 export async function applianceSitemapEntries(siteUrl: string): Promise<Entry[]> {
   try {
     const all = await getAppliances()
@@ -23,10 +23,11 @@ export async function applianceSitemapEntries(siteUrl: string): Promise<Entry[]>
         if (priced >= MIN_INDEXABLE_APPLIANCE_LIST) entries.push({ url: `${siteUrl}/prices/${s.category.slug}/${brand}`, lastModified: newest, changeFrequency: 'daily', priority: 0.7 })
       }
     }
-    for (const a of all.filter(applianceIndexable)) {
+    // only the searched items; every other priced page stays live and linked from its hub
+    for (const a of sitemapItems(all)) {
       entries.push({ url: `${siteUrl}/prices/${a.category.slug}/${a.slug}`, lastModified: a.priceUpdatedAt ?? a.updatedAt, changeFrequency: a.category.group === 'groceries' ? 'weekly' : 'daily', priority: a.hotScore > 0 ? 0.8 : 0.7 })
     }
-    for (const p of comparePairs(all, 150)) entries.push({ url: `${siteUrl}/prices/compare/${p.key}`, lastModified: newest, changeFrequency: 'weekly', priority: 0.5 })
+    for (const p of comparePairs(all, 30)) entries.push({ url: `${siteUrl}/prices/compare/${p.key}`, lastModified: newest, changeFrequency: 'weekly', priority: 0.5 })
     return entries
   } catch (err) {
     console.error('appliance sitemap failed', err)
