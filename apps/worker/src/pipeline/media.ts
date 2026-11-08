@@ -4,14 +4,13 @@ import type { Queue } from 'bullmq'
 import type { WriteResult } from './write.js'
 import { logger } from '../logger.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
-import { renderSocialCardSet, categoryAccentColor, photoDataUrl } from './social-card.js'
+import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 import { renderPostCard } from './post-card.js'
-import { findRealPhoto } from './real-photo.js'
+import { findRealPhoto, findHeroPhoto } from './real-photo.js'
 import { generateViaZImage } from './zimage.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
-import { describeReferenceScene } from './reference.js'
 import { editorApproved } from './pitch.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
@@ -93,6 +92,9 @@ export function deferImage(o: { gate: boolean; articleId?: string; priority: Pri
   return o.gate && !o.articleId && o.priority !== 'breaking' && !o.isUpdate && !o.approved
 }
 
+/** Labelling of AI illustrations (last resort only) */
+export const AI_MEDIA = { license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI illustration)' } as const
+
 const MEDIA_FILE_PREFIX = '/api/media/file/'
 
 /**
@@ -166,24 +168,17 @@ export async function processMediaJob(
     return
   }
 
-  // Never reuse source photos (copyright). Gemini web (Waleed's AI Pro account, then the next one listed) is free,
-  // so it goes first; FLUX on Workers AI (paid per image) is the fallback. Breaking news cannot wait for Gemini.
+  // 1. A real, free-licence photo of what the story is about (Wikimedia Commons: person, organisation, place, building,
+  //    or the topic fallback such as US Congress -> the Capitol). Never photos from outlets or agencies (copyright).
   const brief = data.write.en.imageBrief || data.write.en.title
-  // Look at the real photo behind the story (described in words, never reused) so the image fits the event.
-  let scenePromise: Promise<string | null> | null = null
-  const scene = () =>
-    (scenePromise ??= describeReferenceScene(cluster?.items.map((i) => i.url) ?? [], {
-      geminiApiKey: deps.env.GEMINI_API_KEY,
-      clusterId: data.clusterId,
-    }).catch(() => null))
-  const flux = async () =>
-    generateHeroViaWorkersAI(brief, {
-      ...fluxCreds(deps.env),
-      clusterId: data.clusterId,
-      scene: await scene(),
-    })
+  const realHero = await findHeroPhoto({ title: data.write.en.title, dek: data.write.en.dek, brief, tags: data.write.en.tags }).catch(() => null)
+  if (realHero) logger.info({ clusterId: data.clusterId, ...realHero.meta }, 'hero: real photo from Wikimedia Commons')
+
+  // 2. Last resort: a generic AI illustration (Gemini web is free so it goes first; FLUX on Workers AI is paid and the fallback).
+  //    The prompt forbids real people, events, elections, disasters and specific buildings (fluxPrompt). Breaking news cannot wait for Gemini.
+  const flux = async () => generateHeroViaWorkersAI(brief, { ...fluxCreds(deps.env), clusterId: data.clusterId })
   const gemini = async () => {
-    const prompt = fluxPrompt(brief, await scene())
+    const prompt = fluxPrompt(brief)
     for (const account of geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)) {
       const b = await generateHeroViaExtension(prompt, deps.bridge, data.clusterId, account, GEMINI_ACCOUNT_TIMEOUT_MS)
       if (b) {
@@ -195,10 +190,11 @@ export async function processMediaJob(
     }
     return null
   }
-  const zimage = async () => generateViaZImage(fluxPrompt(brief, await scene()), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
+  const zimage = async () => generateViaZImage(fluxPrompt(brief), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
   const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
-  const blob: Blob | null =
-    deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
+  const blob: Blob | null = realHero
+    ? new Blob([new Uint8Array(realHero.bytes)], { type: realHero.mime })
+    : deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
       ? ((await zimage()) ?? (await flux()) ?? (await gemini()))
       : fluxFirst
         ? ((await flux()) ?? (await gemini()))
@@ -222,9 +218,7 @@ export async function processMediaJob(
     try {
       const uploaded = await deps.payload.uploadMedia(blob, {
         alt: data.write.en.altText?.trim() || data.write.en.title,
-        license: 'ai-generated',
-        isAiGenerated: true,
-        credit: 'Zaviya',
+        ...(realHero ? { license: 'wikimedia', isAiGenerated: false, credit: realHero.meta.mediaCredit } : AI_MEDIA),
         filename: data.write.en.slug,
       })
       heroMediaId = uploaded.id
@@ -236,9 +230,10 @@ export async function processMediaJob(
 
   try {
     // Cards carry the hero photo and the headline: what people stop scrolling for
-    // A real photo of the person/thing named in the headline when one exists; otherwise the AI hero
-    const real = await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null)
-    const photo = real?.dataUrl ?? (await photoDataUrl(blob).catch(() => null))
+    // Social cards never carry the AI hero: the real hero photo, else a real photo of an entity the headline names,
+    // else a clean text/brand card (an invented scene next to a real headline is how a US story got a Pakistani school)
+    const real = realHero ?? (await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null))
+    const photo = real?.dataUrl ?? null
     const breaking = data.priority === 'breaking'
     const cardsEn = await renderSocialCardSet({
       title: data.write.en.title,
@@ -299,7 +294,7 @@ export async function processMediaJob(
     if (!heroMediaId && ogEn?.id) {
       heroMediaId = ogEn.id
     }
-    logger.info({ clusterId: data.clusterId, heroPath: blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
+    logger.info({ clusterId: data.clusterId, heroPath: realHero ? 'real-photo' : blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
 
     for (const u of [portraitEn?.url, portraitUr?.url, ogEn?.url]) {
       if (u && !socialMediaUrls.includes(u)) socialMediaUrls.push(u)

@@ -1,24 +1,26 @@
 import { logger } from '../logger.js'
 
 /**
- * Hero images from Cloudflare Workers AI. FLUX.2 [klein] gives realistic 16:9 photos; FLUX.1 [schnell]
- * is the fallback. When the real news photo behind the story could be described (reference.ts), that
- * scene description steers the image so it looks like the actual event without copying the photo.
- * Images are labelled AI-generated on the site.
+ * Fallback hero images from Cloudflare Workers AI (FLUX.2 [klein], FLUX.1 [schnell] as backup), used only when no real
+ * Wikimedia Commons photo exists (real-photo.ts). Generic illustrations only; labelled AI-generated on the site.
  */
 const PRIMARY = '@cf/black-forest-labs/flux-2-klein-9b'
 const FALLBACK = '@cf/black-forest-labs/flux-1-schnell'
 
-export function fluxPrompt(brief: string, scene?: string | null): string {
+/**
+ * Last-resort hero: a generic editorial illustration of the story's theme, never a "photo" of an event.
+ * The prompt forbids real people, real events (elections, disasters, wars), specific real buildings and any country
+ * or culture the theme does not name (a US story once got a Pakistani school). The real scene is no longer fed in:
+ * describing the actual event is what made the images read as fake news photos.
+ */
+export function fluxPrompt(brief: string, _scene?: string | null): string {
   return [
-    brief.trim(),
-    scene ? `The real scene looks like this: ${scene.trim()}` : '',
-    'Photorealistic editorial news photograph, natural light, realistic setting in Pakistan where relevant, 16:9 landscape composition, documentary style.',
-    'Absolutely no text or writing of any script (no Urdu, Arabic or English letters), no banners, posters, signs, screens with text, captions, logos or watermarks.',
-    'No flags of any country and no portraits or framed photos on walls. No recognisable faces of real, named people: show the scene, places or objects instead; people, if any, seen from behind or at a distance.',
-  ]
-    .filter(Boolean)
-    .join(' ')
+    `Theme: ${brief.trim()}.`,
+    'A clean, modern, abstract editorial illustration for a news website, flat vector style with soft gradients and simple shapes that suggest the theme (for example coins and charts for the economy, a ballot box for a vote, a shield for security), 16:9 landscape composition, calm colour palette. It is clearly an illustration, not a photograph.',
+    'Do not depict real, named or recognisable people, real events, elections, protests, disasters, accidents, wars or crimes, or any specific real building, landmark, chamber or palace. No crowds, no destroyed or damaged places, no children.',
+    'Do not assume any country or culture: no national flags, symbols, architecture, clothing or landscapes of any country, and never place the scene in Pakistan unless the theme names Pakistan.',
+    'Absolutely no text or writing of any script (no Urdu, Arabic or English letters), no numbers, banners, posters, signs, screens with text, captions, logos or watermarks.',
+  ].join(' ')
 }
 
 interface Opts {

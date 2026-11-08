@@ -3,13 +3,16 @@ import { fluxPrompt, generateHeroViaWorkersAI } from './flux.js'
 import { extractOgImage } from './reference.js'
 
 describe('Workers AI hero image', () => {
-  it('asks for a realistic photo without text or real faces, steered by the real scene', () => {
-    const p = fluxPrompt('Petrol pump in Lahore', 'A busy fuel station at night with motorbikes queueing.')
-    expect(p).toMatch(/Photorealistic/)
-    expect(p).toMatch(/real scene looks like this: A busy fuel station/)
+  it('asks only for a generic illustration: no real people, events, buildings, countries or text', () => {
+    const p = fluxPrompt('US midterm elections: Democrats take the House', 'A grand chamber with rows of seats.')
+    expect(p).toMatch(/illustration, not a photograph/)
+    expect(p).toMatch(/Do not depict real, named or recognisable people, real events, elections/)
+    expect(p).toMatch(/specific real building, landmark, chamber or palace/)
+    expect(p).toMatch(/never place the scene in Pakistan unless the theme names Pakistan/)
     expect(p).toMatch(/no text/i)
-    expect(p).toMatch(/No flags/)
-    expect(p).toMatch(/recognisable faces/)
+    // the scene description of the real event no longer steers the image, and no Pakistan or documentary bias remains
+    expect(p).not.toMatch(/grand chamber/)
+    expect(p).not.toMatch(/setting in Pakistan where relevant|documentary style|Photorealistic/)
   })
 
   it('returns null without credentials, falls back from FLUX.2 to schnell', async () => {

@@ -402,6 +402,8 @@ export async function processPublishJob(
           title: data.write.en.title,
           brief: data.write.en.imageBrief || data.write.en.title,
           sourceUrls: cluster.items.map((i) => i.url),
+          dek: data.write.en.dek,
+          tags: data.write.en.tags,
         } satisfies HeroBackfillData,
         { priority: 7, delay: 15 * 60_000 },
       )
