@@ -2,7 +2,8 @@ import type { ApplianceView } from './logic'
 
 /**
  * A family's monthly kitchen basket, priced in every city from the PBS weekly survey (average market price).
- * The quantities are Zaviya's own simple assumption for a family of five, shown on the page.
+ * The quantities are Zaviya's own simple assumption for a family of five, shown on the page. Every item must be
+ * surveyed in all 17 cities (IRRI rice is not sold in Lahore, Gujranwala or Sialkot, so the basket uses basmati).
  */
 export const MONTHLY_BASKET: { slug: string; qty: number; label: string }[] = [
   { slug: 'atta-20kg-price', qty: 2, label: '2 bags atta (20 kg)' },
@@ -11,7 +12,7 @@ export const MONTHLY_BASKET: { slug: string; qty: number; label: string }[] = [
   { slug: 'fresh-milk-price', qty: 30, label: '30 litres milk' },
   { slug: 'eggs-price', qty: 4, label: '4 dozen eggs' },
   { slug: 'live-chicken-price', qty: 4, label: '4 kg chicken' },
-  { slug: 'irri-rice-price', qty: 5, label: '5 kg rice' },
+  { slug: 'basmati-rice-price', qty: 5, label: '5 kg rice (basmati broken)' },
   { slug: 'daal-masoor-price', qty: 2, label: '2 kg daal masoor' },
   { slug: 'daal-chana-price', qty: 2, label: '2 kg daal chana' },
   { slug: 'potato-price', qty: 5, label: '5 kg potatoes' },
