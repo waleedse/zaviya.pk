@@ -61,6 +61,19 @@ export function trendingItems(all: ApplianceView[], max = 12): ApplianceView[] {
     .slice(0, max)
 }
 
+/**
+ * Item pages listed in the sitemap (8 Nov 2026 SEO audit: 1,173 of 1,834 sitemap URLs were /prices items on a
+ * 4-week-old domain). Every priced page stays live, linked and indexable; the sitemap only names the ones people
+ * search: groceries and vehicles first, then the most searched or viewed items, up to `max`.
+ */
+export function sitemapItems(all: ApplianceView[], max = 150): ApplianceView[] {
+  const core = (a: ApplianceView) => a.category.group === 'groceries' || a.category.group === 'vehicles'
+  return all
+    .filter(applianceIndexable)
+    .sort((a, b) => Number(core(b)) - Number(core(a)) || b.hotScore - a.hotScore || b.popularity - a.popularity)
+    .slice(0, max)
+}
+
 /** An appliance page is indexed only with an official price (the same rule as phones, 5 Nov 2026) */
 export function applianceIndexable(a: { pricePkr: number | null }): boolean {
   return typeof a.pricePkr === 'number' && a.pricePkr > 0

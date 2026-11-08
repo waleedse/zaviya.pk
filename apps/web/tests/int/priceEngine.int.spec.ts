@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { classifyAppliance } from '@zaviya/shared'
 import { mergeAppliance } from '@/lib/appliances/importer'
 import { hotScores, matchSearch, words, type DemandItem } from '@/lib/appliances/demand'
-import { categoryBySlug, categoryFaqs, fullName, productFaqs, trendingItems, type ApplianceView } from '@/lib/appliances/logic'
+import { categoryBySlug, categoryFaqs, fullName, productFaqs, sitemapItems, trendingItems, type ApplianceView } from '@/lib/appliances/logic'
 import { categoryCopy } from '@/lib/appliances/seo-copy'
 
 const now = new Date('2026-11-06T06:00:00Z')
@@ -132,6 +132,12 @@ describe('price engine: pages', () => {
   it('ranks trending items by hot score and skips unpriced ones', () => {
     const t = trendingItems([view('a', 1000, { hotScore: 5 }), view('b', 1000, { hotScore: 50 }), view('c', null, { hotScore: 99 }), view('d', 1000)])
     expect(t.map((x) => x.slug)).toEqual(['b', 'a'])
+  })
+  it('lists groceries and vehicles, then the most searched appliances, in the sitemap; never unpriced ones', () => {
+    const fan = (slug: string, hot: number, price: number | null = 9000) =>
+      view(slug, price, { hotScore: hot, category: { slug: 'fans', name: 'Fans', singular: 'Fan', ur: 'پنکھا', group: 'appliances' } })
+    const items = sitemapItems([fan('fan-cold', 0), fan('fan-hot', 40), fan('fan-unpriced', 99, null), atta, view('honda-cd-70', 159_900)], 3)
+    expect(items.map((x) => x.slug)).toEqual(['atta-20kg-price', 'honda-cd-70', 'fan-hot'])
   })
   it('renders a grocery page with the city table, the PBS source and no Buy button or Product offer', async () => {
     const { createElement: h } = await import('react')
