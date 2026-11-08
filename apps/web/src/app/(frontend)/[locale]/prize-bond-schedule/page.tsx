@@ -42,7 +42,7 @@ export default async function PrizeBondSchedulePage({ params }: { params: Promis
         { q: 'When is the next prize bond draw?', a: next ? `The next draw is on ${dateLabel(next.date, false)}: ${nextDay.map((d) => `${formatRs(d.denomination)} in ${d.city}`).join(' and ')}.` : 'All 2026 draws have been held. Check savings.gov.pk for the next schedule.' },
         { q: '750 prize bond list kab hai?', a: 'The Rs750 draw is held a few times a year. The 15 October 2026 draw in Rawalpindi (draw 108) has already been held; check the schedule above for any later date.' },
         { q: 'How is tax charged on prize bond winnings?', a: 'Prize money is taxed at 15% for tax filers and 30% for non-filers.' },
-        { q: 'Where do I get the official draw list?', a: 'The official lists are published by National Savings at savings.gov.pk. This page shows dates only and does not publish results.' },
+        { q: 'Where do I get the draw list?', a: 'Our Rs100, Rs200, Rs750 and Rs1500 list pages show the latest official National Savings result and check your numbers against the last three years of draws.' },
       ]
 
   return (
@@ -67,6 +67,13 @@ export default async function PrizeBondSchedulePage({ params }: { params: Promis
           <h1 className="font-display text-[clamp(1.9rem,1.4rem+2vw,3rem)] font-extrabold leading-tight">
             {isUr ? 'پرائز بانڈ ڈرا شیڈول 2026' : 'Prize bond draw schedule 2026'}
           </h1>
+          <div className="flex flex-wrap gap-2">
+            {[100, 200, 750, 1500].map((x) => (
+              <Link key={x} href={localePath(locale, `/prize-bond-list/rs-${x}`)} className="rounded-xl bg-accent px-4 py-2 font-bold text-accent-fg">
+                {isUr ? `${x} بانڈ لسٹ اور چیکر` : `Rs ${x} list & checker`}
+              </Link>
+            ))}
+          </div>
           {next ? (
             <div className="rounded-2xl border border-border bg-bg p-5">
               <p className="text-sm font-semibold uppercase tracking-wide text-fg-muted">{isUr ? 'اگلا ڈرا' : 'Next draw'}</p>
@@ -117,8 +124,8 @@ export default async function PrizeBondSchedulePage({ params }: { params: Promis
           </div>
           <p className="mt-3 text-sm text-fg-muted">
             {isUr
-              ? 'انعامی رقم پر ٹیکس: فائلر 15 فیصد، نان فائلر 30 فیصد۔ سرکاری فہرست قومی بچت کی ویب سائٹ پر دیکھیں۔ ہم نتائج شائع نہیں کرتے۔'
-              : 'Prize money is taxed at 15% for filers and 30% for non-filers. We list dates only, not results: see the official list on '}
+              ? 'انعامی رقم پر ٹیکس: فائلر 15 فیصد، نان فائلر 30 فیصد۔ سرکاری فہرست قومی بچت کی ویب سائٹ پر بھی دیکھیں۔'
+              : 'Prize money is taxed at 15% for filers and 30% for non-filers. Official lists are also on '}
             {!isUr ? (
               <a href="https://savings.gov.pk/prize-bonds/" rel="noopener" className="underline">
                 savings.gov.pk

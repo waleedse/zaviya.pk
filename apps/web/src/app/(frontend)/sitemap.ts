@@ -47,6 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
   entries.push({ url: `${siteUrl}/baby-names`, changeFrequency: 'weekly', priority: 0.8 })
   entries.push({ url: `${siteUrl}/prize-bond-schedule`, changeFrequency: 'weekly', priority: 0.8 })
+  for (const d of [100, 200, 750, 1500]) entries.push({ url: `${siteUrl}/prize-bond-list/rs-${d}`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/passport-fee-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/chicken-price-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/fuel-relief-9771-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
