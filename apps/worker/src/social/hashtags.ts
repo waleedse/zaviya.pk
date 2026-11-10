@@ -73,20 +73,30 @@ const wordsOf = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').spli
  * words (one, if the term is a single word of 4+ letters) in the headline or the story's tags. Never a party or army tag.
  */
 export function trendHashtag(trend: string, story: { title: string; tags: string[] }): string | null {
+  return matchTrend(trend, story)?.tag ?? null
+}
+
+/** The trending term as words people read ("Iran strike") and its hashtag, when the story is about it; never a party or army term. */
+export function matchTrend(trend: string, story: { title: string; tags: string[] }): { words: string; tag: string } | null {
   const term = trend.trim()
   if (!term) return null
   const haystack = `${story.title} ${story.tags.join(' ')}`.toLowerCase()
   const termWords = wordsOf(term)
-  let tag: string | null = null
-  if (haystack.includes(term.toLowerCase()) && term.split(/\s+/).length <= 3) tag = toHashtag(term)
+  let words = ''
+  if (haystack.includes(term.toLowerCase()) && term.split(/\s+/).length <= 3) words = term
   else {
     const hay = new Set(wordsOf(haystack).map(stemWord))
     const hit = termWords.filter((w) => hay.has(stemWord(w)))
     const enough = termWords.length === 1 ? hit.length === 1 && hit[0]!.length >= 4 : hit.length >= 2
-    if (enough) tag = toHashtag(hit.slice(0, 3).join(' '))
+    if (enough) words = hit.slice(0, 3).join(' ')
   }
-  return tag && !isPartyTag(tag) ? tag : null
+  const tag = words ? toHashtag(words) : null
+  if (!tag || isPartyTag(tag) || isPartyTag(`#${words.replace(/\s+/g, '')}`) || BLOCKED_TREND_WORDS.test(words)) return null
+  return { words, tag }
 }
+
+/** Trending words that never go into post text (army, parties, their leaders): the same rule as for hashtags */
+const BLOCKED_TREND_WORDS = /\b(army|isi|ispr|military|pti|pml-?n|ppp|tlp|mqm|imran khan|nawaz sharif|zardari)\b/i
 
 /** "State Bank of Pakistan" -> "#StateBankOfPakistan"; ASCII only, 3-24 chars, not generic or numeric. */
 export function toHashtag(raw: string): string | null {
@@ -132,18 +142,41 @@ export function stripHashtags(text: string): string {
   return text.replace(/(^|\s)#[\p{L}\p{N}_]+/gu, '$1').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
-/** Final copy per platform: the writer's description, no stray tags, and a controlled set of hashtags. */
+/** The first trending term the story matches, as words for the post text (a trend the text already says needs no repeat). */
+export function trendKeyword(story: { tags: string[]; title: string }, trends: string[], text = ''): string | null {
+  for (const t of trends) {
+    const m = matchTrend(t, story)
+    if (!m) continue
+    return text.toLowerCase().includes(m.words.toLowerCase()) ? null : m.words
+  }
+  return null
+}
+
+/**
+ * Final copy per platform: the writer's description, no stray tags, a controlled set of hashtags (three at most), and the
+ * matching trending keyword as plain words too (people search words, not only tags).
+ */
 export function finalizeCopy(
   copy: { facebook: string; instagram: string; x: string },
   story: { tags: string[]; category: string; title: string; trends?: string[] },
 ): { facebook: string; instagram: string; x: string } {
-  const tags = pickHashtags({ ...story, trends: story.trends ?? currentTrends() })
+  const trends = story.trends ?? currentTrends()
+  const tags = pickHashtags({ ...story, trends })
   const fb = tags.slice(0, 2)
   const xTags = tags.slice(0, 2)
-  const x = stripHashtags(copy.x)
+  const fbText = stripHashtags(copy.facebook)
+  const igText = stripHashtags(copy.instagram)
+  let x = stripHashtags(copy.x)
+  const said = (t: string) => t
+  const kwFb = trendKeyword(story, trends, said(fbText))
+  const kwIg = trendKeyword(story, trends, said(igText))
+  const kwX = trendKeyword(story, trends, said(x))
+  const kwLine = (k: string | null) => (k ? `\n\nTrending: ${k}` : '')
+  // X: 258 characters leave room for the 23-character link; add the words only when they fit with the tags
+  if (kwX && `${x} ${kwX}`.length + 1 + xTags.join(' ').length <= 258) x = `${x} (${kwX})`
   return {
-    facebook: `${stripHashtags(copy.facebook)}\n\n${fb.join(' ')}`,
-    instagram: `${stripHashtags(copy.instagram)}\n\n.\n${tags.join(' ')}`,
+    facebook: `${fbText}${kwLine(kwFb)}\n\n${fb.join(' ')}`,
+    instagram: `${igText}${kwLine(kwIg)}\n\n.\n${tags.join(' ')}`,
     // X counts a link as 23 characters; the 260-character writer limit leaves room for two tags
     x: x.length + 1 + xTags.join(' ').length <= 258 ? `${x} ${xTags.join(' ')}` : x,
   }

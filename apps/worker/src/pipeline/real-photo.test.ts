@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptable, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, plainAuthor, subjectsFor } from './real-photo.js'
+import { acceptable, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
 
 describe('real photo subjects', () => {
@@ -121,5 +121,45 @@ describe('findRealPhoto (social cards)', () => {
     const ok = await findRealPhoto('United States Capitol evacuated', ['United States Capitol'], fakeWiki().fn)
     expect(ok?.credit).toContain('Wikimedia Commons')
     expect(await findRealPhoto('Something else happened', ['United States Capitol'], fakeWiki().fn)).toBeNull()
+  })
+})
+
+describe('person-first photos', () => {
+  it('matches a person by surname as a word, but not short, generic or shared surnames', () => {
+    expect(subjectsFor('Trump warns renewed strike on Iran could be five times larger', ['Donald Trump', 'Iran'])).toContain('Donald Trump')
+    expect(subjectsFor('Huang admits affair probe', ['Jensen Huang'])).toEqual(['Jensen Huang'])
+    // Sharif and Khan are shared by many people: the headline does not say which
+    expect(subjectsFor('Nawaz Sharif returns', ['Shehbaz Sharif'])).toEqual([])
+    expect(subjectsFor('Khan scores a century', ['Babar Khan'])).toEqual([])
+    // a surname inside another word does not count
+    expect(subjectsFor('Trumpet sales rise', ['Donald Trump'])).toEqual([])
+  })
+
+  it('puts living people before organisations and places', () => {
+    expect(peopleFirst(['Nvidia', 'Jensen Huang', 'Santa Clara'], new Set(['Jensen Huang']))).toEqual(['Jensen Huang', 'Nvidia', 'Santa Clara'])
+  })
+
+  it('reads who is a living person from one batched Wikipedia query, following redirects', async () => {
+    const calls: string[] = []
+    const fetchFn = (async (url: string) => {
+      calls.push(url)
+      return new Response(
+        JSON.stringify({
+          query: {
+            redirects: [{ from: 'Jensen Huang', to: 'Jensen Huang (businessman)' }],
+            pages: { '1': { title: 'Jensen Huang (businessman)', categories: [{ title: 'Category:Living people' }] }, '2': { title: 'Nvidia' } },
+          },
+        }),
+      )
+    }) as unknown as typeof fetch
+    const people = await livingPeople(['Nvidia', 'Jensen Huang'], fetchFn)
+    expect([...people]).toEqual(['Jensen Huang'])
+    expect(calls).toHaveLength(1)
+    expect(decodeURIComponent(calls[0]!)).toContain('titles=Nvidia|Jensen Huang')
+  })
+
+  it('treats a failed person check as "no people known"', async () => {
+    const fetchFn = (async () => new Response('', { status: 500 })) as unknown as typeof fetch
+    expect((await livingPeople(['Elon Musk'], fetchFn)).size).toBe(0)
   })
 })

@@ -54,13 +54,13 @@ export function headlineSize(title: string, template: PostCardTemplate): number 
   return n <= 45 ? steps[0]! : n <= 65 ? steps[1]! : n <= 85 ? steps[2]! : steps[3]!
 }
 
-const FONTS =
+export const FONTS =
   'https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Noto+Nastaliq+Urdu:wght@700&family=Unbounded:wght@900&family=Space+Mono:wght@700&display=block'
 
-const MARK = (stroke: string, arc: string) =>
+export const MARK = (stroke: string, arc: string) =>
   `<svg viewBox="0 0 46 40" width="44" height="38" aria-hidden="true"><path d="M3 37 L43 37 M3 37 L33 5" stroke="${stroke}" stroke-width="4.5" fill="none"/><path d="M19 37 A16 16 0 0 0 14 25" stroke="${arc}" stroke-width="4.5" fill="none"/></svg>`
 
-function page(body: string, extraCss = ''): string {
+export function page(body: string, extraCss = ''): string {
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>
 *{box-sizing:border-box}body{margin:0}
 .card{width:1080px;height:1350px;position:relative;overflow:hidden;background:#111;color:#fff;font-family:'Inter',sans-serif}
@@ -121,8 +121,8 @@ async function browser(executablePath: string): Promise<Browser> {
   return browserPromise
 }
 
-/** Renders the card to PNG; null when Chromium is not available or the render fails. */
-export async function renderPostCard(input: PostCardInput, executablePath: string | undefined): Promise<Buffer | null> {
+/** Renders any 1080x1350 card page to PNG in the shared Chromium; null when Chromium is not available or the render fails. */
+export async function renderCardHtml(html: string, executablePath: string | undefined): Promise<Buffer | null> {
   if (!executablePath) return null
   const b = await browser(executablePath).catch((e) => {
     logger.warn({ err: e instanceof Error ? e.message : e }, 'post card: chromium did not start')
@@ -132,7 +132,7 @@ export async function renderPostCard(input: PostCardInput, executablePath: strin
   const p = await b.newPage()
   try {
     await p.setViewport({ ...POST_CARD_SIZE, deviceScaleFactor: 1 })
-    await p.setContent(postCardHtml(input), { waitUntil: 'load', timeout: 30_000 })
+    await p.setContent(html, { waitUntil: 'load', timeout: 30_000 })
     await p.evaluate(async () => {
       await document.fonts.ready
     })
@@ -143,4 +143,9 @@ export async function renderPostCard(input: PostCardInput, executablePath: strin
   } finally {
     await p.close().catch(() => {})
   }
+}
+
+/** Renders the card to PNG; null when Chromium is not available or the render fails. */
+export async function renderPostCard(input: PostCardInput, executablePath: string | undefined): Promise<Buffer | null> {
+  return renderCardHtml(postCardHtml(input), executablePath)
 }

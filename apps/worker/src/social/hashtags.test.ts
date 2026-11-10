@@ -84,3 +84,26 @@ describe('trending hashtags', () => {
   })
 })
 
+
+describe('trending keyword in the post text', () => {
+  it('adds the matching trend as words as well as a hashtag, at most three hashtags', () => {
+    const out = finalizeCopy(
+      { facebook: 'Washington says more strikes are possible.', instagram: 'More strikes are possible.', x: 'More strikes are possible.' },
+      { tags: ['Iran', 'Donald Trump'], category: 'world', title: 'Trump warns renewed Iran strike could be larger', trends: ['Iran strike'] },
+    )
+    expect(out.facebook).toContain('Trending: Iran strike')
+    expect(out.instagram).toContain('Trending: Iran strike')
+    expect(out.facebook).toContain('#IranStrike')
+    expect(out.instagram.match(/#\w+/g)!.length).toBeLessThanOrEqual(3)
+    expect(out.x).toContain('(Iran strike)')
+  })
+  it('does not repeat a trend the text already says, and never uses party or army terms', () => {
+    const said = finalizeCopy({ facebook: 'Iran strike fears grow.', instagram: 'i', x: 'x' }, { tags: [], category: 'world', title: 'Iran strike fears', trends: ['Iran strike'] })
+    expect(said.facebook).not.toContain('Trending:')
+    const party = finalizeCopy({ facebook: 'f', instagram: 'i', x: 'x' }, { tags: ['PTI'], category: 'pakistan', title: 'PTI rally in Lahore', trends: ['PTI rally'] })
+    expect(party.facebook).not.toContain('Trending:')
+    expect(party.facebook).not.toMatch(/#PTI/i)
+    const army = finalizeCopy({ facebook: 'f', instagram: 'i', x: 'x' }, { tags: [], category: 'pakistan', title: 'Pakistan army chief visits Quetta', trends: ['army chief visit'] })
+    expect(army.facebook).not.toContain('Trending:')
+  })
+})
