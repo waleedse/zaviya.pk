@@ -2,6 +2,7 @@ import { finalizeCopy } from '../social/hashtags.js'
 import { articleUrl } from '../social/link.js'
 import { numbersNotInArticle } from '../social/guards.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
+import { randomUUID } from 'node:crypto'
 import type { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
 import type { PayloadClient } from '../payload-client.js'
@@ -122,6 +123,33 @@ export function publishBlocker(write: { en: { bodyMarkdown?: string; whatItMeans
   return null
 }
 
+/**
+ * Publish slot lock. The pacing check (articlesPublishedToday / lastPublishedAt) and the publish itself are
+ * check-then-act: jobs waking in the same second all saw a free slot (10-11 Nov: two stories in one second,
+ * over the overnight allowance). Only the holder of this short lock may check the pace and publish.
+ */
+export const PUBLISH_SLOT_KEY = 'publish:slot'
+const PUBLISH_SLOT_TTL_MS = 30_000
+
+/** Returns a release token, or null when another job holds the slot. waitMs > 0 retries for that long. */
+export async function acquirePublishSlot(redis: Pick<Redis, 'set'>, waitMs = 0): Promise<string | null> {
+  const token = randomUUID()
+  const until = Date.now() + waitMs
+  for (;;) {
+    const ok = await redis.set(PUBLISH_SLOT_KEY, token, 'PX', PUBLISH_SLOT_TTL_MS, 'NX').catch(() => 'OK')  // Redis trouble must not stop publishing
+    if (ok === 'OK') return token
+    if (Date.now() >= until) return null
+    await new Promise((r) => setTimeout(r, 250))
+  }
+}
+
+/** Delete the lock only if we still own it (it may have expired and been taken by another job). */
+export async function releasePublishSlot(redis: Pick<Redis, 'eval'>, token: string): Promise<void> {
+  await redis
+    .eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", 1, PUBLISH_SLOT_KEY, token)
+    .catch(() => undefined)
+}
+
 /** Redis hash of stories waiting for the editor: articleId → publish job data */
 export const GATE_KEY = 'zaviya:gate'
 
@@ -166,13 +194,35 @@ export async function dropOrphanedGateDraft(articleId: string, payload: Pick<Pay
 export async function finishGated(
   articleId: string,
   action: 'publish' | 'reject',
-  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
+  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue; slotHeld?: boolean },
 ): Promise<boolean> {
   const raw = await deps.redis.hget(GATE_KEY, articleId)
   if (!raw) {
     await dropOrphanedGateDraft(articleId, deps.payload)
     return false
   }
+  // Take the publish slot for the cap check and the publish, so it cannot race another publish job (breaking is exempt)
+  let token: string | null = null
+  if (action === 'publish' && !deps.slotHeld && (JSON.parse(raw) as { priority?: string }).priority !== 'breaking') {
+    token = await acquirePublishSlot(deps.redis, 5_000)
+    if (!token) {
+      logger.info({ articleId }, 'editor approved, but another story is publishing: the story keeps waiting')
+      return true
+    }
+  }
+  try {
+    return await finishGatedLocked(articleId, action, raw, deps)
+  } finally {
+    if (token) await releasePublishSlot(deps.redis, token)
+  }
+}
+
+async function finishGatedLocked(
+  articleId: string,
+  action: 'publish' | 'reject',
+  raw: string,
+  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
+): Promise<boolean> {
   // Daily cap (5 Nov): an approved story waits in the gate instead of going out over the cap.
   if (action === 'publish' && (JSON.parse(raw) as { priority?: string }).priority !== 'breaking' && (await dailyCapReached(deps.payload).catch(() => false))) {
     logger.info({ articleId }, 'editor approved, but the daily cap is reached: the story keeps waiting')
@@ -195,7 +245,7 @@ export async function finishGated(
     logger.info({ articleId }, 'editor approved: making the image, then publishing')
     return true
   }
-  await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue, mediaQueue: deps.mediaQueue })
+  await processPublishJob({ ...data, articleId }, { payload: deps.payload, socialQueue: deps.socialQueue, mediaQueue: deps.mediaQueue, slotHeld: true })
   return true
 }
 
@@ -204,13 +254,28 @@ export async function gateFallback(deps: { payload: PayloadClient; socialQueue: 
   const waiting = await deps.redis.hgetall(GATE_KEY)
   const ids = Object.keys(waiting)
   if (!ids.length) return
+  const token = await acquirePublishSlot(deps.redis)
+  if (!token) return
+  try {
+    await gateFallbackLocked(deps, minutes, waiting, ids)
+  } finally {
+    await releasePublishSlot(deps.redis, token)
+  }
+}
+
+async function gateFallbackLocked(
+  deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
+  minutes: number,
+  waiting: Record<string, string>,
+  ids: string[],
+): Promise<void> {
   if (await dailyCapReached(deps.payload).catch(() => false)) return
   const settings = await deps.payload.getSettings()
   const last = settings.lastPublishedAt ? Date.parse(settings.lastPublishedAt) : 0
   if (Date.now() - last < minutes * 60_000) return
   const oldest = ids.sort((a, b) => (JSON.parse(waiting[a]!).waitingSince ?? 0) - (JSON.parse(waiting[b]!).waitingSince ?? 0))[0]!
   logger.warn({ articleId: oldest, minutes }, 'editor gate fallback: publishing the oldest waiting story')
-  await finishGated(oldest, 'publish', deps)
+  await finishGated(oldest, 'publish', { ...deps, slotHeld: true })
 }
 
 /** Categories that must publish at least once every 4 hours (Waleed, 13 Oct). AI dropped on 5 Nov: foreign tech rewrites do not earn a cap bypass. */
@@ -257,8 +322,7 @@ export async function pacingWaitMs(payload: PayloadClient, now = Date.now(), quo
 /** Redis key of a story's Urdu headline, read by the video service */
 export const storyUrKey = (articleId: string) => `story:ur:${articleId}`  // same key as video/explainer/script-job.ts
 
-export async function processPublishJob(
-  data: {
+export type PublishJobData = {
     clusterId: string
     write: WriteResult
     heroMediaId?: string
@@ -269,9 +333,20 @@ export async function processPublishJob(
     articleId?: string
     /** The hero is the branded card, not an illustration: queue a backfill that swaps in the Gemini image later (ZAV-299) */
     heroFallback?: boolean
-  },
-  deps: { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; mediaQueue?: Pick<Queue, 'add'>; gate?: { redis: Redis }; redis?: Redis },
-): Promise<{ articleId: string } | null> {
+}
+type PublishDeps = { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; mediaQueue?: Pick<Queue, 'add'>; gate?: { redis: Redis }; redis?: Redis; slotHeld?: boolean }
+
+export async function processPublishJob(data: PublishJobData, deps: PublishDeps): Promise<{ articleId: string } | null> {
+  const slot: { token: string | null } = { token: null }
+  try {
+    return await publishJob(data, deps, slot)
+  } finally {
+    const kv = deps.redis ?? deps.gate?.redis
+    if (slot.token && kv) await releasePublishSlot(kv, slot.token)
+  }
+}
+
+async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token: string | null }): Promise<{ articleId: string } | null> {
   const cluster = await deps.payload.getCluster(data.clusterId)
   const triage = data.triage ?? (cluster.triage as TriageResult | undefined)
 
@@ -301,6 +376,25 @@ export async function processPublishJob(
   const overdueCategory = triage?.category && QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
     : false
+  // Only the holder of the publish slot may check the pace and publish; the others come back in 30-90 s (breaking and live updates are exempt).
+  const slotKv = deps.redis ?? deps.gate?.redis
+  if (!gated && deps.publishQueue && slotKv && !deps.slotHeld && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
+    slot.token = await acquirePublishSlot(slotKv)
+    if (!slot.token) {
+      await deps.publishQueue.add('publish', data, { delay: 30_000 + Math.floor(Math.random() * 60_000), priority: 5 })
+      logger.info({ clusterId: data.clusterId, articleId: data.articleId }, 'publish slot busy: another story is publishing, retrying shortly')
+      return null
+    }
+    // An approved draft skips the pacing below but not the daily cap (the cap was checked when it was approved, maybe hours ago)
+    if (data.articleId) {
+      const capWait = await dailyCapReached(deps.payload).catch(() => false)
+      if (capWait) {
+        await deps.publishQueue.add('publish', data, { delay: 5 * 60_000 + Math.floor(Math.random() * 90_000), priority: 5 })
+        logger.info({ clusterId: data.clusterId, articleId: data.articleId }, 'approved story waits: the daily cap is reached')
+        return null
+      }
+    }
+  }
   if (!gated && deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
     const wait = await pacingWaitMs(deps.payload, Date.now(), overdueCategory).catch(() => 0)
     if (wait > 0) {
