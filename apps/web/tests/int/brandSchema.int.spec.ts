@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { openSearchXml, aboutPageJsonLd, organizationId, organizationJsonLd, SECTION_SEO, socialProfileUrls, websiteJsonLd } from '../../src/lib/seo'
 
 describe('brand entity (ZAV-100)', () => {
-  it('titles the homepage "Zaviya News: ..." within 50-65 characters', () => {
+  it('titles the homepage "Zaviya: ..." within 50-65 characters', () => {
     const t = SECTION_SEO.home!.en.title
-    expect(t.startsWith('Zaviya News: ')).toBe(true)
+    expect(t.startsWith("Zaviya: ")).toBe(true)
     expect(t.length).toBeGreaterThanOrEqual(50)
     expect(t.length).toBeLessThanOrEqual(65)
   })
   it('names the brand and the domain once each in the homepage title (ZAV-181)', () => {
     const t = SECTION_SEO.home!.en.title
-    expect(t.match(/Zaviya News/g)).toHaveLength(1)
+    expect(t.match(/Zaviya/g)).toHaveLength(1)
     expect(t.match(/zaviya\.pk/g)).toHaveLength(1)
   })
   it('serves an OpenSearch description pointing at the real search page and the WebSite SearchAction matches it (ZAV-181)', () => {

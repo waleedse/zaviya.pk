@@ -14,6 +14,7 @@ import {
   similarAppliances,
   sortByPrice,
 } from '@/lib/appliances/logic'
+import { itemTitle, searchName } from '@/lib/appliances/searchNames'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -49,9 +50,9 @@ export async function generateMetadata({ params }: Params) {
   const full = fullName(a)
   const grocery = a.brand.kind === 'source'
   const rs = a.pricePkr ? `Rs ${a.pricePkr.toLocaleString('en-US')}` : null
-  const title = grocery ? `${a.name} Price Today in Pakistan (${when}): Lahore, Karachi, Islamabad` : `${full} Price in Pakistan ${when}`
+  const title = itemTitle(a, when)
   const description = grocery
-    ? `${a.name} price today: ${rs ? `${rs} average this week` : 'no average this week'}, with the lowest and highest price in ${a.cityPrices.length || 17} cities from the PBS weekly survey, and the price history.`
+    ? `${searchName(a)} today (${a.name}): ${rs ? `${rs} average this week` : 'no average this week'}, with the lowest and highest price in ${a.cityPrices.length || 17} cities from the PBS weekly survey, and the price history.`
     : `${full} price in Pakistan: ${rs ? `${rs} on ${sourceText(a)}` : 'not shown by the maker yet'}. ${a.category.group === 'vehicles' ? 'Variants, ex-factory price, price history and comparisons.' : `Specs, price history, similar ${cat.name.toLowerCase()} and where to buy.`}`
   return buildPageMetadata({
     locale,

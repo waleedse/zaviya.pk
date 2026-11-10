@@ -113,7 +113,7 @@ export function buildPageMetadata(opts: {
 export const SECTION_SEO: Record<string, { en: { title: string; description: string }; ur: { title: string; description: string } }> = {
   home: {
     en: {
-      title: 'Zaviya News: Latest Pakistan News on zaviya.pk, English & Urdu',
+      title: 'Zaviya: Pakistan News, Prices and Rates Today | zaviya.pk',
       description:
         'Latest Pakistan news today: breaking stories, politics, business, cricket, petrol, gold and dollar rates, explained clearly in English and Urdu by Zaviya.',
     },
