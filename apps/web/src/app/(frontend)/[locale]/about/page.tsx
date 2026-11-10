@@ -28,11 +28,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const locale = parseLocale((await params).locale)
   return buildPageMetadata({
     locale,
-    title: locale === 'ur' ? 'زاویہ نیوز کے بارے میں | zaviya.pk' : 'About Zaviya News | zaviya.pk',
+    title: locale === 'ur' ? 'زاویہ نیوز کے بارے میں | zaviya.pk' : 'About Zaviya (zaviya.pk)',
     description:
       locale === 'ur'
         ? 'زاویہ نیوز (zaviya.pk) پاکستان کی خبریں اردو اور انگریزی میں پیش کرتا ہے۔ ہمارا نیوز روم، ہماری پالیسیاں اور رابطہ۔'
-        : 'Zaviya News (zaviya.pk) publishes Pakistan news in English and Urdu. Who we are, how our newsroom works, and how to reach us.',
+        : 'Zaviya (zaviya.pk) publishes Pakistan news in English and Urdu. Who we are, how our newsroom works, and how to reach us.',
     enPath: '/about',
     urPath: '/ur/about',
     absoluteTitle: true,
@@ -49,7 +49,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
     <div className="pb-10">
       <JsonLd data={aboutPageJsonLd(locale)} />
       <PageHero
-        title={isUr ? 'زاویہ نیوز (zaviya.pk)' : 'Zaviya News (zaviya.pk)'}
+        title={isUr ? 'زاویہ نیوز (zaviya.pk)' : 'Zaviya (zaviya.pk)'}
         crumbs={[{ label: d.nav.home, href: localePath(locale, '/') }, { label: isUr ? 'ہمارے بارے میں' : 'About us' }]}
         icon={Newspaper}
         eyebrow={isUr ? 'زاویہ' : 'Zaviya'}
@@ -59,7 +59,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
           <div className="prose-article" dir={isUr ? 'rtl' : 'ltr'}>
             {isUr ? (
               <>
-                <p>زاویہ نیوز، جو zaviya.pk پر شائع ہوتا ہے، پاکستان کا ڈیجیٹل نیوز روم ہے۔ ہم پاکستان کی اہم خبریں، کاروبار، کرکٹ، ٹیکنالوجی، ملازمتیں اور سونے، ڈالر اور پیٹرول کے روزانہ ریٹ آسان زبان میں اردو اور انگریزی دونوں میں پیش کرتے ہیں۔</p>
+                <p>زاویہ (Zaviya, zaviya.pk)، جسے زاویہ نیوز بھی کہا جاتا ہے، پاکستان کا ڈیجیٹل نیوز روم ہے۔ ہم پاکستان کی اہم خبریں، کاروبار، کرکٹ، ٹیکنالوجی، ملازمتیں اور سونے، ڈالر اور پیٹرول کے روزانہ ریٹ آسان زبان میں اردو اور انگریزی دونوں میں پیش کرتے ہیں۔</p>
                 <h2>ہمارا نیوز روم کیسے کام کرتا ہے</h2>
                 <p>ہم معتبر ذرائع سے خبریں اکٹھی کرتے ہیں، ہر خبر میں ذرائع کا حوالہ دیتے ہیں اور اشاعت سے پہلے حقائق کی جانچ کرتے ہیں۔ مصنوعی ذہانت مسودے میں مدد دیتی ہے، مگر حساس موضوعات پر انسانی ایڈیٹر کی نگرانی ضروری ہے۔ ہماری <a href={localePath(locale, '/p/editorial-policy')}>ادارتی پالیسی</a> اور <a href={localePath(locale, '/p/corrections')}>تصحیحات کی پالیسی</a> پڑھیں۔</p>
                 <h2>رابطہ</h2>
@@ -67,7 +67,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
               </>
             ) : (
               <>
-                <p>Zaviya News, published at zaviya.pk, is a Pakistani digital newsroom. We cover the stories that matter to Pakistan: national news, business, cricket, technology, jobs, and the daily gold, dollar and petrol rates, in clear English and Urdu.</p>
+                <p>Zaviya (zaviya.pk) is a Pakistani digital newsroom, also known as Zaviya News. We cover the stories that matter to Pakistan: national news, business, cricket, technology, jobs, and the daily gold, dollar and petrol rates, in clear English and Urdu.</p>
                 <h2>How our newsroom works</h2>
                 <p>We gather news from trusted sources, cite them in every story and check the facts before publishing. AI helps with drafting, but sensitive stories always get a human editor. Read our <a href={localePath(locale, '/p/editorial-policy')}>editorial policy</a> and <a href={localePath(locale, '/p/corrections')}>corrections policy</a>.</p>
                 <h2>Contact us</h2>

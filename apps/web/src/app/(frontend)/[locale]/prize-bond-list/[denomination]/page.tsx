@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: Params }) {
     title:
       locale === 'ur'
         ? `${d} پرائز بانڈ لسٹ ${when}: مکمل نتیجہ اور نمبر چیک کریں`
-        : `Rs ${d} Prize Bond List ${when}${latest?.drawNo ? ` (Draw ${latest.drawNo})` : ''}: Full Result and Online Checker`,
+        : `Rs ${d} Prize Bond List ${when} & Check Online`,
     description:
       locale === 'ur'
         ? `${d} روپے کے پرائز بانڈ کا تازہ ڈرا: پہلا، دوسرا اور تیسرا انعام۔ اپنے نمبر ڈال کر پچھلے تین سال کے سرکاری نتائج میں فوراً چیک کریں۔`

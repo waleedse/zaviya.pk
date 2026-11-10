@@ -19,6 +19,8 @@ import {
   type ApplianceView,
   type CategorySummary,
 } from '@/lib/appliances/logic'
+import { cityHref, hasCityPages } from '@/lib/appliances/cities'
+import { itemH1 } from '@/lib/appliances/searchNames'
 
 const COLOR = '#0f766e'
 export const PRICES_HUB = '/prices'
@@ -458,6 +460,7 @@ export function ApplianceListView({
 function CityPricesTable({ a }: { a: ApplianceView }) {
   const rows = [...a.cityPrices].sort((x, y) => x.avg - y.avg)
   const rs = (n: number | null | undefined) => (n ? formatPkr(Math.round(n)) : '—')
+  const linked = hasCityPages(a)
   return (
     <section aria-labelledby="cities" className="card-surface overflow-x-auto p-4">
       <h2 id="cities" className="font-display text-xl font-bold">
@@ -476,7 +479,7 @@ function CityPricesTable({ a }: { a: ApplianceView }) {
         <tbody>
           {rows.map((c) => (
             <tr key={c.city} className="border-b border-border">
-              <td className="py-2 font-medium">{c.city}</td>
+              <td className="py-2 font-medium">{linked ? <Link href={cityHref(a, c.city)} className="hover:underline">{c.city}</Link> : c.city}</td>
               <td className="py-2 tabular-nums">{rs(c.min)}</td>
               <td className="py-2 font-semibold tabular-nums">{rs(c.avg)}</td>
               <td className="py-2 tabular-nums">{rs(c.max)}</td>
@@ -515,7 +518,7 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
         ]}
       />
       <PageHero
-        title={grocery ? `${a.name} price today in Pakistan` : `${full} price in Pakistan`}
+        title={itemH1(a)}
         description={applianceSummary(a)}
         icon={Plug}
         color={COLOR}
