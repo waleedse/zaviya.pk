@@ -25,6 +25,7 @@ import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
+import { processQuoteJob, QUOTE_JOB, runQuoteRound, type QuoteJobData } from './social/quote-post.js'
 import { runSocialMetrics } from './social/metrics.js'
 import { redisKv, runCommentReplies } from './social/comments.js'
 import { redisKv as mailKv } from './mail/kv.js'
@@ -361,6 +362,15 @@ export async function createWorkerRuntime(
     new Worker(
       'social',
       async (job, token) => {
+        // Quote cards ("who said what") have their own caps and log; they are not tied to an article
+        if (job.name === QUOTE_JOB) {
+          const res = await processQuoteJob(job.data as QuoteJobData, { env, payload, bridge, redis })
+          if ('delayUntil' in res) {
+            await job.moveToDelayed(res.delayUntil + Math.floor(Math.random() * 60_000), token)
+            throw new DelayedError()
+          }
+          return res
+        }
         const d = job.data as {
           articleId: string
           platform: 'facebook' | 'instagram' | 'x'
@@ -448,7 +458,9 @@ export async function createWorkerRuntime(
   workers.push(
     new Worker(
       'discover',
-      async () => {
+      async (job) => {
+        // Quote cards: watch-list posts and quotes from published stories (one card per round)
+        if (job.name === 'quote-round') return runQuoteRound({ env, payload, bridge, redis, socialQueue: queues.social })
         if (!bridge.isOnline()) return { skipped: 'extension offline' }
         const { sources } = await payload.getSources()
         const xSource = sources.find((s) => s.key === 'x-discovery')
@@ -548,6 +560,12 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     { name: 'discover', data: {} },
   )
   await runtime.queues.discover.add('discover', {}, { delay: 60_000 })
+  // Quote cards ("who said what"): a round every 45 minutes; QUOTE_CARDS=0 turns them off. Caps and quiet hours are in social/quote-config.ts.
+  if (process.env.QUOTE_CARDS === '0') {
+    await runtime.queues.discover.removeJobScheduler('quote-round').catch(() => {})
+  } else {
+    await runtime.queues.discover.upsertJobScheduler('quote-round', { every: 45 * 60 * 1000 }, { name: 'quote-round', data: {} })
+  }
   await runtime.queues.data.add('rates', {})
   // Mobile prices and specs (zaviya.pk/mobile-prices): daily refresh from the official Pakistan sites. PHONE_PRICES=0 turns it off.
   if (process.env.PHONE_PRICES === '0') {

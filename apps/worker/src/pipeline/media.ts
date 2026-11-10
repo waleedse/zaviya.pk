@@ -7,6 +7,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 import { renderPostCard } from './post-card.js'
 import { findRealPhoto, findHeroPhoto } from './real-photo.js'
+import { firstPassingPhoto } from './photo-qa.js'
 import { generateViaZImage } from './zimage.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
@@ -232,7 +233,12 @@ export async function processMediaJob(
     // Cards carry the hero photo and the headline: what people stop scrolling for
     // Social cards never carry the AI hero: the real hero photo, else a real photo of an entity the headline names,
     // else a clean text/brand card (an invented scene next to a real headline is how a US story got a Pakistani school)
-    const real = realHero ?? (await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null))
+    // Every photo passes the QA gate (subject named in the headline, free licence, size and shape); a rejected hero
+    // (e.g. a face only the dek names) is replaced by a person-first lookup, so a named person never gets a black card.
+    const qaCtx = { clusterId: data.clusterId, title: data.write.en.title }
+    let real = firstPassingPhoto([realHero], data.write.en.title, qaCtx)
+    if (!real) real = firstPassingPhoto([await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null)], data.write.en.title, qaCtx)
+    if (!real) logger.info(qaCtx, 'social card goes out without a real photo: no named subject has a free photo')
     const photo = real?.dataUrl ?? null
     const breaking = data.priority === 'breaking'
     const cardsEn = await renderSocialCardSet({

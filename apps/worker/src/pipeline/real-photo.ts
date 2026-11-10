@@ -16,6 +16,9 @@ export interface PhotoMeta {
   creditLine: string
   /** Commons file page */
   sourceUrl: string
+  /** Size of the Commons original (the downloaded copy may be scaled down): the QA gate checks size and shape */
+  width?: number
+  height?: number
   /** creditLine plus the file page, as stored in Media.credit (`creditParts` in the web app splits it again) */
   mediaCredit: string
 }
@@ -42,15 +45,25 @@ const HERO: Required<PhotoOpts> = { minWidth: 1000, minAspect: 1.0 }
 
 const GENERIC_FIRST = new Set(['state', 'prime', 'supreme', 'federal', 'national', 'pakistan', 'islamabad', 'punjab', 'sindh', 'chief', 'finance', 'foreign', 'central', 'general', 'united', 'world', 'north', 'south', 'east', 'west', 'high', 'court'])
 
-/** Does the text name this entity? The full tag, or for a person-style tag ("Shehbaz Sharif") its given name as a word ("PM Shehbaz ..."). */
+/** Family names that many people share: "Sharif" or "Khan" in a headline does not say which one. */
+const AMBIGUOUS_SURNAME = new Set(['khan', 'sharif', 'shah', 'ahmed', 'ahmad', 'ali', 'hussain', 'hasan', 'butt', 'malik', 'bhutto', 'zardari', 'singh', 'kumar', 'smith', 'jones', 'brown', 'johnson', 'junior', 'senior', 'mohammad', 'muhammad'])
+
+const wordRe = (w: string) => new RegExp(`(^|[^a-z])${w.replace(/[^a-z]/g, '')}([^a-z]|$)`)
+
+/**
+ * Does the text name this entity? The full tag, or for a person-style tag of 2-3 words ("Donald Trump", "Shehbaz Sharif")
+ * its given name ("PM Shehbaz ...") or its surname ("Trump warns ...") as a word. Short, generic or shared names do not count.
+ */
 export function namedIn(title: string, tag: string): boolean {
   const t = title.toLowerCase()
   const full = tag.trim().toLowerCase()
   if (full.length >= 3 && t.includes(full)) return true
   const words = full.split(/\s+/)
+  if (words.length < 2 || words.length > 3) return false
   const first = words[0] ?? ''
-  if (words.length < 2 || words.length > 3 || first.length < 5 || GENERIC_FIRST.has(first)) return false
-  return new RegExp(`(^|[^a-z])${first.replace(/[^a-z]/g, '')}([^a-z]|$)`).test(t)
+  if (first.length >= 5 && !GENERIC_FIRST.has(first) && wordRe(first).test(t)) return true
+  const last = (words[words.length - 1] ?? '').replace(/[^a-z]/g, '')
+  return last.length >= 4 && !GENERIC_FIRST.has(last) && !AMBIGUOUS_SURNAME.has(last) && wordRe(last).test(t)
 }
 
 /** Tags the headline names, longest (most specific) first. */
@@ -191,7 +204,7 @@ export function buildMeta(subject: string, c: Candidate): PhotoMeta {
   const licence = (c.info.extmetadata?.LicenseShortName?.value ?? '').trim()
   const creditLine = ['Photo:', [author, licence, 'Wikimedia Commons'].filter(Boolean).join(' / ')].join(' ')
   const sourceUrl = c.info.descriptionurl ?? ''
-  return { subject, file: c.file, author, licence, creditLine, sourceUrl, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine }
+  return { subject, file: c.file, author, licence, creditLine, sourceUrl, width: c.info.width, height: c.info.height, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine }
 }
 
 /** Try each subject in turn; the first free-licence photo that downloads wins. */
@@ -216,9 +229,53 @@ export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof f
   return null
 }
 
-/** Social cards: entities named in the headline only. */
+/** Wider net for a person the headline names: a smaller or portrait photo of the face beats a card with no photo at all. */
+const PERSON_FALLBACK: Required<PhotoOpts> = { minWidth: 600, minAspect: 0.45 }
+
+/**
+ * Which of these subjects are living people? One batched Wikipedia query: a page in "Category:Living people" is a person.
+ * (Historical figures are treated like any other subject; news is about the living.) Unknown on any failure.
+ */
+export async function livingPeople(subjects: string[], fetchFn: typeof fetch = fetch): Promise<Set<string>> {
+  const out = new Set<string>()
+  if (!subjects.length) return out
+  try {
+    const res = await fetchFn(
+      `${API}?action=query&format=json&redirects=1&prop=categories&clcategories=${encodeURIComponent('Category:Living people')}&cllimit=max&titles=${encodeURIComponent(subjects.join('|'))}`,
+      { headers: UA, signal: AbortSignal.timeout(15_000) },
+    )
+    if (!res.ok) return out
+    const json = (await res.json()) as {
+      query?: { normalized?: { from: string; to: string }[]; redirects?: { from: string; to: string }[]; pages?: Record<string, { title?: string; categories?: unknown[] }> }
+    }
+    const living = new Set(Object.values(json.query?.pages ?? {}).filter((p) => (p.categories?.length ?? 0) > 0).map((p) => (p.title ?? '').toLowerCase()))
+    const hop = (m: { from: string; to: string }[] | undefined, t: string) => m?.find((x) => x.from.toLowerCase() === t.toLowerCase())?.to ?? t
+    for (const s of subjects) if (living.has(hop(json.query?.redirects, hop(json.query?.normalized, s)).toLowerCase())) out.add(s)
+  } catch (e) {
+    logger.debug({ err: e instanceof Error ? e.message : e }, 'person check failed')
+  }
+  return out
+}
+
+/** Subjects reordered people first (stable inside each group): a face beats a building. */
+export function peopleFirst(subjects: string[], people: Set<string>): string[] {
+  return [...subjects.filter((s) => people.has(s)), ...subjects.filter((s) => !people.has(s))]
+}
+
+/**
+ * Social cards: entities named in the headline, people first, then organisations, then places and buildings.
+ * A headline that names a person does not go photo-less while any free photo of that person exists (relaxed size and
+ * shape on the second pass). `meta.subject` says whose face or place the photo shows.
+ */
 export async function findRealPhoto(title: string, tags: string[], fetchFn: typeof fetch = fetch): Promise<RealPhoto | null> {
-  return findPhotoForSubjects(subjectsFor(title, tags), fetchFn, SOCIAL)
+  const subjects = subjectsFor(title, tags, 4)
+  if (!subjects.length) return null
+  const people = await livingPeople(subjects, fetchFn)
+  const ordered = peopleFirst(subjects, people)
+  const hit = await findPhotoForSubjects(ordered, fetchFn, SOCIAL)
+  if (hit) return hit
+  const named = ordered.filter((s) => people.has(s))
+  return named.length ? findPhotoForSubjects(named, fetchFn, PERSON_FALLBACK) : null
 }
 
 /** Article heroes: named entities, then topic fallbacks (US election -> the Capitol). */

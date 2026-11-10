@@ -6,7 +6,7 @@ vi.mock('./social-card.js', () => ({
   photoDataUrl: vi.fn(async () => null),
 }))
 vi.mock('./post-card.js', () => ({ renderPostCard: vi.fn(async () => null) }))
-vi.mock('./real-photo.js', () => ({ findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
+vi.mock('./real-photo.js', async (orig) => ({ ...(await orig<typeof import('./real-photo.js')>()), findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
 vi.mock('./reference.js', () => ({ describeReferenceScene: vi.fn(async () => null) }))
 vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b }))
 vi.mock('./zimage.js', () => ({ generateViaZImage: vi.fn(async () => null) }))
@@ -126,11 +126,23 @@ describe('real photo first, AI only as a last resort', () => {
     vi.mocked(realPhoto.findHeroPhoto).mockResolvedValueOnce(photo)
     const d = deps()
     const bridge = { isOnline: () => true, send: vi.fn() }
-    await processMediaJob({ clusterId: '1', write, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
+    const capitolStory = { en: { ...(write as { en: object }).en, title: 'Democrats take Congress in the midterms' } } as never
+    await processMediaJob({ clusterId: '1', write: capitolStory, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
     expect(bridge.send).not.toHaveBeenCalled()
     expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'wikimedia', isAiGenerated: false, credit: meta.mediaCredit }))
     expect(d.publishQueue.add.mock.calls[0][1].heroFallback).toBeUndefined()
     expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: photo.dataUrl })
+  })
+
+  it('keeps a hero the headline does not name off the social card and uses a person-first photo of who it names', async () => {
+    const huang = { ...photo, dataUrl: 'data:image/jpeg;base64,HUANG', meta: { ...meta, subject: 'Jensen Huang', licence: 'CC BY 2.0', width: 2000, height: 1300 } }
+    const building = { ...photo, meta: { ...meta, subject: 'Nvidia' } }
+    vi.mocked(realPhoto.findHeroPhoto).mockResolvedValueOnce(building)
+    vi.mocked(realPhoto.findRealPhoto).mockResolvedValueOnce(huang)
+    const d = deps()
+    const story = { en: { title: 'Jensen Huang admits affair probe', slug: 'huang', dek: 'd', altText: 'alt', imageBrief: 'x', tags: ['Jensen Huang', 'Nvidia'] } } as never
+    await processMediaJob({ clusterId: '1', write: story, qaScore: 1, priority: 'normal' }, { ...d, env, bridge: { isOnline: () => true, send: vi.fn() } } as never)
+    expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: 'data:image/jpeg;base64,HUANG' })
   })
 
   it('an AI hero is labelled and never reaches the social cards', async () => {

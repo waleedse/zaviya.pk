@@ -1,4 +1,5 @@
 import { finalizeCopy } from '../social/hashtags.js'
+import { queueArticleQuotes } from '../social/quote-post.js'
 import { articleUrl } from '../social/link.js'
 import { numbersNotInArticle } from '../social/guards.js'
 import { socialIdempotencyKey } from '../lib/idempotency.js'
@@ -559,6 +560,9 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
       },
     )
   }
+
+  // Direct quotes in the sources become quote-card candidates (social/quote-post.ts picks one per round)
+  if (kv && process.env.QUOTE_CARDS !== '0') await queueArticleQuotes(kv, cluster.items, { category, slug: data.write.en.slug })
 
   return { articleId: res.id }
 }
