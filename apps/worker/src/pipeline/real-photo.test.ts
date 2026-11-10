@@ -13,6 +13,11 @@ describe('real photo subjects', () => {
     expect(subjectsFor('State of the economy', ['State Bank of Pakistan'])).toEqual([])
   })
 
+  it('ignores accents: a Kraków or Erdoğan tag matches a plain-ASCII headline', () => {
+    expect(subjectsFor('Krakow mass shooting: six dead, 24-year-old gunman dies', ['Kraków'])).toEqual(['Kraków'])
+    expect(subjectsFor('Erdogan meets Shehbaz in Ankara', ['Recep Tayyip Erdoğan'])).toEqual(['Recep Tayyip Erdoğan'])
+  })
+
   it('maps indirect topics to a place: US election -> Capitol, Fed -> Eccles Building, PSX, SBP, cricket, OpenAI', () => {
     expect(topicSubjects('Midterm elections results: Democrats take Congress')).toEqual(['United States Capitol'])
     expect(topicSubjects('US election results live: Democrats win House as gas prices bite')).toContain('United States Capitol')
