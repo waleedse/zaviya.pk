@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const locale = parseLocale((await params).locale)
   return buildPageMetadata({
     locale,
-    title: locale === 'ur' ? 'پاکستان میں مرغی کا ریٹ: 17 شہروں کی ہفتہ وار قیمت' : 'Chicken Price in Pakistan: Live Broiler Rate, 17 Cities (PBS Weekly)',
+    title: locale === 'ur' ? 'پاکستان میں مرغی کا ریٹ: 17 شہروں کی ہفتہ وار قیمت' : 'Chicken Rate Today in Pakistan: Lahore, Karachi and 17 Cities (PBS Weekly)',
     description:
       locale === 'ur'
         ? 'پی بی ایس کی ہفتہ وار رپورٹ کے مطابق زندہ برائلر مرغی کی قیمت، 17 شہروں کی فہرست اور پانچ ہفتے کا رجحان۔'
@@ -69,7 +69,7 @@ export default async function ChickenPricePage({ params }: { params: Promise<{ l
             › {isUr ? 'مرغی کا ریٹ' : 'Chicken price'}
           </nav>
           <h1 className="font-display text-[clamp(1.9rem,1.4rem+2vw,3rem)] font-extrabold leading-tight">
-            {isUr ? 'پاکستان میں مرغی کا ریٹ' : 'Chicken price in Pakistan'}
+            {isUr ? 'پاکستان میں مرغی کا ریٹ' : 'Chicken rate today in Pakistan'}
           </h1>
           <p className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm font-semibold">
             {isUr

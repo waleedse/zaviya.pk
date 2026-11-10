@@ -54,9 +54,12 @@ const wordRe = (w: string) => new RegExp(`(^|[^a-z])${w.replace(/[^a-z]/g, '')}(
  * Does the text name this entity? The full tag, or for a person-style tag of 2-3 words ("Donald Trump", "Shehbaz Sharif")
  * its given name ("PM Shehbaz ...") or its surname ("Trump warns ...") as a word. Short, generic or shared names do not count.
  */
+/** Lower-case and drop accents, so a "Kraków" or "Erdoğan" tag matches a "Krakow" or "Erdogan" headline. */
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
 export function namedIn(title: string, tag: string): boolean {
-  const t = title.toLowerCase()
-  const full = tag.trim().toLowerCase()
+  const t = fold(title)
+  const full = fold(tag.trim())
   if (full.length >= 3 && t.includes(full)) return true
   const words = full.split(/\s+/)
   if (words.length < 2 || words.length > 3) return false
