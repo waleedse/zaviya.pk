@@ -7,7 +7,7 @@ import { processEmbedJob } from './pipeline/embed.js'
 import { processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './pipeline/triage.js'
 import { processWriteJob } from './pipeline/write.js'
 import { processQaJob } from './pipeline/qa.js'
-import { processMediaJob } from './pipeline/media.js'
+import { processMediaJob, rerenderStaleCards } from './pipeline/media.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './pipeline/hero-backfill.js'
 import { processPublishJob } from './pipeline/publish.js'
 import { EXPLAINER_QUEUE, processExplainerScript, processHeadlineJob } from './video/explainer/script-job.js'
@@ -328,11 +328,12 @@ export async function createWorkerRuntime(
           qaScore: number
           priority: Priority
           heroFallback?: boolean
+          cardVersion?: number
         }
         const cluster = await payload.getCluster(d.clusterId)
         await processPublishJob(
           { ...d, triage: cluster.triage as TriageResult | undefined },
-          { payload, socialQueue: queues.social, publishQueue: queues.publish, mediaQueue: queues.media, gate: env.EDITOR_GATE ? { redis } : undefined, redis },
+          { rerenderCards: (input) => rerenderStaleCards(input, { payload, env }), payload, socialQueue: queues.social, publishQueue: queues.publish, mediaQueue: queues.media, gate: env.EDITOR_GATE ? { redis } : undefined, redis },
         )
       },
       { connection, concurrency: 2, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },

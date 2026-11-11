@@ -12,6 +12,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
 import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
+import { CARD_VERSION } from './card-version.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
@@ -334,8 +335,13 @@ export type PublishJobData = {
     articleId?: string
     /** The hero is the branded card, not an illustration: queue a backfill that swaps in the Gemini image later (ZAV-299) */
     heroFallback?: boolean
+    /** CARD_VERSION the social cards were made under; missing = made before versioning, so they are remade */
+    cardVersion?: number
 }
-type PublishDeps = { payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; mediaQueue?: Pick<Queue, 'add'>; gate?: { redis: Redis }; redis?: Redis; slotHeld?: boolean }
+type PublishDeps = {
+  /** Remakes social cards made under older card rules (media.ts rerenderStaleCards); null keeps the old ones */
+  rerenderCards?: (input: { clusterId: string; write: WriteResult; category: string; priority: Priority }) => Promise<string[] | null>
+  payload: PayloadClient; socialQueue: Queue; publishQueue?: Queue; mediaQueue?: Pick<Queue, 'add'>; gate?: { redis: Redis }; redis?: Redis; slotHeld?: boolean }
 
 export async function processPublishJob(data: PublishJobData, deps: PublishDeps): Promise<{ articleId: string } | null> {
   const slot: { token: string | null } = { token: null }
@@ -510,6 +516,18 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   const kv = deps.redis ?? deps.gate?.redis
   if (headlineUr && kv) await kv.set(storyUrKey(String(res.id)), JSON.stringify({ headlineUr }), 'EX', 7 * 86400).catch(() => undefined)
 
+  // Paced stories wait hours or days: cards made under older card rules (wrong photo, 'AI image' label) are made again
+  let socialMediaUrls = data.socialMediaUrls ?? []
+  if (deps.rerenderCards && socialMediaUrls.length && (data.cardVersion ?? 0) < CARD_VERSION) {
+    const fresh = await deps
+      .rerenderCards({ clusterId: data.clusterId, write: data.write, category, priority: data.priority })
+      .catch((e) => (logger.warn({ err: e, articleId: res.id }, 'stale cards not remade'), null))
+    if (fresh) {
+      logger.info({ articleId: res.id, from: data.cardVersion ?? 0, to: CARD_VERSION }, 'stale social cards remade at publish')
+      socialMediaUrls = fresh
+    }
+  }
+
   const platforms = ['facebook', 'instagram', 'x'] as const
   // Social copy may not change a figure (ZAV-120): hold a platform's post when it states a number the article does not
   const articleText = [
@@ -550,7 +568,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
         copy: finalizeCopy(data.write.en.socialCopy, { tags: cleanTags(data.write.en.tags), category, title: data.write.en.title }),
         title: data.write.en.title,
         clusterId: data.clusterId,
-        mediaUrls: data.socialMediaUrls ?? [],
+        mediaUrls: socialMediaUrls,
         url: articleUrl(category, data.write.en.slug),
       },
       {

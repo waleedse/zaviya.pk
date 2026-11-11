@@ -147,6 +147,96 @@ export function heroMaxTries(priority: Priority, max: number): number {
   return priority === 'breaking' ? Math.min(BREAKING_IMAGE_MAX_TRIES, max) : max
 }
 
+/**
+ * Version of the social-card rules (photo choice, QA gate, labels). Bump it whenever a card fix ships: paced stories
+ * wait hours or days to publish, and a story whose cards were made under older rules gets them made again at publish
+ * time (11 Nov: a 05:54 KP card with a California meeting and an 'AI image' label went out at 13:45, after the fix).
+ */
+export const CARD_VERSION = 1
+
+type RealHero = Awaited<ReturnType<typeof findHeroPhoto>>
+
+/** Renders and uploads a story's social cards (post, portrait, wide). Returns their URLs and the wide card's media id. */
+export async function renderStoryCards(
+  input: { clusterId: string; write: WriteResult; category: string; priority: Priority; realHero?: RealHero | null },
+  deps: { payload: PayloadClient; env: WorkerEnv },
+): Promise<{ urls: string[]; ogId?: string }> {
+  const urls: string[] = []
+  let ogId: string | undefined
+  const { write, category } = input
+  const accent = categoryAccentColor(category)
+  try {
+    // Cards carry the hero photo and the headline: what people stop scrolling for
+    // Social cards never carry the AI hero: the real hero photo, else a real photo of an entity the headline names,
+    // else a clean text/brand card (an invented scene next to a real headline is how a US story got a Pakistani school)
+    // Every photo passes the QA gate (subject named in the headline, free licence, size and shape); a rejected hero
+    // (e.g. a face only the dek names) is replaced by a person-first lookup, so a named person never gets a black card.
+    const qaCtx = { clusterId: input.clusterId, title: write.en.title }
+    let real = firstPassingPhoto([input.realHero ?? null], write.en.title, qaCtx)
+    if (!real) real = firstPassingPhoto([await findRealPhoto(write.en.title, write.en.tags).catch(() => null)], write.en.title, qaCtx)
+    if (!real) logger.info(qaCtx, 'social card goes out without a real photo: no named subject has a free photo')
+    const photo = real?.dataUrl ?? null
+    const breaking = input.priority === 'breaking'
+    const base = deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL
+    const cardsEn = await renderSocialCardSet({
+      title: write.en.title,
+      dek: write.en.dek,
+      category,
+      categoryColor: accent,
+      locale: 'en',
+      photo,
+      photoCredit: real?.credit,
+      breaking,
+    })
+    // No Urdu card: Satori cannot shape Nastaliq (letters come out reversed and broken)
+
+    // The post card every platform gets: hero photo, Urdu + English headline (rendered in Chromium)
+    const card = write.en.card
+    const postPng = await renderPostCard(
+      {
+        title: write.en.title,
+        category,
+        photo,
+        photoCredit: real?.credit,
+        breaking,
+        headlineUr: card?.headlineUr ?? write.ur?.title ?? null,
+        highlight: card?.highlight,
+        highlightUr: card?.highlightUr,
+        figure: card?.figure,
+        time: `${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })} PKT`,
+      },
+      deps.env.CHROMIUM_PATH,
+    ).catch(() => null)
+    const post = postPng
+      ? await uploadGeneratedPng(deps.payload, base, postPng, `${write.en.title} — social post`, `${write.en.slug}-post`, deps.env.MEDIA_CDN_URL).catch(() => null)
+      : null
+    if (post?.url) urls.push(post.url)
+
+    const [ogEn, portraitEn] = await Promise.all([
+      uploadGeneratedPng(deps.payload, base, cardsEn.og, write.en.title, `${write.en.slug}-card`, deps.env.MEDIA_CDN_URL),
+      uploadGeneratedPng(deps.payload, base, cardsEn.portrait, `${write.en.title} — Instagram card (EN)`, `${write.en.slug}-portrait`, deps.env.MEDIA_CDN_URL),
+    ])
+    ogId = ogEn?.id
+    for (const u of [portraitEn?.url, ogEn?.url]) {
+      if (u && !urls.includes(u)) urls.push(u)
+    }
+  } catch (e) {
+    logger.warn({ err: e }, 'social card render/upload skipped')
+  }
+  return { urls, ogId }
+}
+
+/** Remakes the cards of a story whose cards predate CARD_VERSION, looking up its real photo again */
+export async function rerenderStaleCards(
+  input: { clusterId: string; write: WriteResult; category: string; priority: Priority },
+  deps: { payload: PayloadClient; env: WorkerEnv },
+): Promise<string[] | null> {
+  const write = input.write
+  const realHero = await findHeroPhoto({ title: write.en.title, dek: write.en.dek, brief: write.en.imageBrief || write.en.title, tags: write.en.tags }).catch(() => null)
+  const { urls } = await renderStoryCards({ ...input, realHero }, deps)
+  return urls.length ? urls : null
+}
+
 export async function processMediaJob(
   data: { clusterId: string; write: WriteResult; qaScore: number; priority: Priority; imageTries?: number; articleId?: string },
   deps: { payload: PayloadClient; env: WorkerEnv; publishQueue: Queue; mediaQueue?: Queue; bridge: Pick<BridgeServer, 'isOnline' | 'send'> },
@@ -157,7 +247,6 @@ export async function processMediaJob(
   const cluster = await deps.payload.getCluster(data.clusterId).catch(() => null)
   const triage = cluster?.triage as TriageResult | undefined
   const category = triage?.category ?? 'pakistan'
-  const accent = categoryAccentColor(category)
 
   if (deferImage({ gate: deps.env.EDITOR_GATE, articleId: data.articleId, priority: data.priority, isUpdate: triage?.isUpdateOfExisting, approved: editorApproved(triage) })) {
     await deps.publishQueue.add(
@@ -229,86 +318,10 @@ export async function processMediaJob(
     }
   }
 
-  try {
-    // Cards carry the hero photo and the headline: what people stop scrolling for
-    // Social cards never carry the AI hero: the real hero photo, else a real photo of an entity the headline names,
-    // else a clean text/brand card (an invented scene next to a real headline is how a US story got a Pakistani school)
-    // Every photo passes the QA gate (subject named in the headline, free licence, size and shape); a rejected hero
-    // (e.g. a face only the dek names) is replaced by a person-first lookup, so a named person never gets a black card.
-    const qaCtx = { clusterId: data.clusterId, title: data.write.en.title }
-    let real = firstPassingPhoto([realHero], data.write.en.title, qaCtx)
-    if (!real) real = firstPassingPhoto([await findRealPhoto(data.write.en.title, data.write.en.tags).catch(() => null)], data.write.en.title, qaCtx)
-    if (!real) logger.info(qaCtx, 'social card goes out without a real photo: no named subject has a free photo')
-    const photo = real?.dataUrl ?? null
-    const breaking = data.priority === 'breaking'
-    const cardsEn = await renderSocialCardSet({
-      title: data.write.en.title,
-      dek: data.write.en.dek,
-      category,
-      categoryColor: accent,
-      locale: 'en',
-      photo,
-      photoCredit: real?.credit,
-      breaking,
-    })
-    // No Urdu card: Satori cannot shape Nastaliq (letters come out reversed and broken)
-    const cardsUr = null as { portrait: Buffer } | null
-
-    // The post card every platform gets: hero photo, Urdu + English headline (rendered in Chromium)
-    const card = data.write.en.card
-    const postPng = await renderPostCard(
-      {
-        title: data.write.en.title,
-        category,
-        photo,
-        photoCredit: real?.credit,
-        breaking,
-        headlineUr: card?.headlineUr ?? data.write.ur?.title ?? null,
-        highlight: card?.highlight,
-        highlightUr: card?.highlightUr,
-        figure: card?.figure,
-        time: `${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })} PKT`,
-      },
-      deps.env.CHROMIUM_PATH,
-    ).catch(() => null)
-    const post = postPng
-      ? await uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, postPng, `${data.write.en.title} — social post`, `${data.write.en.slug}-post`, deps.env.MEDIA_CDN_URL).catch(() => null)
-      : null
-    if (post?.url) socialMediaUrls.push(post.url)
-
-    const [ogEn, portraitEn, portraitUr] = await Promise.all([
-      uploadGeneratedPng(
-        deps.payload,
-        deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL,
-        cardsEn.og,
-        data.write.en.title,
-        `${data.write.en.slug}-card`,
-        deps.env.MEDIA_CDN_URL,
-      ),
-      uploadGeneratedPng(
-        deps.payload,
-        deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL,
-        cardsEn.portrait,
-        `${data.write.en.title} — Instagram card (EN)`,
-        `${data.write.en.slug}-portrait`,
-        deps.env.MEDIA_CDN_URL,
-      ),
-      cardsUr && data.write.ur
-        ? uploadGeneratedPng(deps.payload, deps.env.PUBLIC_MEDIA_URL ?? deps.env.PAYLOAD_URL, cardsUr.portrait, `${data.write.ur.title} — Instagram card (UR)`, `${data.write.ur.slug}-portrait-ur`, deps.env.MEDIA_CDN_URL)
-        : Promise.resolve(null),
-    ])
-
-    if (!heroMediaId && ogEn?.id) {
-      heroMediaId = ogEn.id
-    }
-    logger.info({ clusterId: data.clusterId, heroPath: realHero ? 'real-photo' : blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
-
-    for (const u of [portraitEn?.url, portraitUr?.url, ogEn?.url]) {
-      if (u && !socialMediaUrls.includes(u)) socialMediaUrls.push(u)
-    }
-  } catch (e) {
-    logger.warn({ err: e }, 'social card render/upload skipped')
-  }
+  const cards = await renderStoryCards({ clusterId: data.clusterId, write: data.write, category, priority: data.priority, realHero }, deps)
+  socialMediaUrls.push(...cards.urls)
+  if (!heroMediaId && cards.ogId) heroMediaId = cards.ogId
+  logger.info({ clusterId: data.clusterId, heroPath: realHero ? 'real-photo' : blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
 
   await deps.publishQueue.add(
     'publish',
@@ -317,6 +330,7 @@ export async function processMediaJob(
       write: data.write,
       heroMediaId,
       socialMediaUrls,
+      cardVersion: CARD_VERSION,
       qaScore: data.qaScore,
       priority: data.priority,
       ...(heroFallback ? { heroFallback: true } : {}),
