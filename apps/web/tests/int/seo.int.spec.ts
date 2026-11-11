@@ -50,14 +50,14 @@ describe('structured data', () => {
   })
   it('uses a PNG logo and alternateName', () => {
     expect(logoUrl()).toMatch(/\/logo\.png$/)
-    expect(organizationJsonLd().alternateName).toEqual(['Zaviya', 'Zaviya.pk'])
+    expect(organizationJsonLd().alternateName).toEqual(['Zaviya.pk', 'Zaviya PK', 'زاویہ', 'Zaviya News'])
     expect(newsArticleJsonLd({ ...base, image: null } as never, 'en').publisher.logo.url).toMatch(/logo\.png$/)
   })
 })
 
 describe('brand in titles and schema (ZAV-125)', () => {
-  it('appends " | Zaviya News" when the whole title is within 65 characters', () => {
-    expect(brandedTitle('SBP holds rate')).toBe('SBP holds rate | Zaviya News')
+  it('appends " | Zaviya" when the whole title is within 65 characters', () => {
+    expect(brandedTitle('SBP holds rate')).toBe('SBP holds rate | Zaviya')
   })
   it('keeps a long headline whole, without the brand', () => {
     const long = 'Government announces a sweeping new package of relief measures for exporters'
@@ -65,23 +65,23 @@ describe('brand in titles and schema (ZAV-125)', () => {
     expect(brandedTitle(long)).toBe(long)
   })
   it('fits exactly at 65 characters and not at 66', () => {
-    const fit = 'x'.repeat(65 - ' | Zaviya News'.length)
-    expect(brandedTitle(fit)).toBe(`${fit} | Zaviya News`)
+    const fit = 'x'.repeat(65 - ' | Zaviya'.length)
+    expect(brandedTitle(fit)).toBe(`${fit} | Zaviya`)
     expect(brandedTitle(`${fit}y`)).toBe(`${fit}y`)
   })
   it('sets the branded title, plain og:title and og:site_name', () => {
     const m = buildPageMetadata({ locale: 'en', title: 'SBP holds rate', enPath: '/business/sbp' })
-    expect(m.title).toEqual({ absolute: 'SBP holds rate | Zaviya News' })
+    expect(m.title).toEqual({ absolute: 'SBP holds rate | Zaviya' })
     expect(m.openGraph?.title).toBe('SBP holds rate')
-    expect((m.openGraph as { siteName?: string }).siteName).toBe('Zaviya News')
+    expect((m.openGraph as { siteName?: string }).siteName).toBe('Zaviya')
   })
   it('uses one brand name for Organization, WebSite and publisher', () => {
     const base = { title: 'T', dek: 'd', publishedAt: '2026-10-12T00:00:00Z', href: '/cricket/t', author: { name: 'Zaviya' }, category: { slug: 'cricket', name: 'Cricket' }, image: null }
     const org = organizationJsonLd() as Record<string, unknown>
     const site = websiteJsonLd('en') as Record<string, unknown>
-    expect(org.name).toBe('Zaviya News')
-    expect(site.name).toBe('Zaviya News')
-    expect(site.alternateName).toEqual(['Zaviya', 'Zaviya.pk'])
-    expect(newsArticleJsonLd(base as never, 'en').publisher.name).toBe('Zaviya News')
+    expect(org.name).toBe('Zaviya')
+    expect(site.name).toBe('Zaviya')
+    expect(site.alternateName).toEqual(['Zaviya.pk', 'Zaviya PK', 'زاویہ', 'Zaviya News'])
+    expect(newsArticleJsonLd(base as never, 'en').publisher.name).toBe('Zaviya')
   })
 })

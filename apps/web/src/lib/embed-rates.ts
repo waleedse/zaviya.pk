@@ -11,10 +11,10 @@ const SERIES: Record<Exclude<EmbedType, 'all'>, string[]> = {
 }
 
 const TITLES: Record<EmbedType, { text: string; href: string }> = {
-  gold: { text: 'Gold rate today by Zaviya News', href: '/gold-rate-today-pakistan' },
-  dollar: { text: 'Dollar rate today by Zaviya News', href: '/dollar-rate-today-pakistan' },
-  petrol: { text: 'Petrol price today by Zaviya News', href: '/petrol-price-today-pakistan' },
-  all: { text: 'Rates today by Zaviya News', href: '/gold-rate-today-pakistan' },
+  gold: { text: 'Gold rate today by Zaviya', href: '/gold-rate-today-pakistan' },
+  dollar: { text: 'Dollar rate today by Zaviya', href: '/dollar-rate-today-pakistan' },
+  petrol: { text: 'Petrol price today by Zaviya', href: '/petrol-price-today-pakistan' },
+  all: { text: 'Rates today by Zaviya', href: '/gold-rate-today-pakistan' },
 }
 
 export function embedTitle(type: EmbedType) {
@@ -74,7 +74,7 @@ a{color:${c.link};font-weight:600;text-decoration:none}a:hover{text-decoration:u
 </style></head><body><div class="w">
 <h1><a href="${href}" target="_blank" rel="noopener">${escapeHtml(title.text)}</a></h1>
 <ul>${body}</ul>
-<div class="ft"><span>${escapeHtml(stamp)}</span><a href="${origin}/?utm_source=embed&amp;utm_medium=widget" target="_blank" rel="noopener">Powered by Zaviya News</a></div>
+<div class="ft"><span>${escapeHtml(stamp)}</span><a href="${origin}/?utm_source=embed&amp;utm_medium=widget" target="_blank" rel="noopener">Powered by Zaviya</a></div>
 </div></body></html>`
 }
 

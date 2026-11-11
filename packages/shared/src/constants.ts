@@ -6,8 +6,8 @@ export const RTL_LOCALES: readonly Locale[] = ['ur']
 export const SITE = {
   name: 'Zaviya',
   /** The public brand in search results, og:site_name and schema.org names (ZAV-125); `name` stays the short wordmark */
-  brandName: 'Zaviya News',
-  brandAlternateNames: ['Zaviya', 'Zaviya.pk'],
+  brandName: 'Zaviya',
+  brandAlternateNames: ['Zaviya.pk', 'Zaviya PK', 'زاویہ', 'Zaviya News'],
   nameUr: 'زاویہ',
   tagline: 'Every story, the right angle',
   taglineUr: 'ہر خبر، صحیح زاویے سے',

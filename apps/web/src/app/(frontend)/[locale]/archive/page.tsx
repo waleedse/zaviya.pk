@@ -17,11 +17,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const locale = parseLocale((await params).locale)
   return buildPageMetadata({
     locale,
-    title: locale === 'ur' ? 'خبروں کا آرکائیو' : 'News archive: every day on Zaviya News',
+    title: locale === 'ur' ? 'خبروں کا آرکائیو' : 'News archive: every day on Zaviya',
     description:
       locale === 'ur'
         ? 'پچھلے 60 دنوں کی تمام خبریں، دن بہ دن۔'
-        : 'Browse every story Zaviya News published, day by day, for the last 60 days.',
+        : 'Browse every story Zaviya published, day by day, for the last 60 days.',
     enPath: '/archive',
     urPath: '/ur/archive',
   })

@@ -34,7 +34,7 @@ export const TEMPLATES: Record<Sentiment, [string, string][]> = {
   ],
   praise: [
     ['Thank you for the kind words! We are glad it helped.', 'حوصلہ افزائی کا شکریہ! خوشی ہوئی کہ یہ مفید رہا۔'],
-    ['Thanks for reading Zaviya News, it means a lot.', 'زاویہ نیوز پڑھنے کا شکریہ، ہمارے لیے بہت اہم ہے۔'],
+    ['Thanks for reading Zaviya, it means a lot.', 'زاویہ پڑھنے کا شکریہ، ہمارے لیے بہت اہم ہے۔'],
     ['Much appreciated! More stories like this on zaviya.pk every day.', 'بہت شکریہ! ایسی مزید خبریں روزانہ zaviya.pk پر۔'],
   ],
   negative: [

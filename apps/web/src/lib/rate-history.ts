@@ -145,7 +145,7 @@ export function dayTitle(family: RateFamily, date: string, rows: SeriesDay[]): s
 
 export function dayDescription(family: RateFamily, date: string, rows: SeriesDay[]): string {
   const parts = rows.map((r) => `${r.label} ${formatRs(r.close)} ${r.suffix}`)
-  return `${family.noun} in Pakistan on ${rateDateLabel(date)}: ${parts.join(', ')}. Figures recorded by Zaviya News, with the earlier and later days.`.slice(0, 300)
+  return `${family.noun} in Pakistan on ${rateDateLabel(date)}: ${parts.join(', ')}. Figures recorded by Zaviya, with the earlier and later days.`.slice(0, 300)
 }
 
 /** The change of a figure against the previous day we hold data for, or null when there is no previous day. */

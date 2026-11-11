@@ -57,7 +57,7 @@ export function boardFaqs(b: BoardView, exams: ExamView[], year: number): { q: s
       ? `Yes. ${b.smsHowTo ?? `Send your roll number to ${b.smsCode}.`} Standard network charges apply.`
       : `We have not verified an SMS service for ${b.name}. Use the board's website or ask your school; we add the code here only when the board publishes it.`,
   })
-  faqs.push({ q: 'Is this the official result?', a: `No. Zaviya News is a news site. We link to ${b.name}'s own result page and report dates with their source. ${FAKE_SITE_WARNING}` })
+  faqs.push({ q: 'Is this the official result?', a: `No. Zaviya is a news site. We link to ${b.name}'s own result page and report dates with their source. ${FAKE_SITE_WARNING}` })
   faqs.push(...b.faqs)
   return faqs
 }

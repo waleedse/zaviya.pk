@@ -29,7 +29,7 @@ export function FollowBox({ locale, source }: { locale: Locale; source: string }
     .filter((p): p is { url: string; label: string } => p.label !== null)
 
   return (
-    <section className="my-8 space-y-4" aria-label={isUr ? 'زاویہ کو فالو کریں' : 'Follow Zaviya News'}>
+    <section className="my-8 space-y-4" aria-label={isUr ? 'زاویہ کو فالو کریں' : 'Follow Zaviya'}>
       {profiles.length ? (
         <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-border bg-surface p-4">
           <span className="text-sm font-bold">{isUr ? 'روز کی اہم خبریں، فالو کریں' : 'Get Pakistan’s key news daily: follow us'}</span>

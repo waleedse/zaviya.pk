@@ -18,7 +18,7 @@ export function WhatsAppCTA({ locale, compact, inline }: { locale: Locale; compa
       <p className="my-6 text-sm font-semibold">
         <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-whatsapp hover:underline">
           {icon}
-          {locale === 'ur' ? 'واٹس ایپ پر زویا نیوز حاصل کریں' : 'Get Zaviya News on WhatsApp'} →
+          {locale === 'ur' ? 'واٹس ایپ پر زاویہ حاصل کریں' : 'Get Zaviya on WhatsApp'} →
         </a>
       </p>
     )

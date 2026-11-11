@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return buildPageMetadata({
     locale,
     title: 'Web Stories: the day\'s big news in swipeable stories',
-    description: 'Swipe through the day\'s five biggest Pakistan stories and breaking news from Zaviya News as Google Web Stories.',
+    description: 'Swipe through the day\'s five biggest Pakistan stories and breaking news from Zaviya as Google Web Stories.',
     enPath: '/web-stories',
   })
 }

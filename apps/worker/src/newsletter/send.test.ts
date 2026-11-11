@@ -41,7 +41,7 @@ describe('newsletter', () => {
     const m = confirmMail(rows(1, 1)[0]!, 'https://zaviya.pk')
     expect(m.body).toContain('https://zaviya.pk/api/newsletter/confirm?token=tok1')
     const raw = buildMessage('news@zaviya.pk', m, '<x@zaviya.pk>')
-    expect(raw).toContain('From: Zaviya News <news@zaviya.pk>')
+    expect(raw).toContain('From: Zaviya <news@zaviya.pk>')
     expect(raw).not.toContain('Auto-Submitted')
   })
 

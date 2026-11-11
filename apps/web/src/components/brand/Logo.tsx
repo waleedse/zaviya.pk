@@ -31,7 +31,7 @@ export function AngleMark({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 44 44" fill="none" aria-hidden>
       <rect width="44" height="44" rx="13" fill="#047857" />
       <path d="M13 13.5h18M13 30.5h18" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" />
-      <path d="M30 14.5 14 29.5" stroke="#FBBF24" strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M31 13.5 13 30.5" stroke="#FBBF24" strokeWidth="3.6" strokeLinecap="round" />
     </svg>
   )
 }

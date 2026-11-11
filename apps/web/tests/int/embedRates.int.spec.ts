@@ -28,7 +28,7 @@ describe('embed rates widget (ZAV-110)', () => {
   it('renders a small noindex page with a followed Powered-by link and no scripts or cookies', () => {
     const html = renderRatesEmbed(ticks, { type: 'all', theme: 'light', origin: 'https://zaviya.pk' })
     expect(html).toContain('noindex')
-    expect(html).toContain('Powered by Zaviya News')
+    expect(html).toContain('Powered by Zaviya')
     expect(html).toContain('href="https://zaviya.pk/gold-rate-today-pakistan?utm_source=embed')
     expect(html).not.toMatch(/<script|nofollow|set-cookie/i)
     expect(html).toContain('412,500')
@@ -41,6 +41,6 @@ describe('embed rates widget (ZAV-110)', () => {
   it('snippet has the iframe and a plain link outside it', () => {
     const s = embedSnippet('gold', 'light', 'https://zaviya.pk')
     expect(s).toContain('<iframe src="https://zaviya.pk/embed/rates?type=gold&theme=light"')
-    expect(s).toContain('</iframe>\n<p><a href="https://zaviya.pk/gold-rate-today-pakistan">Gold rate today by Zaviya News</a></p>')
+    expect(s).toContain('</iframe>\n<p><a href="https://zaviya.pk/gold-rate-today-pakistan">Gold rate today by Zaviya</a></p>')
   })
 })

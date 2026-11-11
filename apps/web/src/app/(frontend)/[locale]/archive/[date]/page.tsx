@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Params }) {
     locale,
     title: locale === 'ur' ? `${label} کی خبریں` : `News from ${label}`,
     description:
-      locale === 'ur' ? `${label} کو زاویہ پر شائع ہونے والی تمام خبریں۔` : `Every story Zaviya News published on ${label}, newest first.`,
+      locale === 'ur' ? `${label} کو زاویہ پر شائع ہونے والی تمام خبریں۔` : `Every story Zaviya published on ${label}, newest first.`,
     enPath: archivePath(date),
     urPath: `/ur${archivePath(date)}`,
     noindex: empty,

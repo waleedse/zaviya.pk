@@ -37,7 +37,7 @@ export async function rateHistoryMetadata(slug: string, p: { locale: string }) {
   return buildPageMetadata({
     locale: 'en',
     title: `${family.noun} history in Pakistan: day by day`,
-    description: `Every day Zaviya News has recorded the ${family.noun.toLowerCase()} in Pakistan, newest first.`,
+    description: `Every day Zaviya has recorded the ${family.noun.toLowerCase()} in Pakistan, newest first.`,
     enPath: rateHistoryPath(family),
   })
 }

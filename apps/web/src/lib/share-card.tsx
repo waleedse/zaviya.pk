@@ -180,7 +180,7 @@ export async function shareCardResponse(locale: Locale, file: string): Promise<R
             )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUr ? 'flex-end' : 'flex-start' }}>
               <div style={{ display: 'flex', fontSize: 38, fontWeight: 700 }}>{brand}</div>
-              <div style={{ display: 'flex', fontSize: 26, fontWeight: 400 }}>{isUr ? rtl('مزید خبروں کے لیے فالو کریں') : 'Follow Zaviya News'}</div>
+              <div style={{ display: 'flex', fontSize: 26, fontWeight: 400 }}>{isUr ? rtl('مزید خبروں کے لیے فالو کریں') : 'Follow Zaviya'}</div>
             </div>
           </div>
           <div style={{ display: 'flex', fontSize: 38, fontWeight: 700, fontFamily: 'Inter', direction: 'ltr' }}>{SHARE_DOMAIN}</div>
