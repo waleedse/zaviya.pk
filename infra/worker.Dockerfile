@@ -3,7 +3,7 @@
 FROM node:22-bookworm-slim
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable && corepack prepare pnpm@10.18.0 --activate \
-  && apt-get update && apt-get install -y --no-install-recommends ca-certificates fonts-noto-core fonts-noto-extra chromium \
+  && apt-get update && apt-get install -y --no-install-recommends ca-certificates fonts-noto-core fonts-noto-extra fonts-noto-color-emoji chromium \
   && rm -rf /var/lib/apt/lists/*
 # Subscription writing engines: Cursor CLI (cursor-agent) and Claude Code (claude -p)
 RUN apt-get update && apt-get install -y --no-install-recommends curl git \

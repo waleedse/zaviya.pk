@@ -25,6 +25,15 @@ import { postX } from './x.js'
  */
 
 export const QUOTE_JOB = 'quote'
+
+/** When the words were said (the post's own time), not when the card was made: "10 NOV, 18:21 PKT". */
+export function saidAt(at: string | undefined, now: number): string {
+  const t = at ? Date.parse(at) : NaN
+  const d = new Date(Number.isFinite(t) ? t : now)
+  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Karachi' }).toUpperCase()
+  const hm = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })
+  return `${day}, ${hm} PKT`
+}
 const K = {
   done: (id: string) => `zaviya:quote:done:${id}`,
   posted: (id: string, platform: string) => `zaviya:quote:posted:${id}:${platform}`,
@@ -243,7 +252,7 @@ export async function runQuoteRound(deps: QuoteDeps & { socialQueue: { add: (nam
         lang: c.lang,
         photo: photo.dataUrl,
         photoCredit: photo.credit,
-        time: `${new Date(now).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' })} PKT`,
+        time: saidAt(c.at, now),
       },
       deps.env.CHROMIUM_PATH,
     ).catch(() => null)
