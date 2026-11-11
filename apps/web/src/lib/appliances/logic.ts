@@ -260,11 +260,24 @@ export function categoryFaqs(cat: { name: string; singular: string; group?: Pric
   return faqs
 }
 
+/**
+ * Bags people price by weight ("sugar price in pakistan today 50 kg", autocomplete gl=pk, 11 Nov 2026). PBS gives only
+ * the per-kg retail average, so the bag figure is that rate times the weight, and the page says so.
+ */
+const BULK_KG: Record<string, number> = { 'sugar-price': 50 }
+
+export function bulkPrice(a: Pick<ApplianceView, 'slug' | 'pricePkr'>): { kg: number; pkr: number } | null {
+  const kg = BULK_KG[a.slug]
+  return kg && a.pricePkr ? { kg, pkr: Math.round(a.pricePkr * kg) } : null
+}
+
 export function productFaqs(a: ApplianceView): Faq[] {
   const full = fullName(a)
   const faqs: Faq[] = []
   if (a.brand.kind === 'source') {
     if (a.pricePkr) faqs.push({ q: `What is the price of ${a.name.toLowerCase()} in Pakistan today?`, a: `${formatPkr(a.pricePkr)} on average across ${a.cityPrices.length} cities this week, from the Pakistan Bureau of Statistics weekly price survey.` })
+    const bulk = bulkPrice(a)
+    if (bulk) faqs.push({ q: `What is the ${a.name.toLowerCase()} price today for ${bulk.kg} kg?`, a: `About ${formatPkr(bulk.pkr)} at this week's average retail rate (${formatPkr(a.pricePkr!)} per kg × ${bulk.kg}). A ${bulk.kg} kg bag bought wholesale usually costs less; PBS does not survey wholesale bag prices.` })
     const sorted = [...a.cityPrices].sort((x, y) => x.avg - y.avg)
     if (sorted.length > 1) faqs.push({ q: `Where is ${a.name.toLowerCase()} cheapest?`, a: `${sorted[0]!.city} (${formatPkr(Math.round(sorted[0]!.avg))} average) and most expensive in ${sorted[sorted.length - 1]!.city} (${formatPkr(Math.round(sorted[sorted.length - 1]!.avg))}).` })
     for (const city of ['Lahore', 'Karachi', 'Islamabad']) {

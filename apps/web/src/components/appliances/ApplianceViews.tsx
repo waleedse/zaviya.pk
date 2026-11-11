@@ -9,6 +9,7 @@ import { absoluteUrl, breadcrumbJsonLd, faqJsonLd } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import {
   applianceSummary,
+  bulkPrice,
   compareKey,
   compareSpecRows,
   compareVerdict,
@@ -497,6 +498,7 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
   const maker = a.brand.kind === 'maker'
   const ld = productJsonLd(a)
   const off = discountText(a)
+  const bulk = grocery ? bulkPrice(a) : null
   const crumbs = [
     { label: 'Home', href: '/' },
     { label: 'Prices', href: PRICES_HUB },
@@ -539,6 +541,12 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
             </p>
             {a.listPricePkr && off ? <p className="text-sm text-fg-muted">Was {formatPkr(a.listPricePkr)}. {off}.</p> : null}
             {a.unit ? <p className="text-sm font-medium">{a.unit}</p> : null}
+            {bulk ? (
+              <p className="text-sm" data-testid="bulk-price">
+                <span className="font-semibold">{bulk.kg} kg: about {formatPkr(bulk.pkr)}</span>
+                <span className="text-fg-muted"> at the retail rate per kg × {bulk.kg}; wholesale bags usually cost less</span>
+              </p>
+            ) : null}
             <p className="text-sm text-fg-muted">
               {a.priceUpdatedAt ? `From ${sourceText(a)}, checked ${dateText(a.priceUpdatedAt)}` : 'We update this page when the source shows a price.'}
               {a.inStock === false && a.brand.kind === 'store' ? ' · Out of stock right now' : ''}
