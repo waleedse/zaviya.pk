@@ -44,11 +44,20 @@ describe('FLUX_IMAGES', () => {
     else process.env.FLUX_IMAGES = original
   })
 
-  it('is on by default and off with false', () => {
+  it('is off by default (paid Workers AI) and on only with true', () => {
     delete process.env.FLUX_IMAGES
+    expect(loadConfig().FLUX_IMAGES).toBe(false)
+    process.env.FLUX_IMAGES = 'true'
     expect(loadConfig().FLUX_IMAGES).toBe(true)
     process.env.FLUX_IMAGES = 'false'
     expect(loadConfig().FLUX_IMAGES).toBe(false)
+  })
+
+  it('embeds locally and never with Workers AI, even when the Cloudflare token is still set', async () => {
+    const { embedder } = await import('./config.js')
+    const e = embedder({ CLOUDFLARE_ACCOUNT_ID: 'acc', CLOUDFLARE_AI_TOKEN: 'tok' })
+    expect(e.provider.id).toBe('local-embed')
+    expect(e.model).not.toContain('@cf/')
   })
 
   it('hands out no Workers AI credentials for pictures when off', async () => {

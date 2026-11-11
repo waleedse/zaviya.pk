@@ -10,7 +10,7 @@ const EMBED_RETRY_DELAY_MS = 2 * 60 * 1000
 
 export async function processEmbedJob(
   data: { sourceItemId: string; title: string; summary?: string; tries?: number },
-  deps: { router: LLMRouter; payload: PayloadClient; triageQueue: Queue; embedQueue?: Queue; minSources?: number },
+  deps: { router: LLMRouter; payload: PayloadClient; triageQueue: Queue; embedQueue?: Queue; minSources?: number; matchThreshold?: number },
 ): Promise<void> {
   const text = `${data.title}\n${data.summary ?? ''}`.trim()
   let embedding: number[][]
@@ -35,6 +35,8 @@ export async function processEmbedJob(
     match = await deps.payload.clusterMatch({
       sourceItemId: data.sourceItemId,
       embedding: vec,
+      model: deps.router.embedModelId(),
+      ...(deps.matchThreshold ? { threshold: deps.matchThreshold } : {}),
     })
   } catch (e) {
     logger.warn({ err: e }, 'cluster-match failed')

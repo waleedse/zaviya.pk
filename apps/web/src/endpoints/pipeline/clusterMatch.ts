@@ -3,9 +3,17 @@ import type { Payload } from 'payload'
 import { pickClusterHeadline } from '@zaviya/shared'
 import { embeddingToPgVector } from './helpers'
 
+/**
+ * Vectors from different embedding models are not comparable. Every vector is stored with the model that made it and
+ * a new item is only matched against vectors of the same model. Rows (and workers) that predate the tag are Cloudflare bge.
+ */
+export const LEGACY_EMBED_MODEL = 'workers-ai:@cf/baai/bge-base-en-v1.5'
+
 export type ClusterMatchInput = {
   sourceItemId: string
   embedding: number[]
+  /** Embedding model that produced `embedding` (default: the legacy Workers AI model, for workers that do not send it yet) */
+  model?: string
   windowHours?: number
   threshold?: number
 }
@@ -94,7 +102,7 @@ export async function runClusterMatch(
   payload: Payload,
   input: ClusterMatchInput,
 ): Promise<ClusterMatchResult> {
-  const { sourceItemId, embedding, windowHours = 48, threshold = 0.83 } = input
+  const { sourceItemId, embedding, windowHours = 48, threshold = 0.83, model = LEGACY_EMBED_MODEL } = input
   if (embedding.length !== 768) {
     throw new Error('embedding must have 768 dimensions')
   }
@@ -104,26 +112,31 @@ export async function runClusterMatch(
 
   await drizzle.execute(sql`
     UPDATE source_items
-    SET embedding = ${vectorLiteral}::vector
+    SET embedding = ${vectorLiteral}::vector, embedding_model = ${model}
     WHERE id = ${sourceItemId}
   `)
 
   const windowStart = new Date(Date.now() - windowHours * 3600_000).toISOString()
   const cutoffs = clusterMatchCutoffs(Date.now())
 
+  // Exact search over the recent, same-model candidates (a few thousand rows) instead of the HNSW index: the index
+  // returns its nearest neighbours first and filters afterwards, which misses matches while two models share the table.
   const matchResult = await drizzle.execute(sql`
-    SELECT
-      si.cluster_id AS cluster_id,
-      1 - (si.embedding <=> ${vectorLiteral}::vector) AS similarity
-    FROM source_items si
-    INNER JOIN story_clusters sc ON sc.id = si.cluster_id
-    WHERE si.id != ${sourceItemId}
-      AND si.embedding IS NOT NULL
-      AND si.cluster_id IS NOT NULL
-      AND sc.last_seen_at >= ${windowStart}
-      AND sc.first_seen_at >= ${cutoffs.anyFirstSeen}
-      AND (sc.status IS DISTINCT FROM 'rejected' OR sc.first_seen_at >= ${cutoffs.rejectedFirstSeen})
-    ORDER BY si.embedding <=> ${vectorLiteral}::vector
+    WITH cand AS MATERIALIZED (
+      SELECT si.cluster_id, si.embedding
+      FROM source_items si
+      INNER JOIN story_clusters sc ON sc.id = si.cluster_id
+      WHERE si.id != ${sourceItemId}
+        AND si.embedding IS NOT NULL
+        AND COALESCE(si.embedding_model, ${LEGACY_EMBED_MODEL}) = ${model}
+        AND si.cluster_id IS NOT NULL
+        AND sc.last_seen_at >= ${windowStart}
+        AND sc.first_seen_at >= ${cutoffs.anyFirstSeen}
+        AND (sc.status IS DISTINCT FROM 'rejected' OR sc.first_seen_at >= ${cutoffs.rejectedFirstSeen})
+    )
+    SELECT cluster_id, 1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
+    FROM cand
+    ORDER BY embedding <=> ${vectorLiteral}::vector
     LIMIT 1
   `)
 
@@ -177,4 +190,35 @@ export async function runClusterMatch(
     overrideAccess: true,
   })
   return { clusterId: String(cluster.id), isNew: true, similarity: 0 }
+}
+
+export type ReembedCandidate = { id: string; title: string; summary: string | null }
+
+/** Clustered items of live clusters whose vector was made by another model (newest first), for the worker to re-embed. */
+export async function reembedCandidates(payload: Payload, model: string, hours: number, limit: number): Promise<ReembedCandidate[]> {
+  const since = new Date(Date.now() - hours * 3600_000).toISOString()
+  const res = await payload.db.drizzle.execute(sql`
+    SELECT si.id, si.title, si.summary
+    FROM source_items si
+    INNER JOIN story_clusters sc ON sc.id = si.cluster_id
+    WHERE sc.first_seen_at >= ${since}
+      AND (COALESCE(si.embedding_model, ${LEGACY_EMBED_MODEL}) IS DISTINCT FROM ${model} OR si.embedding IS NULL)
+    ORDER BY si.id DESC
+    LIMIT ${limit}
+  `)
+  return (res.rows as { id: number | string; title: string; summary: string | null }[]).map((r) => ({ id: String(r.id), title: r.title, summary: r.summary }))
+}
+
+/** Stores vectors made by `model` for existing items (no clustering decision is taken here). */
+export async function storeReembedded(payload: Payload, model: string, items: { id: string; embedding: number[] }[]): Promise<number> {
+  let n = 0
+  for (const it of items) {
+    if (it.embedding.length !== 768) continue
+    await payload.db.drizzle.execute(sql`
+      UPDATE source_items SET embedding = ${embeddingToPgVector(it.embedding)}::vector, embedding_model = ${model}
+      WHERE id = ${it.id}
+    `)
+    n++
+  }
+  return n
 }

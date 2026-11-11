@@ -202,9 +202,21 @@ export class PayloadClient {
     )
   }
 
+  reembedCandidates(model: string, hours: number, limit: number) {
+    return this.request<{ items: { id: string; title: string; summary: string | null }[] }>(
+      'GET',
+      `/api/pipeline/reembed-candidates?model=${encodeURIComponent(model)}&hours=${hours}&limit=${limit}`,
+    )
+  }
+
+  storeReembedded(model: string, items: { id: string; embedding: number[] }[]) {
+    return this.request<{ stored: number }>('POST', '/api/pipeline/reembed', { model, items })
+  }
+
   clusterMatch(body: {
     sourceItemId: string
     embedding: number[]
+    model?: string
     windowHours?: number
     threshold?: number
   }) {

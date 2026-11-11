@@ -16,6 +16,9 @@ WORKDIR /app
 COPY . .
 # tsx runs the TypeScript directly, so dev dependencies are needed too
 RUN pnpm install --frozen-lockfile --filter @zaviya/worker...
+# Free local embeddings (story clustering): bake the ONNX model into the image so a start never downloads it
+ENV EMBED_CACHE_DIR=/app/.cache/models
+RUN cd packages/llm && node -e "import('@huggingface/transformers').then(async (m) => { m.env.cacheDir = process.env.EMBED_CACHE_DIR; await m.pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-mpnet-base-v2', { dtype: 'q8' }) })"
 ENV NODE_ENV=production
 # Social post cards render in headless Chromium (Satori cannot shape Urdu)
 ENV CHROMIUM_PATH=/usr/bin/chromium
