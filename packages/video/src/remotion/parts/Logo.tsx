@@ -9,10 +9,12 @@ export const Logo: React.FC<{ scale?: number; opacity?: number; color?: string; 
   arc = BRAND.yellow,
   style,
 }) => (
-  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 * scale, opacity, ...style }}>
-    <svg viewBox="0 0 46 40" width={44 * scale} height={38 * scale} aria-hidden="true">
-      <path d="M3 37 L43 37 M3 37 L33 5" stroke={color} strokeWidth="4.5" fill="none" />
-      <path d="M19 37 A16 16 0 0 0 14 25" stroke={arc} strokeWidth="4.5" fill="none" />
+  <div style={{ display: 'flex', alignItems: 'center', gap: 12 * scale, opacity, ...style }}>
+    {/* The Z mark (site header, favicon, logo.png since 12 Nov); `arc` is kept for older callers */}
+    <svg viewBox="0 0 44 44" width={44 * scale} height={44 * scale} aria-hidden="true" data-arc={arc}>
+      <rect width="44" height="44" rx="10" fill="#047857" />
+      <path d="M12.5 12.5h19M12.5 31.5h19" stroke="#fff" strokeWidth="4.4" strokeLinecap="round" />
+      <path d="M31.5 12.5 12.5 31.5" stroke="#FBBF24" strokeWidth="4.4" strokeLinecap="round" />
     </svg>
     <div style={{ fontFamily: FONT.inter, fontWeight: 800, fontSize: 40 * scale, letterSpacing: -1 * scale, lineHeight: 0.9, color }}>
       zaviya

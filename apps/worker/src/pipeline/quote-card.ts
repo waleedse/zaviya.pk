@@ -32,7 +32,7 @@ export function quoteCardHtml(input: QuoteCardInput): string {
     `<img class="bg" src="${input.photo}" alt="" style="object-position:50% 25%">
 <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,.05) 18%,rgba(6,8,12,.55) 38%,rgba(6,8,12,.94) 62%,rgba(6,8,12,.98) 100%)"></div>
 <div style="position:absolute;top:52px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center">
-  <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
+  <div style="display:flex;align-items:center;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
   <div class="mono" style="font-size:20px;background:rgba(0,0,0,.45);padding:8px 16px;border-radius:6px">WHO SAID WHAT${input.time ? ` · ${escapeHtml(input.time)}` : ''}</div>
 </div>
 <div style="position:absolute;left:60px;right:60px;bottom:70px;display:flex;flex-direction:column;gap:28px">
