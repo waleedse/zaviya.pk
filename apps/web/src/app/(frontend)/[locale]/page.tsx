@@ -6,7 +6,6 @@ import { ArticleCard } from '@/components/article/ArticleCard'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { LatestList } from '@/components/article/LatestList'
 import { HomeLatest } from '@/components/home/HomeLatest'
-import { PriceSearch } from '@/components/appliances/PriceSearch'
 import { LeadCarousel } from '@/components/home/LeadCarousel'
 import { LiveRefresh } from '@/components/home/LiveRefresh'
 import { DeskHead, LeadStory, PictureStory, ThumbStory, TopList, Wire } from '@/components/home/Newsroom'
@@ -336,14 +335,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <h1 className="sr-only">{isUr ? 'زاویہ: پاکستان کی تازہ ترین خبریں' : 'Zaviya: Pakistan news, prices and rates today'}</h1>
       <LiveRefresh locale={locale} />
 
-      {/* ── Search any price: atta, eggs, bikes, cars, fridges (all official prices, /prices) ── */}
-      <section aria-label={isUr ? 'قیمت تلاش کریں' : 'Search any price'} className="container-wide pt-4 md:pt-6">
-        <div className="rounded-[var(--radius-card)] border border-accent-line bg-accent-soft p-4 md:p-6">
-          <p className="font-display text-lg font-extrabold md:text-xl">{isUr ? 'کوئی بھی قیمت تلاش کریں' : 'Search any price in Pakistan'}</p>
-          <p className="mb-3 text-sm text-fg-muted">{isUr ? 'آٹا، انڈے، چینی، موٹر سائیکل، گاڑیاں، فریج اور مزید: سرکاری ذرائع سے روزانہ' : 'Atta, eggs, sugar, bikes, cars, fridges and more: official prices, checked daily'}</p>
-          <PriceSearch locale={locale} variant="hero" />
-        </div>
-      </section>
+      {/* Price search lives in the header ("Search any price"); the news front page comes first (Waleed, 12 Nov). */}
 
       {/* ── Front page: the editor's lead, the next stories, the wire and the top stories ── */}
       <section aria-label={isUr ? 'صفحہ اول' : 'Front page'} className="container-wide pt-6">
