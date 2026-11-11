@@ -57,8 +57,9 @@ export function headlineSize(title: string, template: PostCardTemplate): number 
 export const FONTS =
   'https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Noto+Nastaliq+Urdu:wght@700&family=Unbounded:wght@900&family=Space+Mono:wght@700&display=block'
 
-export const MARK = (stroke: string, arc: string) =>
-  `<svg viewBox="0 0 46 40" width="44" height="38" aria-hidden="true"><path d="M3 37 L43 37 M3 37 L33 5" stroke="${stroke}" stroke-width="4.5" fill="none"/><path d="M19 37 A16 16 0 0 0 14 25" stroke="${arc}" stroke-width="4.5" fill="none"/></svg>`
+/** The Z mark, same as the site header, favicon and logo.png (12 Nov brand change). Arguments kept for older call sites. */
+export const MARK = (_stroke?: string, _arc?: string) =>
+  `<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><rect width="44" height="44" rx="10" fill="#047857"/><path d="M12.5 12.5h19M12.5 31.5h19" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/><path d="M31.5 12.5 12.5 31.5" stroke="#FBBF24" stroke-width="4.4" stroke-linecap="round"/></svg>`
 
 export function page(body: string, extraCss = ''): string {
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>
@@ -94,7 +95,7 @@ export function postCardHtml(input: PostCardInput, _template = chooseTemplate(in
     `${photo}
 ${input.photo ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 20%,rgba(0,0,0,0) 38%,rgba(6,8,12,.78) 62%,rgba(6,8,12,.97) 100%)"></div>` : ''}
 <div style="position:absolute;top:52px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center">
-  <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
+  <div style="display:flex;align-items:center;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
   <div class="mono" style="font-size:20px;background:rgba(0,0,0,.45);padding:8px 16px;border-radius:6px">${cat}${time ? ` · ${time}` : ''}</div>
 </div>
 ${input.breaking ? `<div class="mono" style="position:absolute;top:140px;left:60px;display:flex;align-items:center;gap:12px;font-size:26px;background:#E5231B;padding:10px 20px;border-radius:6px"><div style="width:16px;height:16px;border-radius:16px;background:#fff"></div>BREAKING</div>` : ''}
