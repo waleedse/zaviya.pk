@@ -30,4 +30,11 @@ describe('social photo QA gate', () => {
     expect(firstPassingPhoto([bad, null, good], 'Jensen Huang admits affair probe')).toBe(good)
     expect(firstPassingPhoto([bad], 'Jensen Huang admits affair probe')).toBeNull()
   })
+  it('rejects a mosque or shrine as the photo of a city (Kohat police killing card showed Ghamkol Shareef)', () => {
+    const v = photoQa(photo({ subject: 'Kohat', file: 'Ghamkol_Shareef_Kohat,_KPK_Pakistan.jpg' }), 'Six police killed in Kohat firing on illegal gold mining raid')
+    expect(v.ok).toBe(false)
+    expect(photoQa(photo({ subject: 'Islamabad', file: 'Faisal_Mosque,_Islamabad_III.jpg' }), 'Islamabad police jobs').ok).toBe(false)
+    expect(photoQa(photo({ subject: 'Faisal Mosque', file: 'Faisal_Mosque,_Islamabad_III.jpg' }), 'Faisal Mosque lit up').ok).toBe(true)
+    expect(photoQa(photo({ subject: 'Nawaz Sharif', file: 'Nawaz_Sharif_2013.jpg' }), 'Nawaz Sharif says').ok).toBe(true)
+  })
 })

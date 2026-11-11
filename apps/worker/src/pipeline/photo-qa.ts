@@ -1,5 +1,5 @@
 import { logger } from '../logger.js'
-import { licenceOk, namedIn, type RealPhoto } from './real-photo.js'
+import { licenceOk, namedIn, worshipSiteMismatch, type RealPhoto } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
 
 /**
@@ -19,6 +19,7 @@ export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string):
   // named in the headline/quote, or a topic place the headline maps to (Congress -> the Capitol)
   const named = namedIn(text, m.subject) || topicSubjects(text).some((t) => t.toLowerCase() === m.subject.toLowerCase())
   if (!named) return { ok: false, reason: `subject "${m.subject}" is not named in the text` }
+  if (m.file && worshipSiteMismatch(m.subject, m.file)) return { ok: false, reason: `worship site photo "${m.file}" for subject "${m.subject}"` }
   if (!licenceOk(m.licence)) return { ok: false, reason: `licence "${m.licence || 'unknown'}" is not free` }
   if (!/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/.test(m.sourceUrl)) return { ok: false, reason: 'no Commons file page to credit' }
   if (photo.bytes.length < 20_000) return { ok: false, reason: `file too small (${photo.bytes.length} bytes)` }
