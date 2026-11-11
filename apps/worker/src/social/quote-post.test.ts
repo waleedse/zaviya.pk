@@ -20,7 +20,7 @@ vi.mock('./facebook.js', () => ({ postFacebook: posts.fb }))
 vi.mock('./instagram.js', () => ({ postInstagram: posts.ig }))
 vi.mock('./x.js', () => ({ postX: posts.x }))
 
-import { processQuoteJob, queueArticleQuotes, runQuoteRound, watchSearches, withTags, type QuoteDeps } from './quote-post.js'
+import { processQuoteJob, queueArticleQuotes, saidAt, runQuoteRound, watchSearches, withTags, type QuoteDeps } from './quote-post.js'
 
 function fakeRedis() {
   const kv = new Map<string, string>()
@@ -227,5 +227,15 @@ describe('hashtags and trend words on quote cards', () => {
     expect(out.facebook).toContain('Trending: Starship launch')
     expect(out.facebook.startsWith('F “q”')).toBe(true)
     expect(out.instagram.match(/#\w+/g)!.length).toBeLessThanOrEqual(3)
+  })
+})
+
+describe('saidAt', () => {
+  it('shows when the words were said, in PKT', () => {
+    expect(saidAt('2026-11-10T13:21:13Z', Date.parse('2026-11-11T03:00:00Z'))).toBe('10 NOV, 18:21 PKT')
+  })
+  it('falls back to now when the time is missing or bad', () => {
+    expect(saidAt(undefined, Date.parse('2026-11-11T03:00:00Z'))).toBe('11 NOV, 08:00 PKT')
+    expect(saidAt('nope', Date.parse('2026-11-11T03:00:00Z'))).toBe('11 NOV, 08:00 PKT')
   })
 })
