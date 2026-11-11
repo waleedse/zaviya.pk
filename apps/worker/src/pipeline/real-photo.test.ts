@@ -121,6 +121,21 @@ describe('findHeroPhoto', () => {
   })
 })
 
+describe('findHeroPhoto people first', () => {
+  it('a living person the headline names beats a longer award or event tag', async () => {
+    const base = fakeWiki({ page: 'Donald Trump' }).fn
+    const fn = (async (u: string) => {
+      const url = String(u)
+      if (url.includes('prop=categories')) {
+        return new Response(JSON.stringify({ query: { pages: { '1': { title: 'Donald Trump', categories: [{ title: 'Category:Living people' }] }, '2': { title: 'Nobel Peace Prize' } } } }))
+      }
+      return base(u)
+    }) as unknown as typeof fetch
+    const hit = await findHeroPhoto({ title: 'Trump Nobel Peace Prize push draws criticism', tags: ['Nobel Peace Prize', 'Donald Trump'] }, fn)
+    expect(hit?.meta.subject).toBe('Donald Trump')
+  })
+})
+
 describe('findRealPhoto (social cards)', () => {
   it('only uses entities named in the headline and keeps the credit', async () => {
     const ok = await findRealPhoto('United States Capitol evacuated', ['United States Capitol'], fakeWiki().fn)

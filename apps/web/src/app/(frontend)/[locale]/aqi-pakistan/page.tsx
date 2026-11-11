@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const locale = parseLocale((await params).locale)
   return buildPageMetadata({
     locale,
-    title: locale === 'ur' ? 'آج لاہور اور پاکستان کا AQI: اسموگ اور ہوا کا معیار' : 'Lahore and Pakistan AQI Today: Smog and Air Quality',
+    title: locale === 'ur' ? 'آج لاہور اور پاکستان کا AQI: اسموگ اور ہوا کا معیار' : 'AQI Lahore Today: Smog and Air Quality in Pakistan',
     description:
       locale === 'ur'
         ? 'لاہور، کراچی، اسلام آباد اور دیگر شہروں کا آج کا AQI اور PM2.5، اسموگ سے بچاؤ کے مشورے۔'
