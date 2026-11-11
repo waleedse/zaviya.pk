@@ -8,11 +8,13 @@ vi.mock('./social-card.js', () => ({
 vi.mock('./post-card.js', () => ({ renderPostCard: vi.fn(async () => null) }))
 vi.mock('./real-photo.js', async (orig) => ({ ...(await orig<typeof import('./real-photo.js')>()), findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
 vi.mock('./reference.js', () => ({ describeReferenceScene: vi.fn(async () => null) }))
+vi.mock('./openverse.js', async (orig) => ({ ...(await orig<typeof import('./openverse.js')>()), findOpenversePhoto: vi.fn(async () => null) }))
 vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b }))
 vi.mock('./zimage.js', () => ({ generateViaZImage: vi.fn(async () => null) }))
 
 import { heroMaxTries, processMediaJob } from './media.js'
 import * as realPhoto from './real-photo.js'
+import * as openverse from './openverse.js'
 import * as socialCard from './social-card.js'
 import { HERO_BACKFILL_JOB, processHeroBackfill } from './hero-backfill.js'
 import { processPublishJob } from './publish.js'
@@ -21,7 +23,7 @@ const write = {
   en: { title: 'Gold price today', slug: 'gold-price-today', dek: 'd', altText: 'alt', imageBrief: 'gold bars', tags: [] },
 } as never
 
-const env = { REQUIRE_HERO_IMAGE: true, HERO_IMAGE_MAX_TRIES: 8, EDITOR_GATE: false, IMAGE_SOURCE: 'gemini', PAYLOAD_URL: 'http://x' } as never
+const env = { AI_HERO_IMAGES: true, REQUIRE_HERO_IMAGE: true, HERO_IMAGE_MAX_TRIES: 8, EDITOR_GATE: false, IMAGE_SOURCE: 'gemini', PAYLOAD_URL: 'http://x' } as never
 const offline = { isOnline: () => false, send: vi.fn() }
 
 function deps() {
@@ -110,7 +112,7 @@ describe('fallback story gets its real hero later', () => {
     const bridge = { isOnline: () => true, send: vi.fn(async () => ({ base64: Buffer.alloc(200, 1).toString('base64'), mimeType: 'image/png', width: 1, height: 1 })) }
     const run = processHeroBackfill(
       { articleId: '77', title: 'Gold price today', brief: 'gold bars' },
-      { payload: payload as never, env: { HERO_IMAGE_MAX_TRIES: 8 } as never, mediaQueue: { add: vi.fn() } as never, bridge },
+      { payload: payload as never, env: { HERO_IMAGE_MAX_TRIES: 8, AI_HERO_IMAGES: true } as never, mediaQueue: { add: vi.fn() } as never, bridge },
     )
     await vi.advanceTimersByTimeAsync(60_000)
     await run
@@ -151,5 +153,45 @@ describe('real photo first, AI only as a last resort', () => {
     await processMediaJob({ clusterId: '1', write, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
     expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI illustration)' }))
     expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: null })
+  })
+})
+
+describe('hero order with AI heroes off (default since 13 Nov)', () => {
+  const offEnv = { ...(env as object), AI_HERO_IMAGES: false } as never
+  const policeStory = { en: { title: 'Eleven policemen killed in Kohat attack', slug: 'kohat-attack', dek: 'd', altText: 'alt', imageBrief: 'police', tags: ['Kohat'] } } as never
+  const ovMeta = { subject: 'Pakistan police', file: 'Pakistan police on duty', author: 'Jane', licence: 'CC BY 2.0', creditLine: 'Photo: Jane / CC BY 2.0 / Flickr', sourceUrl: 'https://www.flickr.com/photos/1/2', mediaCredit: 'Photo: Jane / CC BY 2.0 / Flickr | https://www.flickr.com/photos/1/2', width: 1600, height: 1000, provider: 'openverse' as const, fromCommons: false }
+  const ovPhoto = { dataUrl: 'data:image/jpeg;base64,OV', credit: ovMeta.creditLine, bytes: Buffer.alloc(30_000, 1), mime: 'image/jpeg', meta: ovMeta }
+
+  it('(a) no Commons photo, (b) an Openverse topic photo becomes the hero, labelled stock, and stays off the social cards', async () => {
+    vi.mocked(openverse.findOpenversePhoto).mockImplementationOnce(async (_i, o) => (o?.accept?.(ovPhoto) ? ovPhoto : null))
+    const d = deps()
+    const bridge = { isOnline: () => true, send: vi.fn() }
+    await processMediaJob({ clusterId: '1', write: policeStory, qaScore: 1, priority: 'normal' }, { ...d, env: offEnv, bridge } as never)
+    expect(bridge.send).not.toHaveBeenCalled()
+    expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'stock', isAiGenerated: false, credit: ovMeta.mediaCredit }))
+    const job = d.publishQueue.add.mock.calls[0][1]
+    expect(job.heroFallback).toBeUndefined()
+    expect(job.heroMediaId).toBe('m-kohat-attack')
+    expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: null })
+  })
+
+  it('(c) no photo anywhere: the branded card, no AI image, no waiting', async () => {
+    const d = deps()
+    const bridge = { isOnline: () => true, send: vi.fn() }
+    await processMediaJob({ clusterId: '1', write: policeStory, qaScore: 1, priority: 'normal' }, { ...d, env: offEnv, bridge } as never)
+    expect(bridge.send).not.toHaveBeenCalled()
+    expect(d.mediaQueue.add).not.toHaveBeenCalled()
+    const job = d.publishQueue.add.mock.calls[0][1]
+    expect(job.heroFallback).toBe(true)
+    expect(job.heroMediaId).toBe('m-kohat-attack-card')
+    expect(d.payload.uploadMedia).not.toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'ai-generated' }))
+  })
+
+  it('a document photo from Commons is rejected and the Openverse step runs', async () => {
+    vi.mocked(realPhoto.findHeroPhoto).mockResolvedValueOnce({ ...ovPhoto, meta: { ...ovMeta, provider: 'commons', file: 'Kenyataan Akhbar 2025.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:K.jpg' } })
+    const d = deps()
+    await processMediaJob({ clusterId: '1', write: policeStory, qaScore: 1, priority: 'normal' }, { ...d, env: offEnv, bridge: { isOnline: () => true, send: vi.fn() } } as never)
+    expect(openverse.findOpenversePhoto).toHaveBeenCalled()
+    expect(d.publishQueue.add.mock.calls[0][1].heroFallback).toBe(true)
   })
 })

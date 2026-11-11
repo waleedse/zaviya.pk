@@ -32,12 +32,19 @@ async function run() {
     return
   }
 
-  // Swap real Wikimedia Commons photos into recent stories with AI heroes (old media kept):
+  // Fix recent heroes that are AI, missing or a document screenshot: Commons photo, else Openverse photo, else branded card (old media kept):
   //   backfill-real-photos [--days=7] [--limit=50] [--dry-run]
   if (cmd === 'backfill-real-photos') {
     const arg = (n: string) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split('=')[1]
-    const res = await backfillRealPhotos(payload, { days: Number(arg('days') ?? 7), limit: arg('limit') ? Number(arg('limit')) : undefined, dryRun: process.argv.includes('--dry-run') })
-    console.log(JSON.stringify(res, null, 1))
+    const res = await backfillRealPhotos(payload, {
+      days: Number(arg('days') ?? 7),
+      limit: arg('limit') ? Number(arg('limit')) : undefined,
+      dryRun: process.argv.includes('--dry-run'),
+      mediaBase: env.PUBLIC_MEDIA_URL ?? env.PAYLOAD_URL,
+      cdnBase: env.MEDIA_CDN_URL,
+    })
+    console.log(JSON.stringify({ ...res, items: undefined }, null, 1))
+    console.log(JSON.stringify(res.items))
     return
   }
 

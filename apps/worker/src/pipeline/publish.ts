@@ -14,6 +14,7 @@ import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_D
 import { editorApproved, freshForApproved } from './pitch.js'
 import { CARD_VERSION } from './card-version.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
+import { ensureHeroMedia } from './hero-photo.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
 const HOST_NAMES: Record<string, string> = {
@@ -430,6 +431,29 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
 
   const embeds = embedsFromUrls(cluster.items.map((i) => i.url))
 
+  // Publish guard: a live article always has a hero (real photo of the subject, real photo of the topic, else the branded card).
+  // The media step normally did this; this catches every path that arrives without one (retries, approved drafts, manual releases).
+  let heroMediaId = data.heroMediaId
+  let heroFallback = Boolean(data.heroFallback)
+  if (!gated && !heroMediaId) {
+    const hero = await ensureHeroMedia(deps.payload, {
+      title: data.write.en.title,
+      dek: data.write.en.dek,
+      brief: data.write.en.imageBrief || data.write.en.title,
+      tags: data.write.en.tags,
+      category,
+      slug: data.write.en.slug,
+      breaking: data.priority === 'breaking',
+    }).catch(() => null)
+    if (hero) {
+      heroMediaId = hero.id
+      if (hero.kind === 'card') heroFallback = true
+      logger.warn({ clusterId: data.clusterId, kind: hero.kind, mediaId: hero.id }, 'publish guard: story had no hero, made one')
+    } else {
+      logger.error({ clusterId: data.clusterId, title: data.write.en.title }, 'publish guard: no hero could be made, publishing without one (the backfill will fix it)')
+    }
+  }
+
   let res: { id: string }
   try {
     res = await deps.payload.postArticle({
@@ -439,7 +463,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
       priority: data.priority,
       isBreaking: data.priority === 'breaking',
       status: gated ? 'in_review' : 'published',
-      heroMediaId: data.heroMediaId,
+      heroMediaId,
       sources,
       embeds,
       ai: {
@@ -491,10 +515,10 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   }
 
   await deps.payload.patchCluster(data.clusterId, { status: 'published', article: res.id })
-  logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(data.heroMediaId), heroFallback: Boolean(data.heroFallback) }, 'published')
+  logger.info({ clusterId: data.clusterId, articleId: res.id, title: data.write.en.title, hero: Boolean(heroMediaId), heroFallback }, 'published')
 
   // Published with the branded card: the story stays online, the real hero replaces the card in place (same article and slug)
-  if (data.heroFallback && deps.mediaQueue) {
+  if (heroFallback && deps.mediaQueue) {
     await deps.mediaQueue
       .add(
         HERO_BACKFILL_JOB,

@@ -21,6 +21,10 @@ export interface PhotoMeta {
   height?: number
   /** creditLine plus the file page, as stored in Media.credit (`creditParts` in the web app splits it again) */
   mediaCredit: string
+  /** Where the photo came from: Wikimedia Commons (default) or an Openverse topic photo (Flickr, Commons, ...) */
+  provider?: 'commons' | 'openverse'
+  /** Openverse photo that is itself a Commons file (media.license 'wikimedia' instead of 'stock') */
+  fromCommons?: boolean
 }
 
 export interface RealPhoto {
@@ -226,7 +230,7 @@ export function buildMeta(subject: string, c: Candidate): PhotoMeta {
   const licence = (c.info.extmetadata?.LicenseShortName?.value ?? '').trim()
   const creditLine = ['Photo:', [author, licence, 'Wikimedia Commons'].filter(Boolean).join(' / ')].join(' ')
   const sourceUrl = c.info.descriptionurl ?? ''
-  return { subject, file: c.file, author, licence, creditLine, sourceUrl, width: c.info.width, height: c.info.height, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine }
+  return { subject, file: c.file, author, licence, creditLine, sourceUrl, width: c.info.width, height: c.info.height, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine, provider: 'commons', fromCommons: true }
 }
 
 /**
