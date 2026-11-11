@@ -3,16 +3,18 @@ import { fluxCreds, type WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { logger } from '../logger.js'
-import { generateHeroViaExtension, geminiAccounts, AI_MEDIA } from './media.js'
+import { generateHeroViaExtension, geminiAccounts, AI_MEDIA, absoluteMediaUrl } from './media.js'
 import { fluxPrompt, generateHeroViaWorkersAI } from './flux.js'
-import { findHeroPhoto, type RealPhoto } from './real-photo.js'
+import { findHeroImage, uploadHeroPhoto, uploadBrandCard, heroKindOf, type HeroInput } from './hero-photo.js'
+import type { RealPhoto } from './real-photo.js'
+import { documentNameReason, documentPixelReason } from './photo-qa.js'
 
 /**
  * Stories that went out without a hero image (or with only the branded text card) get one
  * afterwards. They stay online the whole time; the image is attached when it is ready.
- * Image path is the same as for new stories: a real Wikimedia Commons photo first (real-photo.ts), a generic AI
- * illustration (FLUX on Workers AI, Gemini web as backup) only when none exists.
- * `backfillRealPhotos` swaps real photos into recent stories that went out with an AI hero.
+ * Image path is the same as for new stories (hero-photo.ts): a real Commons photo of the named subject, else a real
+ * Openverse photo of the topic, else the branded card. AI illustrations only when AI_HERO_IMAGES is on (default off).
+ * `backfillRealPhotos` fixes recent stories whose hero is an AI image, missing, or a document/screenshot.
  */
 
 export const HERO_BACKFILL_JOB = 'backfill-hero'
@@ -83,18 +85,20 @@ export async function processHeroBackfill(
 ): Promise<void> {
   const brief = data.brief || data.title
   const clusterId = `article_${data.articleId}`
-  const real = await findHeroPhoto({ title: data.title, dek: data.dek, brief, tags: data.tags ?? [] }).catch(() => null)
+  const real = await findHeroImage({ title: data.title, dek: data.dek, brief, tags: data.tags ?? [] }).catch(() => null)
   if (real) {
-    const uploaded = await uploadReal(deps.payload, real, data.title, `article-${data.articleId}-photo`)
+    const uploaded = await uploadHeroPhoto(deps.payload, real, data.title, `article-${data.articleId}-photo`)
     await deps.payload.request('PATCH', `/api/articles/${data.articleId}?locale=en`, { heroImage: Number(uploaded.id) })
-    logger.info({ articleId: data.articleId, mediaId: uploaded.id, file: real.meta.file, title: data.title }, 'hero backfill: real photo added')
+    logger.info({ articleId: data.articleId, mediaId: uploaded.id, file: real.meta.file, kind: heroKindOf(real), title: data.title }, 'hero backfill: real photo added')
     return
   }
-  const blob =
-    (await generateHeroViaWorkersAI(brief, {
-      ...fluxCreds(deps.env),
-      clusterId,
-    })) ?? (await generateHeroViaExtension(fluxPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0]))
+  // No real photo: AI illustrations only when switched on (off since 13 Nov 2026); otherwise look again later, then keep the branded card.
+  const blob = deps.env.AI_HERO_IMAGES
+    ? ((await generateHeroViaWorkersAI(brief, {
+        ...fluxCreds(deps.env),
+        clusterId,
+      })) ?? (await generateHeroViaExtension(fluxPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0])))
+    : null
   if (!blob) {
     const tries = (data.tries ?? 0) + 1
     if (tries < deps.env.HERO_IMAGE_MAX_TRIES) {
@@ -114,14 +118,15 @@ export async function processHeroBackfill(
   logger.info({ articleId: data.articleId, mediaId: uploaded.id, title: data.title }, 'hero backfill: image added')
 }
 
-async function uploadReal(payload: PayloadClient, photo: RealPhoto, alt: string, filename: string) {
-  return payload.uploadMedia(new Blob([new Uint8Array(photo.bytes)], { type: photo.mime }), {
-    alt,
-    license: 'wikimedia',
-    isAiGenerated: false,
-    credit: photo.meta.mediaCredit,
-    filename,
-  })
+interface HeroMedia {
+  id: number | string
+  isAiGenerated?: boolean
+  license?: string
+  credit?: string
+  filename?: string
+  alt?: string
+  url?: string | null
+  sizes?: Record<string, { url?: string | null } | undefined>
 }
 
 interface RecentArticle {
@@ -129,29 +134,86 @@ interface RecentArticle {
   title?: string
   dek?: string
   publishedAt?: string
-  heroImage?: { id: number | string; isAiGenerated?: boolean } | number | string | null
+  heroImage?: HeroMedia | number | string | null
+  category?: { slug?: string } | number | string | null
   tags?: ({ name?: string } | number | string)[]
 }
 
-export interface RealPhotoBackfillResult {
+export type HeroProblem = 'missing' | 'ai' | 'document' | 'card'
+
+export interface HeroFixResult {
   scanned: number
-  aiHeroes: number
-  replaced: number
-  noPhoto: number
+  /** Stories whose hero is missing, AI-generated, a document/screenshot, or the branded card (card: only upgraded when a photo is found) */
+  candidates: number
+  replacedCommons: number
+  replacedOpenverse: number
+  /** Missing, AI or document heroes for which no photo exists: the branded card now */
+  brandedCard: number
+  unchanged: number
   failed: number
-  items: { id: string; title: string; views: number; status: 'replaced' | 'no-photo' | 'failed' | 'would-try'; file?: string; credit?: string; oldMediaId?: string }[]
+  /** Headlines for which no real photo could be found */
+  noPhoto: string[]
+  items: { id: string; title: string; views: number; problem?: HeroProblem; status: 'commons' | 'openverse' | 'card' | 'unchanged' | 'failed' | 'would-try'; file?: string; credit?: string; reason?: string; oldMediaId?: string }[]
+}
+
+type FetchImage = (m: HeroMedia) => Promise<{ bytes: Buffer; mime: string } | null>
+
+function decodeURIComponentSafe(s: string | undefined): string {
+  try {
+    return decodeURIComponent(s ?? '')
+  } catch {
+    return s ?? ''
+  }
+}
+
+/** The article's current hero and what is wrong with it, or null when it is a fine real photo. Documents are found by name, then by pixels. */
+export async function heroProblem(hero: RecentArticle['heroImage'], fetchImage?: FetchImage): Promise<{ problem: HeroProblem | null; reason?: string }> {
+  if (!hero || typeof hero !== 'object') return { problem: 'missing' }
+  if (hero.isAiGenerated === true || hero.license === 'ai-generated') return { problem: 'ai' }
+  // The branded text card (our own design) is not a photo; it is upgraded when a real photo turns up, never flagged as a document
+  if (hero.license === 'own' || hero.credit === 'Zaviya') return { problem: 'card' }
+  const byName = documentNameReason(hero.filename, hero.alt, decodeURIComponentSafe(hero.credit))
+  if (byName) return { problem: 'document', reason: byName }
+  const img = fetchImage ? await fetchImage(hero).catch(() => null) : null
+  const byPixels = img ? documentPixelReason(img.bytes, img.mime) : null
+  return byPixels ? { problem: 'document', reason: byPixels } : { problem: null }
 }
 
 /**
- * Stories published in the last `days` days whose hero is an AI image get a real Commons photo when one exists, most
- * viewed first. The old media doc stays in the library (only the article's hero pointer changes), so it is reversible.
+ * Stories published in the last `days` days whose hero is an AI image, missing, or a document screenshot get a real photo
+ * with the new hero order (Commons, then Openverse); with none found the branded card replaces them. Branded-card heroes
+ * are upgraded only when a photo exists. Most viewed first. The old media doc stays in the library (only the article's
+ * hero pointer changes), so it is reversible.
  */
 export async function backfillRealPhotos(
   payload: PayloadClient,
-  opts: { days?: number; dryRun?: boolean; limit?: number; find?: typeof findHeroPhoto; pauseMs?: number } = {},
-): Promise<RealPhotoBackfillResult> {
+  opts: {
+    days?: number
+    dryRun?: boolean
+    limit?: number
+    find?: (i: HeroInput) => Promise<RealPhoto | null>
+    pauseMs?: number
+    fetchImage?: FetchImage
+    /** Public media base and CDN, for downloading current heroes (document check by pixels) */
+    mediaBase?: string
+    cdnBase?: string
+    card?: typeof uploadBrandCard
+  } = {},
+): Promise<HeroFixResult> {
   const days = opts.days ?? 7
-  const find = opts.find ?? findHeroPhoto
+  const find = opts.find ?? findHeroImage
+  const makeCard = opts.card ?? uploadBrandCard
+  const fetchImage: FetchImage | undefined =
+    opts.fetchImage ??
+    (opts.mediaBase
+      ? async (m) => {
+          const u = absoluteMediaUrl(opts.mediaBase!, m.sizes?.hero?.url ?? m.sizes?.card?.url ?? m.url, opts.cdnBase)
+          if (!u) return null
+          const r = await fetch(u, { signal: AbortSignal.timeout(30_000) })
+          if (!r.ok) return null
+          return { bytes: Buffer.from(await r.arrayBuffer()), mime: (r.headers.get('content-type') ?? '').split(';')[0] ?? '' }
+        }
+      : undefined)
   const since = new Date(Date.now() - days * 86_400_000).toISOString()
   const res = await payload.request<{ docs: RecentArticle[] }>(
     'GET',
@@ -168,18 +230,27 @@ export async function backfillRealPhotos(
       views.set(id, (views.get(id) ?? 0) + (d.pageviews ?? 0))
     }
   } catch (e) {
-    logger.warn({ err: e instanceof Error ? e.message : e }, 'real-photo backfill: no pageview data, newest first')
+    logger.warn({ err: e instanceof Error ? e.message : e }, 'hero fix backfill: no pageview data, newest first')
   }
-  const ai = res.docs
-    .filter((a) => typeof a.heroImage === 'object' && a.heroImage !== null && a.heroImage.isAiGenerated === true)
-    .sort((a, b) => (views.get(String(b.id)) ?? 0) - (views.get(String(a.id)) ?? 0))
-    .slice(0, opts.limit ?? 500)
-  const out: RealPhotoBackfillResult = { scanned: res.docs.length, aiHeroes: ai.length, replaced: 0, noPhoto: 0, failed: 0, items: [] }
-  logger.info({ scanned: out.scanned, aiHeroes: out.aiHeroes, days, dryRun: Boolean(opts.dryRun) }, 'real-photo backfill: scan')
-  for (const a of ai) {
+  const out: HeroFixResult = { scanned: res.docs.length, candidates: 0, replacedCommons: 0, replacedOpenverse: 0, brandedCard: 0, unchanged: 0, failed: 0, noPhoto: [], items: [] }
+  const sorted = [...res.docs].sort((a, b) => (views.get(String(b.id)) ?? 0) - (views.get(String(a.id)) ?? 0))
+  const todo: { a: RecentArticle; problem: HeroProblem; reason?: string }[] = []
+  for (const a of sorted) {
+    const p = await heroProblem(a.heroImage, fetchImage)
+    if (p.problem) todo.push({ a, problem: p.problem, reason: p.reason })
+    else {
+      out.unchanged++
+      out.items.push({ id: String(a.id), title: a.title ?? '', views: views.get(String(a.id)) ?? 0, status: 'unchanged' })
+    }
+  }
+  const work = todo.slice(0, opts.limit ?? 500)
+  out.candidates = work.length
+  logger.info({ scanned: out.scanned, candidates: out.candidates, days, dryRun: Boolean(opts.dryRun) }, 'hero fix backfill: scan')
+  for (const { a, problem, reason } of work) {
     const id = String(a.id)
     const title = a.title ?? ''
-    const item = { id, title, views: views.get(id) ?? 0, oldMediaId: String((a.heroImage as { id: number | string }).id) }
+    const old = typeof a.heroImage === 'object' && a.heroImage ? String(a.heroImage.id) : undefined
+    const item = { id, title, views: views.get(id) ?? 0, problem, reason, oldMediaId: old }
     if (opts.dryRun) {
       out.items.push({ ...item, status: 'would-try' })
       continue
@@ -187,23 +258,35 @@ export async function backfillRealPhotos(
     try {
       const tags = (a.tags ?? []).map((t) => (typeof t === 'object' ? t.name : undefined)).filter((n): n is string => Boolean(n))
       const real = await find({ title, dek: a.dek, tags })
-      if (!real) {
-        out.noPhoto++
-        out.items.push({ ...item, status: 'no-photo' })
-      } else {
-        const uploaded = await uploadReal(payload, real, title, `article-${id}-photo`)
+      if (real) {
+        const uploaded = await uploadHeroPhoto(payload, real, title, `article-${id}-photo`)
         await payload.request('PATCH', `/api/articles/${id}?locale=en`, { heroImage: Number(uploaded.id) })
-        out.replaced++
-        out.items.push({ ...item, status: 'replaced', file: real.meta.file, credit: real.meta.creditLine })
-        logger.info({ articleId: id, newMediaId: uploaded.id, oldMediaId: item.oldMediaId, file: real.meta.file }, 'real-photo backfill: hero replaced')
+        const kind = heroKindOf(real)
+        if (kind === 'openverse') out.replacedOpenverse++
+        else out.replacedCommons++
+        out.items.push({ ...item, status: kind, file: real.meta.file, credit: real.meta.creditLine })
+        logger.info({ articleId: id, newMediaId: uploaded.id, oldMediaId: old, kind, file: real.meta.file }, 'hero fix backfill: hero replaced with a real photo')
+      } else {
+        out.noPhoto.push(title)
+        if (problem === 'card') {
+          out.unchanged++
+          out.items.push({ ...item, status: 'unchanged' })
+        } else {
+          const slug = typeof a.category === 'object' && a.category?.slug ? a.category.slug : 'pakistan'
+          const card = await makeCard(payload, { title, dek: a.dek, category: slug }, `article-${id}-card`)
+          await payload.request('PATCH', `/api/articles/${id}?locale=en`, { heroImage: Number(card.id) })
+          out.brandedCard++
+          out.items.push({ ...item, status: 'card' })
+          logger.info({ articleId: id, newMediaId: card.id, oldMediaId: old, problem }, 'hero fix backfill: no real photo, branded card')
+        }
       }
     } catch (e) {
       out.failed++
       out.items.push({ ...item, status: 'failed' })
-      logger.warn({ articleId: id, err: e instanceof Error ? e.message : e }, 'real-photo backfill: article failed')
+      logger.warn({ articleId: id, err: e instanceof Error ? e.message : e }, 'hero fix backfill: article failed')
     }
     await new Promise((r) => setTimeout(r, opts.pauseMs ?? 1500))
   }
-  logger.info({ scanned: out.scanned, aiHeroes: out.aiHeroes, replaced: out.replaced, noPhoto: out.noPhoto, failed: out.failed }, 'real-photo backfill: done')
+  logger.info({ scanned: out.scanned, candidates: out.candidates, commons: out.replacedCommons, openverse: out.replacedOpenverse, card: out.brandedCard, unchanged: out.unchanged, failed: out.failed }, 'hero fix backfill: done')
   return out
 }

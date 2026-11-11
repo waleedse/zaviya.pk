@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+vi.mock('./hero-photo.js', async (orig) => ({ ...(await orig<typeof import('./hero-photo.js')>()), ensureHeroMedia: vi.fn(async () => ({ id: 'h1', kind: 'card' })) }))
 import { processPublishJob, acquirePublishSlot, releasePublishSlot } from './publish.js'
 
 const body = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ')

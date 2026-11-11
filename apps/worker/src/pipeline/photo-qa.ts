@@ -1,6 +1,7 @@
 import { logger } from '../logger.js'
 import { licenceOk, namedIn, worshipSiteMismatch, type RealPhoto } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
+import { analyzeImage, documentReason } from './image-stats.js'
 
 /**
  * Last check before a photo goes on a social card: the photo's subject is named in the headline (or the quote), the licence
@@ -10,6 +11,28 @@ import { topicSubjects } from './photo-topics.js'
 export const QA_MIN_WIDTH = 600
 export const QA_MIN_ASPECT = 0.45
 export const QA_MAX_ASPECT = 3
+
+/**
+ * Words in a file title, alt text or credit that say the image is a document or a screenshot, not a photo
+ * (a Malaysian "Kenyataan Akhbar" page, a Reddit capture, a scanned notification).
+ */
+const DOCUMENT_WORDS = /press[\s_-]*release|press[\s_-]*statement|kenyataan|siaran akhbar|screen[\s_-]?shot|screen[\s_-]?cap(ture)?|\bscan(ned)?\b|\bletters?\b|notification|\bnotice\b|document|\bpage\b|\bpdf\b|\bmemo\b|circular|gazette|certificate|\binvoice\b|\breceipt\b|\bform\b|\btweet\b|reddit|facebook post|infographic|\bslides?\b|web[\s_-]?page/i
+
+/** Why this name says "document or screenshot", or null when the names look like a photo. */
+export function documentNameReason(...names: (string | undefined | null)[]): string | null {
+  for (const n of names) {
+    const t = (n ?? '').replace(/[_]+/g, ' ')
+    const m = DOCUMENT_WORDS.exec(t)
+    if (m) return `name says document/screenshot ("${m[0].trim()}")`
+  }
+  return null
+}
+
+/** The image bytes look like a page or a screenshot (mostly white, a few flat colours). Unknown formats pass. */
+export function documentPixelReason(bytes: Buffer, mime?: string): string | null {
+  const stats = analyzeImage(bytes, mime)
+  return stats ? documentReason(stats) : null
+}
 
 export type PhotoVerdict = { ok: true } | { ok: false; reason: string }
 
@@ -28,6 +51,25 @@ export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string):
     const aspect = m.width / Math.max(1, m.height)
     if (aspect < QA_MIN_ASPECT || aspect > QA_MAX_ASPECT) return { ok: false, reason: `odd shape (${m.width}x${m.height})` }
   }
+  const doc = documentNameReason(m.file, m.subject) ?? documentPixelReason(photo.bytes, (photo as { mime?: string }).mime)
+  if (doc) return { ok: false, reason: doc }
+  return { ok: true }
+}
+
+/**
+ * Article heroes (Commons or Openverse): free licence, credit page, size, and never a document or screenshot.
+ * Unlike social cards the subject need not be named in the text (a topic photo of "Pakistan police" is fine).
+ * A failed check is logged as 'hero rejected' by the caller; the next candidate or the next step of the hero order follows.
+ */
+export function heroPhotoQa(photo: Pick<RealPhoto, 'meta' | 'bytes' | 'mime'>): PhotoVerdict {
+  const m = photo.meta
+  if (!licenceOk(m.licence)) return { ok: false, reason: `licence "${m.licence || 'unknown'}" is not free` }
+  if (!/^https:\/\//.test(m.sourceUrl)) return { ok: false, reason: 'no file page to credit' }
+  if (photo.bytes.length < 20_000) return { ok: false, reason: `file too small (${photo.bytes.length} bytes)` }
+  if (m.width !== undefined && m.height !== undefined && m.width < 600) return { ok: false, reason: `too narrow (${m.width}px)` }
+  if (m.file && m.provider !== 'openverse' && worshipSiteMismatch(m.subject, m.file)) return { ok: false, reason: `worship site photo "${m.file}" for subject "${m.subject}"` }
+  const doc = documentNameReason(m.file, m.subject) ?? documentPixelReason(photo.bytes, photo.mime)
+  if (doc) return { ok: false, reason: doc }
   return { ok: true }
 }
 

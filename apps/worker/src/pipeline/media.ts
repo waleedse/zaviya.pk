@@ -6,7 +6,8 @@ import { logger } from '../logger.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { renderSocialCardSet, categoryAccentColor } from './social-card.js'
 import { renderPostCard } from './post-card.js'
-import { findRealPhoto, findHeroPhoto } from './real-photo.js'
+import { findRealPhoto } from './real-photo.js'
+import { findHeroImage, heroMediaMeta } from './hero-photo.js'
 import { firstPassingPhoto } from './photo-qa.js'
 import { generateViaZImage } from './zimage.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
@@ -154,7 +155,7 @@ export function heroMaxTries(priority: Priority, max: number): number {
  */
 export const CARD_VERSION = 1
 
-type RealHero = Awaited<ReturnType<typeof findHeroPhoto>>
+type RealHero = Awaited<ReturnType<typeof findHeroImage>>
 
 /** Renders and uploads a story's social cards (post, portrait, wide). Returns their URLs and the wide card's media id. */
 export async function renderStoryCards(
@@ -172,7 +173,8 @@ export async function renderStoryCards(
     // Every photo passes the QA gate (subject named in the headline, free licence, size and shape); a rejected hero
     // (e.g. a face only the dek names) is replaced by a person-first lookup, so a named person never gets a black card.
     const qaCtx = { clusterId: input.clusterId, title: write.en.title }
-    let real = firstPassingPhoto([input.realHero ?? null], write.en.title, qaCtx)
+    // (a topic photo from Openverse is for the article hero only: a social card needs a photo of a subject the headline names)
+    let real = firstPassingPhoto([input.realHero?.meta.provider === 'openverse' ? null : (input.realHero ?? null)], write.en.title, qaCtx)
     if (!real) real = firstPassingPhoto([await findRealPhoto(write.en.title, write.en.tags).catch(() => null)], write.en.title, qaCtx)
     if (!real) logger.info(qaCtx, 'social card goes out without a real photo: no named subject has a free photo')
     const photo = real?.dataUrl ?? null
@@ -232,7 +234,7 @@ export async function rerenderStaleCards(
   deps: { payload: PayloadClient; env: WorkerEnv },
 ): Promise<string[] | null> {
   const write = input.write
-  const realHero = await findHeroPhoto({ title: write.en.title, dek: write.en.dek, brief: write.en.imageBrief || write.en.title, tags: write.en.tags }).catch(() => null)
+  const realHero = await findHeroImage({ title: write.en.title, dek: write.en.dek, brief: write.en.imageBrief || write.en.title, tags: write.en.tags }).catch(() => null)
   const { urls } = await renderStoryCards({ ...input, realHero }, deps)
   return urls.length ? urls : null
 }
@@ -261,10 +263,10 @@ export async function processMediaJob(
   // 1. A real, free-licence photo of what the story is about (Wikimedia Commons: person, organisation, place, building,
   //    or the topic fallback such as US Congress -> the Capitol). Never photos from outlets or agencies (copyright).
   const brief = data.write.en.imageBrief || data.write.en.title
-  const realHero = await findHeroPhoto({ title: data.write.en.title, dek: data.write.en.dek, brief, tags: data.write.en.tags }).catch(() => null)
-  if (realHero) logger.info({ clusterId: data.clusterId, ...realHero.meta }, 'hero: real photo from Wikimedia Commons')
+  const realHero = await findHeroImage({ title: data.write.en.title, dek: data.write.en.dek, brief, tags: data.write.en.tags }).catch(() => null)
+  if (realHero) logger.info({ clusterId: data.clusterId, ...realHero.meta }, `hero: real photo from ${realHero.meta.provider === 'openverse' ? 'Openverse' : 'Wikimedia Commons'}`)
 
-  // 2. Last resort: a generic AI illustration (Gemini web is free so it goes first; FLUX on Workers AI is paid and the fallback).
+  // 2. Off by default since 13 Nov 2026 (AI_HERO_IMAGES): a generic AI illustration (Gemini web is free so it goes first; FLUX on Workers AI is paid and the fallback).
   //    The prompt forbids real people, events, elections, disasters and specific buildings (fluxPrompt). Breaking news cannot wait for Gemini.
   const flux = async () => generateHeroViaWorkersAI(brief, { ...fluxCreds(deps.env), clusterId: data.clusterId })
   const gemini = async () => {
@@ -282,9 +284,12 @@ export async function processMediaJob(
   }
   const zimage = async () => generateViaZImage(fluxPrompt(brief), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
   const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
+  const aiAllowed = Boolean(deps.env.AI_HERO_IMAGES)
   const blob: Blob | null = realHero
     ? new Blob([new Uint8Array(realHero.bytes)], { type: realHero.mime })
-    : deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
+    : !aiAllowed
+      ? null
+      : deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
       ? ((await zimage()) ?? (await flux()) ?? (await gemini()))
       : fluxFirst
         ? ((await flux()) ?? (await gemini()))
@@ -293,7 +298,8 @@ export async function processMediaJob(
   // last try it goes out with the branded Zaviya card as its hero, and a backfill job swaps in the Gemini image later.
   // Source-site photos are never reused (copyright), so there is no og:image step.
   const heroFallback = !blob
-  if (!blob && deps.env.REQUIRE_HERO_IMAGE) {
+  // Without AI heroes there is nothing to wait for: no real photo means the branded card now, and the backfill job keeps looking for a photo.
+  if (!blob && aiAllowed && deps.env.REQUIRE_HERO_IMAGE) {
     const tries = (data.imageTries ?? 0) + 1
     if (deps.mediaQueue && tries < heroMaxTries(data.priority, deps.env.HERO_IMAGE_MAX_TRIES)) {
       const delay = data.priority === 'breaking' ? BREAKING_IMAGE_RETRY_DELAY_MS : IMAGE_RETRY_DELAY_MS
@@ -308,7 +314,7 @@ export async function processMediaJob(
     try {
       const uploaded = await deps.payload.uploadMedia(blob, {
         alt: data.write.en.altText?.trim() || data.write.en.title,
-        ...(realHero ? { license: 'wikimedia', isAiGenerated: false, credit: realHero.meta.mediaCredit } : AI_MEDIA),
+        ...(realHero ? heroMediaMeta(realHero) : AI_MEDIA),
         filename: data.write.en.slug,
       })
       heroMediaId = uploaded.id
@@ -321,7 +327,7 @@ export async function processMediaJob(
   const cards = await renderStoryCards({ clusterId: data.clusterId, write: data.write, category, priority: data.priority, realHero }, deps)
   socialMediaUrls.push(...cards.urls)
   if (!heroMediaId && cards.ogId) heroMediaId = cards.ogId
-  logger.info({ clusterId: data.clusterId, heroPath: realHero ? 'real-photo' : blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
+  logger.info({ clusterId: data.clusterId, heroPath: realHero ? (realHero.meta.provider === 'openverse' ? 'openverse-photo' : 'real-photo') : blob ? 'ai-image' : heroMediaId ? 'branded-card-fallback' : 'none' }, 'hero image path')
 
   await deps.publishQueue.add(
     'publish',

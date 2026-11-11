@@ -73,6 +73,8 @@ const envSchema = z.object({
   DISCOVERY_IG_PROFILES: optionalStr,
   /** Google account on gemini.google.com when Chrome has several: the /u/N/ number (e.g. 4) or the email */
   GEMINI_WEB_ACCOUNT: optionalStr,
+  /** AI illustrations as article heroes (Gemini/FLUX/Z-Image). Off since 13 Nov 2026: heroes are real photos (Commons, then Openverse), else the branded card. The media agent code stays for explainer videos. */
+  AI_HERO_IMAGES: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? false : v === 'true' || v === '1'), z.boolean()).default(false),
   /** Never publish with only the branded text card: wait for a real Gemini illustration (default on) */
   REQUIRE_HERO_IMAGE: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** How often to retry the image before giving up (retries are 15 min apart) */
