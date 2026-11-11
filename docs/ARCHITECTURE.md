@@ -138,7 +138,7 @@ Seed data: `pakistan`, `world`, `business`, `tech-telecom`, `autos`, `cricket`, 
 
 **sources**: name, url, type (`rss`, `gnews`, `x_account`, `x_list`, `data`), trustTier (1-3), language, category hint, pollIntervalSec, enabled, lastPolledAt, etag, robotsOk.
 
-**source-items**: source, externalId, url, title, summary, contentText (cleaned), publishedAt, lang, embedding (vector(768), stored through a raw SQL column), clusterId, hash. Unique on (source, externalId).
+**source-items**: source, externalId, url, title, summary, contentText (cleaned), publishedAt, lang, embedding (vector(768), stored through a raw SQL column), clusterId, hash. Unique on (source, externalId). Each vector is tagged with the model that made it (`embedding_model`, raw SQL column; NULL = legacy Cloudflare bge): cluster-match only compares vectors of the same model. Embeddings are made in the worker process by a local multilingual ONNX model (`packages/llm/src/local-embed.ts`, baked into the worker image); no external embedding service is used.
 
 **story-clusters**: headline, firstSeenAt, lastSeenAt, itemCount, distinctSources, maxTier, status (`new`, `triaged`, `rejected`, `in_review`, `writing`, `published`, `updated`), triage (json), article (relationship).
 
@@ -237,7 +237,7 @@ Every pipeline endpoint lives under `/api/pipeline/*` (a Payload custom endpoint
 | GET | `/api/pipeline/sources` | – | `{ sources: [{id, key, name, url, type, trustTier, language, categoryHint, pollIntervalSec, etag, lastPolledAt}] }` (enabled only) |
 | PATCH | `/api/pipeline/sources/:id` | `{ etag?, lastPolledAt? }` | `{ ok: true }` |
 | POST | `/api/pipeline/source-items` | `{ items: [{ sourceId, externalId, url, title, summary?, contentText?, publishedAt, lang, hash }] }` | `{ inserted: [{id, externalId}], skipped: number }` (unique on sourceId+externalId) |
-| POST | `/api/pipeline/cluster-match` | `{ sourceItemId, embedding: number[768], windowHours?: 48, threshold?: 0.83 }` | `{ clusterId, isNew, similarity }`. The server stores the embedding, then joins the nearest cluster or creates one, updating itemCount, distinctSources and maxTier |
+| POST | `/api/pipeline/cluster-match` | `{ sourceItemId, embedding: number[768], model?, windowHours?: 48, threshold?: 0.83 }` | `{ clusterId, isNew, similarity }`. The server stores the embedding, then joins the nearest cluster or creates one, updating itemCount, distinctSources and maxTier |
 | GET | `/api/pipeline/clusters/:id` | – | `{ id, headline, status, itemCount, distinctSources, maxTier, triage, article, items: [{id, title, url, summary, contentText, publishedAt, source:{name, trustTier}}] }` |
 | PATCH | `/api/pipeline/clusters/:id` | `{ status?, triage?, article? }` | `{ ok: true }` |
 | POST | `/api/pipeline/articles` | see `PipelineArticleInput` below | `{ id, status, urls: { en?, ur? } }`. Creates the article, or updates it if `articleId` is given |

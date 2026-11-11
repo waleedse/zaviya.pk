@@ -12,6 +12,7 @@ import {
   type WorkerRuntime,
 } from './queues.js'
 import { startHeartbeat } from './heartbeat.js'
+import { runEmbedBackfill } from './pipeline/embed-backfill.js'
 import { startMailCommands } from './mail/scheduler.js'
 import { createHealService } from './heal/service.js'
 import { smtpMailer } from './mail/transport.js'
@@ -54,6 +55,8 @@ async function main() {
 
   runtime = await createWorkerRuntime(env, bridge, telegram)
   await scheduleIngestSources(runtime)
+  // Re-embed recent items after an embedding model switch (background; the live embed jobs already use the new model)
+  void runEmbedBackfill({ router: runtime.router, payload: runtime.payload, hours: env.EMBED_BACKFILL_HOURS })
   // The extension's "eyes": a stuck page is looked at by Gemini (vision), only allow-listed actions come back,
   // and Waleed gets an email (screenshot attached) only when a person is really needed.
   bridge.setHealHandler(

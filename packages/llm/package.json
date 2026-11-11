@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "@zaviya/shared": "workspace:*",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"

@@ -205,11 +205,11 @@ export async function createWorkerRuntime(
   )
 
   workers.push(
-    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage, embedQueue: queues.embed, minSources: env.TRIAGE_MIN_SOURCES }), {
+    new Worker('embed', async (job) => processEmbedJob(job.data, { router, payload, triageQueue: queues.triage, embedQueue: queues.embed, minSources: env.TRIAGE_MIN_SOURCES, matchThreshold: env.EMBED_MATCH_THRESHOLD }), {
       connection,
       concurrency: 2,
-      // Stay under the free Gemini embedding rate limit when a feed delivers hundreds of items at once
-      limiter: { max: env.CLOUDFLARE_AI_TOKEN ? 600 : 50, duration: 60_000 },
+      // Local model: CPU-bound (about 0.15 s a headline), so a feed that delivers hundreds of items at once cannot starve the box
+      limiter: { max: 300, duration: 60_000 },
     }),
   )
 

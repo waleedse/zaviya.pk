@@ -9,7 +9,7 @@ import {
   parseJson,
   requireBotOrAdmin,
 } from './helpers'
-import { refreshClusterStats, runClusterMatch } from './clusterMatch'
+import { refreshClusterStats, reembedCandidates, runClusterMatch, storeReembedded } from './clusterMatch'
 import { handlePipelineArticles } from './articles'
 import { phoneEndpoints } from './phones'
 import { applianceEndpoints } from './appliances'
@@ -214,6 +214,7 @@ const pipelineEndpoints: Endpoint[] = [
       const schema = z.object({
         sourceItemId: z.string(),
         embedding: z.array(z.number()).length(768),
+        model: z.string().min(1).max(200).optional(),
         windowHours: z.number().optional(),
         threshold: z.number().optional(),
       })
@@ -225,6 +226,38 @@ const pipelineEndpoints: Endpoint[] = [
       } catch (e) {
         return badRequest(e instanceof Error ? e.message : 'cluster-match failed')
       }
+    },
+  },
+  {
+    // Items of live clusters still embedded by another model, newest first (the worker re-embeds them after a model switch)
+    path: '/pipeline/reembed-candidates',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const q = req.query as Record<string, string | undefined>
+      const model = String(q.model ?? '')
+      if (!model) return badRequest('model required')
+      const hours = Math.min(168, Math.max(1, Number(q.hours ?? 72) || 72))
+      const limit = Math.min(500, Math.max(1, Number(q.limit ?? 100) || 100))
+      return json({ items: await reembedCandidates(req.payload, model, hours, limit) })
+    },
+  },
+  {
+    path: '/pipeline/reembed',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(
+        req,
+        z.object({
+          model: z.string().min(1).max(200),
+          items: z.array(z.object({ id: z.string(), embedding: z.array(z.number()).length(768) })).max(500),
+        }),
+      )
+      if ('error' in parsed) return parsed.error
+      return json({ stored: await storeReembedded(req.payload, parsed.data.model, parsed.data.items) })
     },
   },
   {

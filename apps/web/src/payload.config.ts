@@ -161,6 +161,10 @@ export default buildConfig({
         END $$
       `)
 
+      // Which embedding model made each vector: only same-model vectors are compared (cluster-match). Rows that
+      // predate the tag (NULL) came from Cloudflare bge; cluster-match reads NULL as that model (idempotent, additive, no migration).
+      await drizzle.execute(sql`ALTER TABLE source_items ADD COLUMN IF NOT EXISTS embedding_model text`)
+
       await drizzle.execute(sql`ALTER TYPE enum_sources_type ADD VALUE IF NOT EXISTS 'instagram'`)
       // ZAV-201: new category slugs are added to the select enum here (additive, idempotent), no migration
       await drizzle.execute(sql`ALTER TYPE enum_categories_slug ADD VALUE IF NOT EXISTS 'sports'`)

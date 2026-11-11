@@ -1,4 +1,4 @@
-import { CliProvider, WorkersAIProvider, WORKERS_AI_EMBED_MODEL, type LLMTask } from '@zaviya/llm'
+import { CliProvider, LocalEmbedProvider, LOCAL_EMBED_MODEL, type LLMTask } from '@zaviya/llm'
 import { z } from 'zod'
 
 /** Treat blank env vars as unset so optional `.url()` fields don't fail. */
@@ -83,11 +83,15 @@ const envSchema = z.object({
   /** The video service's media hub: the explainer pictures are claimed from it (needs MEDIA_AGENT_TOKEN, the same token the Mac agent uses) */
   MEDIA_AGENT_TOKEN: optionalStr,
   VIDEO_HUB_URL: z.string().default('http://video:8790'),
-  /** Cloudflare Workers AI (FLUX) for hero images: account id (same as R2) + API token */
+  /** Cloudflare Workers AI (FLUX) for hero images: account id (same as R2) + API token. Paid per image: only read when FLUX_IMAGES=true */
   CLOUDFLARE_ACCOUNT_ID: optionalStr,
   CLOUDFLARE_AI_TOKEN: optionalStr,
-  /** FLUX pictures on Workers AI (paid per image). Off: only Gemini makes hero and explainer images; embeddings stay on Workers AI */
-  FLUX_IMAGES: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
+  /** FLUX pictures on Workers AI (paid per image). Off by default: only Gemini makes hero and explainer images. Embeddings never use Workers AI (they run locally) */
+  FLUX_IMAGES: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? false : v === 'true' || v === '1'), z.boolean()).default(false),
+  /** Cosine similarity at which a new item joins an existing story cluster (tuned for the local embedding model) */
+  EMBED_MATCH_THRESHOLD: z.coerce.number().min(0.3).max(0.99).default(0.78),
+  /** Re-embed items of the last N hours that still carry vectors from another model (0 = off) */
+  EMBED_BACKFILL_HOURS: z.coerce.number().min(0).max(168).default(72),
   /** Gemini attempts before the FLUX fallback is used */
   GEMINI_IMAGE_TRIES_BEFORE_FALLBACK: z.coerce.number().min(1).default(3),
   HERO_IMAGE_MAX_TRIES: z.coerce.number().min(1).default(8),
@@ -175,8 +179,7 @@ export function fluxCreds(env: Pick<WorkerEnv, 'FLUX_IMAGES' | 'CLOUDFLARE_ACCOU
   return env.FLUX_IMAGES ? { accountId: env.CLOUDFLARE_ACCOUNT_ID, token: env.CLOUDFLARE_AI_TOKEN } : {}
 }
 
-/** Embeddings on Cloudflare Workers AI when its credentials are set (Gemini's free tier is 1,000/day). */
-export function embedder(env: WorkerEnv) {
-  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_AI_TOKEN) return undefined
-  return { provider: new WorkersAIProvider(env.CLOUDFLARE_ACCOUNT_ID, env.CLOUDFLARE_AI_TOKEN), model: WORKERS_AI_EMBED_MODEL }
+/** Embeddings run inside this process (free, multilingual ONNX model); no external service is called. */
+export function embedder(_env?: unknown) {
+  return { provider: new LocalEmbedProvider(), model: LOCAL_EMBED_MODEL }
 }

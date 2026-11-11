@@ -30,7 +30,7 @@ export interface LLMRouterOptions {
    * for writing). A resting or failing engine is skipped and the normal chain takes over.
    */
   subscriptionChain?: { provider: CliProvider; model: string; tasks: LLMTask[] }[]
-  /** Embeddings provider tried before the task's normal chain (e.g. Cloudflare Workers AI) */
+  /** Embeddings provider tried before the task's normal chain (the local ONNX model) */
   embedder?: { provider: LLMProvider; model: string }
 }
 
@@ -208,6 +208,11 @@ export class LLMRouter {
       }
       throw err
     }
+  }
+
+  /** Name of the embedding space new vectors live in; stored next to each vector so only like is compared with like. */
+  embedModelId(): string {
+    return this.embedder ? `${this.embedder.provider.id}:${this.embedder.model}` : 'router-default'
   }
 
   async embed(task: LLMTask, input: string[]): Promise<number[][]> {
