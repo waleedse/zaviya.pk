@@ -13,7 +13,7 @@ import { explainerRoutes } from './explainer/routes.js'
 import { runExplainerRound } from './explainer/run.js'
 import { flashKeys, flashSlot, pickFlash } from './flash.js'
 import { runEdition } from './job.js'
-import { MediaHub, redisHubStore, startMediaHubServer } from './media-hub.js'
+import { MediaHub, redisHubStore, startMediaHubServer, youtubeFileResolver } from './media-hub.js'
 import { pickTrendArticle, trendNames, TREND_SLOT_NAME } from './trend.js'
 import { X_TRENDS_KEY } from '../queues-keys.js'
 import { repeatFor, schedulerId, staleSchedulers } from './schedule.js'
@@ -73,6 +73,8 @@ async function main() {
     startMediaHubServer(hub, {
       port: cfg.mediaHubPort,
       token: cfg.mediaAgentToken,
+      // the MP4 for the Chrome extension's YouTube upload, behind a token that lives a few minutes
+      publicFiles: youtubeFileResolver(redis, cfg.dataDir),
       extra: explainerRoutes(explainer.store, Date.now, async (o) => void (await roundsQueue.add('explainer-round', o, { jobId: `manual-${Date.now()}` }))),
     })
   } else logger.info('media hub off: MEDIA_AGENT_TOKEN is not set')

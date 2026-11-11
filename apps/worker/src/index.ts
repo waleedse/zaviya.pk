@@ -17,6 +17,11 @@ import { createHealService } from './heal/service.js'
 import { smtpMailer } from './mail/transport.js'
 import { redisKv } from './mail/kv.js'
 import { WALEED } from './mail/auth.js'
+import { PayloadClient } from './payload-client.js'
+import { loadYoutubeConfig } from './youtube/config.js'
+import { createDebugHandler } from './youtube/debug.js'
+import { YtStore, type YtRedis } from './youtube/queue.js'
+import { startUploader } from './youtube/uploader.js'
 
 async function main() {
   const env = loadConfig()
@@ -66,6 +71,25 @@ async function main() {
     }),
   )
   const heartbeatTimer = startHeartbeat(runtime)
+  // YouTube: videos queued by the video service go up through the Chrome extension (YOUTUBE_SHORTS=0 switches it off)
+  const ytCfg = loadYoutubeConfig()
+  bridge.setDebugHandler(createDebugHandler({ dir: ytCfg.debugDir, telegramToken: env.TELEGRAM_BOT_TOKEN, chatId: env.TELEGRAM_ADMIN_CHAT_ID }))
+  const ytPayload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
+  const stopYoutube = env.BRIDGE_TOKEN
+    ? startUploader({
+        cfg: ytCfg,
+        store: new YtStore(runtime.redis as unknown as YtRedis),
+        bridge,
+        redis: runtime.redis as unknown as { set(key: string, value: string, mode: 'EX', seconds: number): Promise<unknown> },
+        payload: ytPayload,
+        anchorArticleId: async () => {
+          const r = await ytPayload.request<{ docs: { id: number | string }[] }>('GET', '/api/articles?limit=1&sort=-publishedAt&depth=0')
+          return String(r.docs[0]?.id ?? 1)
+        },
+        notify: (text) => telegram.notify(text),
+        now: () => Date.now(),
+      })
+    : () => undefined
   // Off unless MAIL_COMMANDS_ENABLED=true (and the ops@ login is set)
   const stopMailCommands = await startMailCommands(runtime).catch((e) => {
     logger.warn({ err: e }, 'mail commands failed to start')
@@ -81,6 +105,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'shutting down')
     clearInterval(heartbeatTimer)
+    stopYoutube()
     telegram.bot?.stop()
     await stopMailCommands?.()
     bridge.stop()

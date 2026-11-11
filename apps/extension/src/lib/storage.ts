@@ -1,4 +1,4 @@
-export type PlatformKey = 'x' | 'instagram' | 'facebook' | 'gemini'
+export type PlatformKey = 'x' | 'instagram' | 'facebook' | 'gemini' | 'youtube'
 
 export interface ExtensionSettings {
   bridgeUrl: string
@@ -14,7 +14,7 @@ export interface ExtensionSettings {
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   bridgeUrl: 'wss://zaviya.194-163-184-12.sslip.io/bridge',
   bridgeToken: 'zaviya-dev-bridge',
-  platforms: { x: true, instagram: true, facebook: true, gemini: true },
+  platforms: { x: true, instagram: true, facebook: true, gemini: true, youtube: true },
   actionDelayMinMs: 2_000,
   actionDelayMaxMs: 5_000,
   geminiSelectorsJson: '',

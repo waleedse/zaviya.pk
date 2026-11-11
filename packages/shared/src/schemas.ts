@@ -72,6 +72,26 @@ export const BridgeJobSchema = z.discriminatedUnion('type', [
   z.object({ id: z.string(), type: z.literal('x.search'), payload: z.object({ query: z.string(), limit: z.number().int().max(50).default(20) }) }),
   z.object({ id: z.string(), type: z.literal('x.trending'), payload: z.object({}).default({}) }),
   z.object({ id: z.string(), type: z.literal('instagram.readProfile'), payload: z.object({ username: z.string(), limit: z.number().int().max(24).default(9) }) }),
+  /**
+   * Upload one MP4 through YouTube Studio in the logged-in Chrome (no Data API: unverified API projects upload as private).
+   * The extension downloads `videoUrl` (a short-lived tokenised URL the media hub serves) and returns the video URL.
+   */
+  z.object({
+    id: z.string(),
+    type: z.literal('youtube.upload'),
+    payload: z.object({
+      videoUrl: z.string().url(),
+      title: z.string().min(1).max(100),
+      description: z.string().max(5000),
+      fileName: z.string().default('zaviya.mp4'),
+      /** known size in bytes, so a truncated download is caught */
+      sizeBytes: z.number().int().positive().optional(),
+      /** the channel's UC... id: the upload page of that channel is opened, so a second channel on the account is never used by mistake */
+      channelId: z.string().optional(),
+      /** "Altered or synthetic content" answer: yes for videos made from AI pictures */
+      syntheticMedia: z.boolean().default(false),
+    }),
+  }),
   /** Open a page in the reader tab (follows Google News redirects) and return its article text */
   z.object({ id: z.string(), type: z.literal('page.read'), payload: z.object({ url: z.string().url() }) }),
 ])
@@ -112,6 +132,23 @@ export const InstagramPostRefSchema = z.object({
 export type InstagramPostRef = z.infer<typeof InstagramPostRefSchema>
 export type BridgeJob = z.infer<typeof BridgeJobSchema>
 
+/** Result of a `youtube.upload` bridge job */
+export const YoutubeUploadResultSchema = z.object({
+  videoId: z.string(),
+  url: z.string(),
+  visibility: z.string().optional(),
+})
+export type YoutubeUploadResult = z.infer<typeof YoutubeUploadResultSchema>
+
+/** A failed job's evidence: what the page looked like (JPEG screenshot, base64) and a text summary of its dialogs and buttons */
+export const JobDebugSchema = z.object({
+  type: z.literal('job.debug'),
+  id: z.string(),
+  note: z.string().max(8000),
+  jpegBase64: z.string().max(4_000_000).optional(),
+})
+export type JobDebug = z.infer<typeof JobDebugSchema>
+
 export const BridgeMessageSchema = z.union([
   z.object({ type: z.literal('hello'), token: z.string(), version: z.string() }),
   z.object({ type: z.literal('heartbeat'), tabs: z.record(z.boolean()) }),
@@ -120,6 +157,7 @@ export const BridgeMessageSchema = z.union([
   /** Extension "eyes": a stuck job asks the worker what to do, then reports how it went */
   HealRequestSchema,
   HealReportSchema,
+  JobDebugSchema,
 ])
 export type BridgeMessage = z.infer<typeof BridgeMessageSchema>
 

@@ -50,6 +50,8 @@ const samples = [
     result: 'retry_ok',
   },
   { id: 'job_8', type: 'instagram.readProfile', payload: { username: 'geonews', limit: 6 } },
+  { id: 'job_9', type: 'youtube.upload', payload: { videoUrl: 'https://example.com/media/yt/abc.mp4', title: 'Petrol price in Pakistan today #Shorts', description: 'x', channelId: 'UCCzAybBVt3TIIgvBoSHJy8Q' } },
+  { type: 'job.debug', id: 'job_9', note: 'file_input_not_found', jpegBase64: 'AAAA' },
 ]
 
 let failed = false

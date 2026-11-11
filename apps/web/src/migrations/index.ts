@@ -7,6 +7,7 @@ import * as migration_20261103_192624_mobile_prices from './20261103_192624_mobi
 import * as migration_20261104_043222_results_vacations_closures from './20261104_043222_results_vacations_closures';
 import * as migration_20261105_064505_appliance_prices from './20261105_064505_appliance_prices';
 import * as migration_20261105_222249_price_engine from './20261105_222249_price_engine';
+import * as migration_20261111_201829_youtube_social_posts from './20261111_201829_youtube_social_posts';
 
 export const migrations = [
   {
@@ -52,6 +53,11 @@ export const migrations = [
   {
     up: migration_20261105_222249_price_engine.up,
     down: migration_20261105_222249_price_engine.down,
-    name: '20261105_222249_price_engine'
+    name: '20261105_222249_price_engine',
+  },
+  {
+    up: migration_20261111_201829_youtube_social_posts.up,
+    down: migration_20261111_201829_youtube_social_posts.down,
+    name: '20261111_201829_youtube_social_posts'
   },
 ];
