@@ -76,7 +76,11 @@ function categoryLabel(slug: string): string {
 }
 
 export function postCardHtml(input: PostCardInput, _template = chooseTemplate(input)): string {
-  const photo = input.photo ? `<img class="bg" src="${input.photo}" alt="">` : ''
+  // No photo: a branded backdrop and the headline centred, so the top half is not an empty black block
+  // (11 Nov: the PESCO card went out with 600px of plain black above the headline)
+  const photo = input.photo
+    ? `<img class="bg" src="${input.photo}" alt="">`
+    : `<div style="position:absolute;inset:0;background:radial-gradient(circle at 85% 18%,rgba(26,122,86,.55) 0,rgba(26,122,86,0) 46%),radial-gradient(circle at 10% 92%,rgba(245,197,24,.16) 0,rgba(245,197,24,0) 40%),linear-gradient(160deg,#141b2b 0%,#0b0f17 100%)"></div><div style="position:absolute;top:0;left:0;right:0;height:10px;background:#1a7a56"></div>`
   const time = escapeHtml(input.time ?? '')
   const cat = escapeHtml(categoryLabel(input.category).toUpperCase())
   // One look for every story (22 Oct: the NUMBERS and ticker looks were still going out and read as the old design)
@@ -88,13 +92,13 @@ export function postCardHtml(input: PostCardInput, _template = chooseTemplate(in
   const y = BRAND_YELLOW
   return page(
     `${photo}
-<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 20%,rgba(0,0,0,0) 38%,rgba(6,8,12,.78) 62%,rgba(6,8,12,.97) 100%)"></div>
+${input.photo ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,0) 20%,rgba(0,0,0,0) 38%,rgba(6,8,12,.78) 62%,rgba(6,8,12,.97) 100%)"></div>` : ''}
 <div style="position:absolute;top:52px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center">
   <div style="display:flex;align-items:flex-end;gap:12px">${MARK('#fff', y)}<div style="font-weight:800;font-size:44px;letter-spacing:-1px;line-height:.9">zaviya</div></div>
   <div class="mono" style="font-size:20px;background:rgba(0,0,0,.45);padding:8px 16px;border-radius:6px">${cat}${time ? ` · ${time}` : ''}</div>
 </div>
 ${input.breaking ? `<div class="mono" style="position:absolute;top:140px;left:60px;display:flex;align-items:center;gap:12px;font-size:26px;background:#E5231B;padding:10px 20px;border-radius:6px"><div style="width:16px;height:16px;border-radius:16px;background:#fff"></div>BREAKING</div>` : ''}
-<div style="position:absolute;left:56px;right:56px;bottom:64px;display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center">
+<div style="position:absolute;left:56px;right:56px;${input.photo ? 'bottom:64px' : 'top:190px;bottom:64px;justify-content:center'};display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center">
   <div class="en" style="font-size:${size}px;font-weight:800;line-height:1.14;letter-spacing:-0.025em;text-shadow:0 2px 24px rgba(0,0,0,.55)">${markHighlight(input.title, highlight)}</div>
   <div style="width:150px;height:6px;background:${y}"></div>
   ${input.headlineUr ? `<div class="ur" style="font-size:50px;line-height:1.8;text-align:center;color:rgba(255,255,255,.95)">${markHighlight(input.headlineUr, input.highlightUr, 'hl-ur')}</div>` : ''}
