@@ -195,3 +195,16 @@ export const PriceDemandItemSchema = z.object({
 })
 export type PriceDemandItem = z.infer<typeof PriceDemandItemSchema>
 export const PriceDemandBodySchema = z.object({ items: z.array(PriceDemandItemSchema).min(1).max(200) })
+
+// ---------- history backfill from an official archive (PBS weekly releases) ----------
+
+export const PriceHistoryPointSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(140),
+  /** When the official source collected or published the price */
+  date: z.string().datetime(),
+  pricePkr: z.number().positive().max(MAX_ITEM_PRICE_PKR),
+  /** The release page the price was read from */
+  sourceUrl: url,
+})
+export type PriceHistoryPoint = z.infer<typeof PriceHistoryPointSchema>
+export const PriceHistoryBodySchema = z.object({ points: z.array(PriceHistoryPointSchema).min(1).max(1000) })

@@ -86,3 +86,10 @@ seo agent, daily
 2. Solar: check the brands' own product pages for schema.org prices. If they have them, add a generic "sitemap plus schema.org Product" adapter, which also covers many other brand sites.
 3. City pages for groceries ("atta price in Lahore today"), once the item pages are indexed and show impressions.
 4. DRAP medicine prices, and NEPRA/OGRA tariffs.
+
+## Search, charts and history (12 Nov 2026)
+
+- **Price search**: the box on `/prices`, the home page and the header search dialog (`components/appliances/PriceSearch.tsx`). It calls `GET /api/prices/search?q=` (not a page, `/api/` is disallowed in robots, nothing is linked, so no thin pages). Matching is in `lib/appliances/search.ts`: English, Roman Urdu (anda, cheeni, atta, gari, murghi) and Urdu script, item aliases, typo tolerance, closest categories when nothing matches. A search with no match is logged by `POST /api/prices/search` into `price-demand` (origin `site-search`, priority 30, +2 per repeat); the research agent and coverage endpoint pick it up.
+- **History**: stored rows are price changes (plus one row per PBS weekly release). Between rows the price carries forward and the last point is the last check (`priceUpdatedAt`), so every chart grows daily without a row per item per day (`lib/appliances/series.ts`). Less than a week of history and no change: "Tracking since <date>" instead of a chart.
+- **PBS backfill**: `runPbsBackfill` (worker, runs after the daily `appliance-prices`) reads the weekly SPI releases pbs.gov.pk still lists in its post sitemap (16 weeks, 30 Oct 2025 to 5 Nov 2026; PBS keeps no others online), asks `GET /api/pipeline/appliances/history-days` which weeks are already stored, and posts the rest to `POST /api/pipeline/appliances/history` (`source_url` = the release page). Idempotent; never changes the current price. Manual run: `tsx src/appliances/cli.ts backfill`.
+- **Charts**: Recharts (`components/appliances/PriceCharts.tsx`): step line with min/max, range buttons, per-city bars. Hub: today's movers (`lib/appliances/movers.ts`), grocery basket by city, popular items, categories.

@@ -104,3 +104,35 @@ export function mergeAppliance(existing: StoredAppliance | null, item: Appliance
   }
   return { data, created: !existing, change, skipped }
 }
+
+export interface HistoryPoint {
+  date: string
+  pricePkr: number
+  sourceUrl?: string | null
+}
+
+const DAY_MS = 86_400_000
+
+/**
+ * Backfill from an official archive (PBS weekly releases): adds points that are not stored yet, never changes the
+ * current price. A point is skipped when its calendar day is already recorded, or when a recorded point within
+ * 3 days carries the same price (the daily refresh recorded that same release a day or two later).
+ */
+export function mergeHistoryPoints(existing: HistoryPoint[] | null | undefined, points: HistoryPoint[]): { history: HistoryPoint[]; added: number } {
+  const history = [...(existing ?? [])]
+  let added = 0
+  for (const p of points) {
+    const t = Date.parse(p.date)
+    if (!Number.isFinite(t) || !(p.pricePkr > 0)) continue
+    const day = new Date(t).toISOString().slice(0, 10)
+    const dup = history.some((h) => {
+      const ht = Date.parse(h.date)
+      return new Date(ht).toISOString().slice(0, 10) === day || (Math.abs(ht - t) <= 3 * DAY_MS && h.pricePkr === p.pricePkr)
+    })
+    if (dup) continue
+    history.push({ date: new Date(t).toISOString(), pricePkr: p.pricePkr, sourceUrl: p.sourceUrl ?? null })
+    added++
+  }
+  history.sort((a, b) => a.date.localeCompare(b.date))
+  return { history, added }
+}

@@ -463,3 +463,67 @@ export async function fetchHyundai(ctx: AdapterCtx): Promise<ApplianceImportInpu
   if (!items.length) throw new Error('hyundai price list not found in page')
   return items
 }
+
+// ---------- PBS history: the weekly releases pbs.gov.pk still publishes ----------
+
+export interface PbsRelease {
+  url: string
+  /** week-ended date, "2026-11-05" */
+  date: string
+}
+
+/** Every "Weekly SPI for the week ended on D-M-YYYY" page named in a PBS sitemap (the site keeps only some weeks online) */
+export function pbsReleasesFromSitemap(xml: string): PbsRelease[] {
+  const out = new Map<string, PbsRelease>()
+  for (const m of xml.matchAll(/<loc>(https:\/\/www\.pbs\.gov\.pk\/weekly-sensitive-price-indicator-spi-for-the-week-ended-on-(\d{1,2})-(\d{1,2})-(\d{4})\/)<\/loc>/g)) {
+    const date = `${m[4]}-${m[3]!.padStart(2, '0')}-${m[2]!.padStart(2, '0')}`
+    out.set(date, { url: m[1]!, date })
+  }
+  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+export interface PbsHistoryPoint {
+  slug: string
+  date: string
+  pricePkr: number
+  sourceUrl: string
+}
+
+/** One release's national average per item (the same figure the live price uses), dated with the day PBS collected it */
+export function spiHistoryPoints(release: SpiRelease, releaseUrl: string, fallbackDate: string): PbsHistoryPoint[] {
+  const day = release.date ?? fallbackDate
+  const out: PbsHistoryPoint[] = []
+  for (const it of release.items) {
+    const def = SPI_ITEMS[it.no]
+    if (!def || it.cities.length < 3) continue
+    const avg = nationalAverage(it.cities)
+    if (avg) out.push({ slug: def.slug, date: `${day}T00:00:00.000Z`, pricePkr: avg, sourceUrl: releaseUrl })
+  }
+  return out
+}
+
+const DAY_MS = 86_400_000
+/** Releases whose week is not already within 3 days of a recorded day */
+export function missingReleases(releases: PbsRelease[], recordedDays: string[]): PbsRelease[] {
+  const have = recordedDays.map((d) => Date.parse(d)).filter(Number.isFinite)
+  return releases.filter((r) => !have.some((t) => Math.abs(t - Date.parse(r.date)) <= 3 * DAY_MS))
+}
+
+export async function fetchPbsHistory(ctx: AdapterCtx, recordedDays: string[], max = 20, fetchBuffer = politeFetchBuffer): Promise<PbsHistoryPoint[]> {
+  const sitemap = await ctx.fetchText('https://www.pbs.gov.pk/post-sitemap.xml')
+  if (!sitemap) throw new Error('PBS sitemap unavailable')
+  const todo = missingReleases(pbsReleasesFromSitemap(sitemap), recordedDays).slice(-max)
+  const out: PbsHistoryPoint[] = []
+  for (const rel of todo) {
+    try {
+      const page = await ctx.fetchText(rel.url)
+      const annex = page && /href="([^"]+Annex[^"]*\.xlsx)"/i.exec(page)?.[1]
+      const buf = annex ? await fetchBuffer(annex) : null
+      if (!buf) continue
+      out.push(...spiHistoryPoints(parseSpiAnnex(xlsxRows(buf)), rel.url, rel.date))
+    } catch (e) {
+      ctx.log({ release: rel.url, err: String(e) }, 'PBS history release failed')
+    }
+  }
+  return out
+}

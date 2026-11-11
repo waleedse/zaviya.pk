@@ -3,6 +3,8 @@ import { ApplianceHubView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
 import { getPhones } from '@/lib/phones/queries'
 import { categorySummaries, hubFaqs, monthYear, trendingItems } from '@/lib/appliances/logic'
+import { cityBaskets } from '@/lib/appliances/basket'
+import { topMovers } from '@/lib/appliances/movers'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
@@ -25,9 +27,9 @@ export default async function PricesHub({ params }: { params: Promise<{ locale: 
   const [all, phones] = await Promise.all([getAppliances(), getPhones()])
   const phonePrices = phones.map((p) => p.pricePkr).filter((n): n is number => typeof n === 'number' && n > 0)
   const phoneSummary = { count: phones.length, minPrice: phonePrices.length ? Math.min(...phonePrices) : null, brands: [...new Set(phones.map((p) => p.brand.name))] }
-  const weekAgo = Date.now() - 7 * 86_400_000
-  const latest = all
-    .filter((a) => a.pricePkr && a.priceHistory.length > 1 && Date.parse(a.priceHistory[0]!.date) > weekAgo)
-    .slice(0, 10)
-  return <ApplianceHubView summaries={categorySummaries(all)} latest={latest} trending={trendingItems(all, 10)} faqs={hubFaqs(all.length)} phones={phoneSummary} />
+  const pbs = all.filter((a) => a.brand.kind === 'source' && a.cityPrices.length)
+  const popular = trendingItems(all, 10)
+  const fallback = [...all].filter((a) => a.pricePkr).sort((a, b) => b.popularity - a.popularity).slice(0, 10)
+  const basketUpdated = pbs.map((a) => a.priceUpdatedAt).filter(Boolean).sort().at(-1)
+  return <ApplianceHubView summaries={categorySummaries(all)} movers={topMovers(all, 5)} baskets={cityBaskets(pbs)} basketUpdated={basketUpdated} trending={popular.length >= 4 ? popular : fallback} faqs={hubFaqs(all.length)} phones={phoneSummary} />
 }
