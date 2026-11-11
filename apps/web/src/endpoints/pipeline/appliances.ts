@@ -1,8 +1,8 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
-import { APPLIANCE_BRANDS, APPLIANCE_CATEGORIES, ApplianceImportBodySchema, PriceDemandBodySchema, applianceSlug } from '@zaviya/shared'
+import { APPLIANCE_BRANDS, APPLIANCE_CATEGORIES, ApplianceImportBodySchema, PriceDemandBodySchema, PriceHistoryBodySchema, applianceSlug } from '@zaviya/shared'
 import { json, parseJson, requireBotOrAdmin } from './helpers'
-import { mergeAppliance, type AppliancePriceChange, type StoredAppliance } from '../../lib/appliances/importer'
+import { mergeAppliance, mergeHistoryPoints, type AppliancePriceChange, type StoredAppliance } from '../../lib/appliances/importer'
 import { hotScores, matchSearch, type DemandItem } from '../../lib/appliances/demand'
 import { revalidateAppliancePages } from '../../lib/revalidate'
 import { indexNowBatcher } from '../../hooks/indexNow'
@@ -104,6 +104,52 @@ export const applianceEndpoints: Endpoint[] = [
       }
       req.payload.logger.info({ created, updated, changes: changes.length, skipped: skipped.length, indexNow: announce.size }, 'appliances import')
       return json({ created, updated, changes, skipped, announced: announce.size })
+    },
+  },
+  {
+    // Days already recorded in one item's history: the worker asks before it re-reads old PBS releases
+    path: '/pipeline/appliances/history-days',
+    method: 'get',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const slug = new URL(req.url ?? 'http://x').searchParams.get('slug') ?? ''
+      const found = await req.payload.find({ collection: 'appliances', where: { slug: { equals: slug } }, limit: 1, depth: 0, overrideAccess: true })
+      const doc = found.docs[0] as unknown as { priceHistory?: { date: string }[] } | undefined
+      return json({ slug, days: (doc?.priceHistory ?? []).map((h) => String(h.date).slice(0, 10)).sort() })
+    },
+  },
+  {
+    // Backfill of price history from an official archive (PBS weekly releases, source_url per point).
+    // Adds missing points only: never changes the current price, never removes a point. Idempotent.
+    path: '/pipeline/appliances/history',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, PriceHistoryBodySchema)
+      if ('error' in parsed) return parsed.error
+      const bySlug = new Map<string, typeof parsed.data.points>()
+      for (const p of parsed.data.points) bySlug.set(p.slug, [...(bySlug.get(p.slug) ?? []), p])
+      let added = 0
+      let items = 0
+      const unknown: string[] = []
+      for (const [slug, points] of bySlug) {
+        const found = await req.payload.find({ collection: 'appliances', where: { slug: { equals: slug } }, limit: 1, depth: 0, overrideAccess: true })
+        if (!found.docs[0]) {
+          unknown.push(slug)
+          continue
+        }
+        const stored = docToStored(found.docs[0] as unknown as Record<string, any>)
+        const merged = mergeHistoryPoints(stored.priceHistory, points.map((p) => ({ date: p.date, pricePkr: p.pricePkr, sourceUrl: p.sourceUrl })))
+        if (!merged.added) continue
+        await req.payload.update({ collection: 'appliances', id: found.docs[0].id, data: { priceHistory: merged.history } as never, overrideAccess: true, context: { skipRevalidate: true } })
+        added += merged.added
+        items++
+      }
+      if (added) await revalidateAppliancePages()
+      req.payload.logger.info({ added, items, unknown: unknown.length }, 'appliances history backfill')
+      return json({ added, items, unknown })
     },
   },
   {

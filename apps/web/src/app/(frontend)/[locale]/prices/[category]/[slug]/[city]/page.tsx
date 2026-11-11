@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Plug } from 'lucide-react'
 import { formatPkr } from '@zaviya/shared'
+import { CityBarChart } from '@/components/appliances/PriceCharts'
+import { WhatsAppShare } from '@/components/appliances/PriceParts'
 import { FAQAccordion } from '@/components/article/FAQAccordion'
 import { PageHero } from '@/components/layout/PageHero'
 import { JsonLd } from '@/components/seo/JsonLd'
@@ -111,6 +113,19 @@ export default async function CityRatePage({ params }: Params) {
             </Link>
             .
           </p>
+        </section>
+        <section aria-labelledby="city-chart" className="card-surface p-4 md:p-5">
+          <h2 id="city-chart" className="font-display text-xl font-bold">
+            {name}: {place} against other cities
+          </h2>
+          <p className="mb-3 mt-1 text-sm text-fg-muted">Average market price this week, cheapest city first. {place} is highlighted.</p>
+          <CityBarChart rows={a.cityPrices} highlight={place} />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <WhatsAppShare a={{ name: `${name} in ${place}`, pricePkr: v.row.avg, unit: a.unit, brand: a.brand }} path={cityHref(a, place)} />
+            <Link href={applianceHref(a)} className="inline-flex h-11 items-center rounded-xl border border-border px-4 font-semibold hover:border-accent hover:text-accent">
+              Price history
+            </Link>
+          </div>
         </section>
         <section aria-labelledby="other-cities">
           <h2 id="other-cities" className="font-display text-xl font-bold">

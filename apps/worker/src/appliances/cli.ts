@@ -1,11 +1,12 @@
 // Appliance prices CLI (run from apps/worker):
 //   tsx src/appliances/cli.ts collect [--brand=nasgas,samsung] [--out=appliances.json]   read the brand stores and print a summary
+//   tsx src/appliances/cli.ts backfill                                                  PBS weekly history from the releases still on pbs.gov.pk
 //   tsx src/appliances/cli.ts import  [--brand=...]                                      read and send to PAYLOAD_URL (needs PAYLOAD_API_KEY)
 import { writeFileSync } from 'node:fs'
 import { loadConfig } from '../config.js'
 import { PayloadClient } from '../payload-client.js'
 import { makeCtx } from '../phones/catalog.js'
-import { collectAppliances, runAppliancePrices } from './collect.js'
+import { collectAppliances, runAppliancePrices, runPbsBackfill } from './collect.js'
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3)
 const only = arg('brand')?.split(',')
@@ -32,7 +33,13 @@ async function main() {
     console.log(JSON.stringify(await runAppliancePrices((m, p, b, o) => payload.request(m, p, b, o), only), null, 2))
     return
   }
-  console.error('usage: collect | import')
+  if (cmd === 'backfill') {
+    const env = loadConfig()
+    const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
+    console.log(JSON.stringify(await runPbsBackfill((m, p, b, o) => payload.request(m, p, b, o), 60), null, 2))
+    return
+  }
+  console.error('usage: collect | import | backfill')
   process.exit(2)
 }
 

@@ -4,7 +4,7 @@ import { makeCtx } from '../phones/catalog.js'
 import { decodeEntities, pageTitle } from '../phones/highlights.js'
 import { parseSamsungPdp } from '../phones/samsung.js'
 import type { AdapterCtx } from '../phones/types.js'
-import { WOO_STORES, fetchHyundai, fetchPbsSpi, fetchToyota, fetchWoo } from './sources.js'
+import { WOO_STORES, fetchHyundai, fetchPbsHistory, fetchPbsSpi, fetchToyota, fetchWoo } from './sources.js'
 
 /**
  * Home appliance prices (zaviya.pk/prices), added 5 Nov 2026.
@@ -265,5 +265,29 @@ export async function runAppliancePrices(request: Request, only?: string[]) {
   } catch (e) {
     logger.warn({ err: String(e) }, 'price hot scores failed')
   }
-  return { items: items.length, created, updated, changes: changes.length, failed, dropped: dropped.length, hot }
+  let history: unknown = null
+  try {
+    history = await runPbsBackfill(request)
+  } catch (e) {
+    logger.warn({ err: String(e) }, 'PBS history backfill failed')
+  }
+  return { items: items.length, created, updated, changes: changes.length, failed, dropped: dropped.length, hot, history }
+}
+
+/**
+ * PBS weekly history (12 Nov 2026): the releases pbs.gov.pk still has online, one point per item per week with the
+ * release page as source. Idempotent: the server says which days atta already has, only missing releases are read,
+ * and the import skips days and prices already recorded. A normal day finds nothing to do.
+ */
+export async function runPbsBackfill(request: Request, max = 20) {
+  const ctx = makeCtx({ log: (obj, msg) => logger.warn(obj, msg), concurrency: 2 })
+  const { days } = await request<{ days: string[] }>('GET', '/api/pipeline/appliances/history-days?slug=atta-20kg-price')
+  const points = await fetchPbsHistory(ctx, days, max)
+  let added = 0
+  for (let i = 0; i < points.length; i += 500) {
+    const res = await request<{ added: number }>('POST', '/api/pipeline/appliances/history', { points: points.slice(i, i + 500) }, { timeoutMs: 180_000 })
+    added += res.added
+  }
+  logger.info({ points: points.length, added }, 'PBS price history backfill')
+  return { points: points.length, added }
 }

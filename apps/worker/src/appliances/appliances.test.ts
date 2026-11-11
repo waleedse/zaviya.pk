@@ -61,3 +61,31 @@ describe('collect', () => {
     expect(r.failed.map((f) => f.brand).sort()).toEqual(['anex', 'gfc', 'honda', 'hyundai', 'nasgas', 'pbs', 'samsung', 'toyota'])
   })
 })
+
+describe('PBS history backfill', () => {
+  const xml = [
+    '<loc>https://www.pbs.gov.pk/weekly-sensitive-price-indicator-spi-for-the-week-ended-on-05-11-2026/</loc>',
+    '<loc>https://www.pbs.gov.pk/weekly-sensitive-price-indicator-spi-for-the-week-ended-on-4-06-2026/</loc>',
+    '<loc>https://www.pbs.gov.pk/some-other-post/</loc>',
+  ].join('')
+  it('lists the weekly releases, oldest first, with padded dates', async () => {
+    const { pbsReleasesFromSitemap } = await import('./sources.js')
+    expect(pbsReleasesFromSitemap(xml).map((r) => r.date)).toEqual(['2026-06-04', '2026-11-05'])
+  })
+  it('reads only releases whose week is not recorded yet', async () => {
+    const { pbsReleasesFromSitemap, missingReleases } = await import('./sources.js')
+    const rel = pbsReleasesFromSitemap(xml)
+    expect(missingReleases(rel, ['2026-11-06']).map((r) => r.date)).toEqual(['2026-06-04'])
+    expect(missingReleases(rel, ['2026-06-04', '2026-11-05'])).toEqual([])
+  })
+  it('turns a release into one national-average point per listed item, sourced to the release page', async () => {
+    const { spiHistoryPoints } = await import('./sources.js')
+    const city = (name: string, avg: number) => ({ city: name, avg, min: avg - 10, max: avg + 10 })
+    const points = spiHistoryPoints(
+      { date: '2026-06-04', items: [{ no: 1, description: 'Wheat Flour', unit: '20 Kg', cities: [city('Lahore', 2000), city('Karachi', 2200), city('Quetta', 2400)] }, { no: 99, description: 'Unlisted', unit: '', cities: [] }] },
+      'https://www.pbs.gov.pk/x/',
+      '2026-06-05',
+    )
+    expect(points).toEqual([{ slug: 'atta-20kg-price', date: '2026-06-04T00:00:00.000Z', pricePkr: 2200, sourceUrl: 'https://www.pbs.gov.pk/x/' }])
+  })
+})

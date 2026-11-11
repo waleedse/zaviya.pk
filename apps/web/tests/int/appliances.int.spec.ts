@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// the search box uses the app router; static rendering has none
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }), notFound: () => {} }))
 import { classifyAppliance } from '@zaviya/shared'
 import { mergeAppliance, sensibleListPrice } from '@/lib/appliances/importer'
 import { applianceIndexable, compareKey, comparePairs, findComparePair, similarAppliances, sortByPrice, categorySummaries, discountText, type ApplianceView } from '@/lib/appliances/logic'
@@ -139,7 +142,7 @@ describe('appliance views render', () => {
     const b = view('nasgas-b', 8500, { brand: { slug: 'nasgas', name: 'Nasgas', kind: 'store' } })
     const all = [a, b]
     const summaries = categorySummaries(all)
-    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, latest: [a], trending: [a], faqs: hubFaqs(2), phones: { count: 66, minPrice: 20000, brands: ['Samsung'] } }))
+    const hub = renderToStaticMarkup(h(V.ApplianceHubView, { summaries, movers: { up: [], down: [], windowDays: 14 }, baskets: [], trending: [a], faqs: hubFaqs(2), phones: { count: 66, minPrice: 20000, brands: ['Samsung'] } }))
     expect(hub).toContain('Prices in Pakistan today')
     expect(hub).toContain('href="/mobile-prices"')
     expect(hub).toContain('href="/petrol-price-today-pakistan"')

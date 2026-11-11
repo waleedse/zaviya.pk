@@ -1,10 +1,16 @@
 import Link from 'next/link'
-import { ExternalLink, Plug } from 'lucide-react'
+import { ArrowRight, ExternalLink, Plug } from 'lucide-react'
 import { PRICE_GROUPS, formatPkr, type FAQ, type PriceGroupSlug } from '@zaviya/shared'
 import { FAQAccordion } from '@/components/article/FAQAccordion'
 import { PageHero } from '@/components/layout/PageHero'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { hostOf } from '@/components/phones/PhoneParts'
+import { PriceSearch } from '@/components/appliances/PriceSearch'
+import { ChangeBadge, MoverRow, PriceTrendSection, WhatsAppShare, seriesOf } from '@/components/appliances/PriceParts'
+import { CityBarChart } from '@/components/appliances/PriceCharts'
+import type { CityBasket } from '@/lib/appliances/basket'
+import type { Mover } from '@/lib/appliances/movers'
+import { buildSeries, changeOver } from '@/lib/appliances/series'
 import { absoluteUrl, breadcrumbJsonLd, faqJsonLd } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import {
@@ -70,6 +76,26 @@ function productJsonLd(a: ApplianceView) {
           },
         }
       : {}),
+  }
+}
+
+/** Dataset markup for an official statistic with a real history: who publishes it, the period, what is measured */
+function datasetJsonLd(a: ApplianceView) {
+  if (a.brand.kind !== 'source') return null
+  const series = buildSeries(a.priceHistory, a.pricePkr, a.priceUpdatedAt).filter((p) => p.real)
+  if (series.length < 3) return null
+  const day = (t: number) => new Date(t).toISOString().slice(0, 10)
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: `${a.name}: average price in Pakistan, ${series.length} recorded points`,
+    description: `Average price of ${a.name.toLowerCase()} in Pakistan (PKR) from the Pakistan Bureau of Statistics weekly Sensitive Price Indicator, ${day(series[0]!.t)} to ${day(series.at(-1)!.t)}.`,
+    url: absoluteUrl(applianceHref(a)),
+    creator: { '@type': 'Organization', name: 'Pakistan Bureau of Statistics', url: 'https://www.pbs.gov.pk/' },
+    isBasedOn: a.officialUrl,
+    temporalCoverage: `${day(series[0]!.t)}/${day(series.at(-1)!.t)}`,
+    spatialCoverage: { '@type': 'Country', name: 'Pakistan' },
+    variableMeasured: { '@type': 'PropertyValue', name: 'Average price', unitText: 'PKR' },
   }
 }
 
@@ -237,22 +263,24 @@ function CategoryCards({ summaries }: { summaries: CategorySummary[] }) {
 
 export function ApplianceHubView({
   summaries,
-  latest,
+  movers,
+  baskets,
   trending,
   faqs,
   phones,
+  basketUpdated,
 }: {
   summaries: CategorySummary[]
-  latest: ApplianceView[]
+  movers: { up: Mover[]; down: Mover[]; windowDays: number }
+  baskets: CityBasket[]
   trending: ApplianceView[]
   faqs: FAQ[]
   phones: PhonesSummary
+  basketUpdated?: string
 }) {
-  const crumbs = [{ label: 'Home', href: '/' }, { label: 'Prices' }]
   const count = (g: PriceGroupSlug) => summaries.filter((s) => s.category.group === g).reduce((n, s) => n + s.count, 0)
   const groups = PRICE_GROUPS.filter((g) => count(g.slug) > 0)
-  const appliances = groups.find((g) => g.slug === 'appliances')
-  const others = groups.filter((g) => g.slug !== 'appliances')
+  const total = summaries.reduce((n, s) => n + s.count, 0)
   const groupSection = (g: (typeof PRICE_GROUPS)[number]) => (
     <section key={g.slug} aria-labelledby={`g-${g.slug}`}>
       <h2 id={`g-${g.slug}`} className="font-display text-xl font-bold">
@@ -261,30 +289,138 @@ export function ApplianceHubView({
       <CategoryCards summaries={summaries.filter((s) => s.category.group === g.slug)} />
     </section>
   )
+  const lo = baskets[0]
+  const hi = baskets.at(-1)
+  const maxTotal = hi?.total ?? 1
+  const basketRows = baskets.length > 9 ? [...baskets.slice(0, 5), ...baskets.slice(-3)] : baskets
+  const hasMovers = movers.up.length + movers.down.length > 0
   return (
     <div className="pb-10">
       <JsonLd data={[breadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: 'Prices', url: PRICES_HUB }]), ...(faqs.length ? [faqJsonLd(faqs)] : [])]} />
-      <PageHero
-        title="Prices in Pakistan today"
-        description="One place for official prices: atta, sugar, ghee, milk, eggs and LPG in 17 cities, Honda bikes and Toyota and Hyundai cars, mobile phones, home appliances from the brands' own stores, and today's petrol, gold, dollar and chicken rates."
-        icon={Plug}
-        color={COLOR}
-        eyebrow="Prices"
-        crumbs={crumbs}
-        stats={[
-          { label: 'Groceries', value: count('groceries') },
-          { label: 'Bikes & cars', value: count('vehicles') },
-          { label: 'Phones', value: phones.count },
-          { label: 'Appliances', value: count('appliances') },
-        ]}
-      />
-      <div className="container-wide mt-8 space-y-8">
+      <section className="border-b border-border py-8 md:py-12" style={{ background: `color-mix(in oklab, ${COLOR} 8%, var(--bg))` }}>
+        <div className="container-wide max-w-[860px]">
+          <nav aria-label="Breadcrumb" className="mb-4 text-sm text-fg-muted">
+            <Link href="/" className="hover:text-accent">Home</Link> › <span className="text-fg">Prices</span>
+          </nav>
+          <h1 className="font-display text-[clamp(2rem,1.4rem+2.4vw,3.2rem)] font-extrabold leading-[1.05]">Prices in Pakistan today: search any price</h1>
+          <p className="mt-2 text-fg-muted md:text-lg">
+            Atta, eggs, sugar, bikes, cars, fridges, ACs and {total ? `${total.toLocaleString('en-US')} items` : 'hundreds of items'} from official sources, with price history.{' '}
+            <span lang="ur">کوئی بھی قیمت تلاش کریں</span>
+          </p>
+          <PriceSearch className="mt-5" variant="hero" />
+        </div>
+      </section>
+      <div className="container-wide mt-8 space-y-10">
         <CategoryChips summaries={summaries} />
+
+        {hasMovers ? (
+          <section aria-labelledby="movers">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 id="movers" className="font-display text-xl font-bold md:text-2xl">Today&apos;s price movers</h2>
+              <p className="text-sm text-fg-muted">Biggest recorded changes in the last {movers.windowDays} days</p>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {([['Going up', movers.up], ['Coming down', movers.down]] as const).map(([title, list]) => (
+                <div key={title} className="card-surface min-w-0 p-2 md:p-3">
+                  <h3 className="px-3 pb-1 pt-2 text-sm font-bold uppercase tracking-wider text-fg-subtle">{title}</h3>
+                  {list.length ? (
+                    <ul>
+                      {list.map((m) => (
+                        <MoverRow key={m.item.slug} href={m.href} name={m.name} sub={m.item.unit} from={m.move.from} to={m.move.to} pct={m.move.pct} when={m.move.t} />
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="px-3 pb-3 text-sm text-fg-muted">No recorded changes in this direction.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {lo && hi ? (
+          <section aria-labelledby="basket" className="card-surface p-4 md:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="basket" className="font-display text-xl font-bold md:text-2xl">Monthly grocery basket by city</h2>
+                <p className="mt-1 text-sm text-fg-muted">
+                  The same family basket costs {formatPkr(lo.total)} in {lo.city} and {formatPkr(hi.total)} in {hi.city}: {formatPkr(hi.total - lo.total)} a month apart.
+                </p>
+              </div>
+              <Link href="/prices/cheapest-city" className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline">
+                All {baskets.length} cities <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+            <ul className="mt-4 space-y-2" aria-label="Basket cost by city, cheapest first">
+              {basketRows.map((b, i) => (
+                <li key={b.city} className="contents">
+                  <div className="grid grid-cols-[84px_1fr_auto] items-center gap-3 text-sm">
+                    <span className="truncate font-medium">{b.city}</span>
+                    <span className="h-3.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                      <span
+                        className="block h-full rounded-full"
+                        style={{ width: `${Math.max(8, Math.round((b.total / maxTotal) * 100))}%`, background: b === lo ? 'var(--up)' : b === hi ? 'var(--down)' : 'color-mix(in oklab, var(--accent) 50%, var(--surface-2))' }}
+                      />
+                    </span>
+                    <span className="font-semibold tabular-nums">{formatPkr(b.total)}</span>
+                  </div>
+                  {baskets.length > 9 && i === 4 ? <p className="py-0.5 text-center text-xs text-fg-subtle">{baskets.length - 8} more cities in between</p> : null}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-fg-subtle">
+              Official PBS weekly prices (city averages){basketUpdated ? `, checked ${dateText(basketUpdated)}` : ''}: 2 bags atta, sugar, ghee, 30 litres milk, eggs, chicken, rice, daal, vegetables, tea and an LPG cylinder.
+            </p>
+          </section>
+        ) : null}
+
+        {trending.length ? (
+          <section aria-labelledby="trending">
+            <h2 id="trending" className="font-display text-xl font-bold md:text-2xl">Popular prices</h2>
+            <p className="mt-1 text-sm text-fg-muted">What people in Pakistan are checking most this week.</p>
+            <div className="mt-4">
+              <ApplianceGrid items={trending} />
+            </div>
+          </section>
+        ) : null}
+
+        <div className="space-y-8">
+          {groups.map(groupSection)}
+          <section aria-labelledby="mobiles">
+            <h2 id="mobiles" className="font-display text-xl font-bold">
+              Mobile phones <span className="text-fg-subtle" lang="ur">(موبائل)</span>
+            </h2>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <li>
+                <Link href="/mobile-prices" className="card-lift flex h-full flex-col p-4">
+                  <span className="font-display text-lg font-bold">Mobile prices in Pakistan</span>
+                  <span className="mt-1 text-sm text-fg-muted">
+                    {phones.count} phones · {phones.brands.join(', ')}
+                  </span>
+                  {phones.minPrice ? <span className="mt-2 font-semibold tabular-nums">From {formatPkr(phones.minPrice)}</span> : null}
+                </Link>
+              </li>
+              <li>
+                <Link href="/mobile-prices/new-phones" className="card-lift flex h-full flex-col p-4">
+                  <span className="font-display font-bold">New phones</span>
+                  <span className="mt-1 text-sm text-fg-muted">Latest launches with official prices</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/mobile-prices/upcoming" className="card-lift flex h-full flex-col p-4">
+                  <span className="font-display font-bold">Upcoming phones</span>
+                  <span className="mt-1 text-sm text-fg-muted">Announced for Pakistan, coming soon</span>
+                </Link>
+              </li>
+            </ul>
+          </section>
+        </div>
+
         <section aria-labelledby="rates">
           <h2 id="rates" className="font-display text-xl font-bold">
             Daily rates
           </h2>
-          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {RATE_LINKS.map((r) => (
               <li key={r.href}>
                 <Link href={r.href} className="card-lift flex h-full flex-col p-4">
@@ -297,59 +433,6 @@ export function ApplianceHubView({
             ))}
           </ul>
         </section>
-        {trending.length ? (
-          <section aria-labelledby="trending">
-            <h2 id="trending" className="font-display text-xl font-bold">
-              Trending prices
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">What people in Pakistan are checking most this week.</p>
-            <div className="mt-4">
-              <ApplianceGrid items={trending} />
-            </div>
-          </section>
-        ) : null}
-        {others.map(groupSection)}
-        <section aria-labelledby="mobiles">
-          <h2 id="mobiles" className="font-display text-xl font-bold">
-            Mobile phones
-          </h2>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <li className="sm:col-span-2">
-              <Link href="/mobile-prices" className="card-lift flex h-full flex-col p-4">
-                <span className="font-display text-lg font-bold">
-                  Mobile prices in Pakistan <span className="text-fg-subtle" lang="ur">(موبائل)</span>
-                </span>
-                <span className="mt-1 text-sm text-fg-muted">
-                  {phones.count} phones · {phones.brands.join(', ')}
-                </span>
-                {phones.minPrice ? <span className="mt-2 font-semibold tabular-nums">From {formatPkr(phones.minPrice)}</span> : null}
-              </Link>
-            </li>
-            <li>
-              <Link href="/mobile-prices/new-phones" className="card-lift flex h-full flex-col p-4">
-                <span className="font-display font-bold">New phones</span>
-                <span className="mt-1 text-sm text-fg-muted">Latest launches with official prices</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/mobile-prices/upcoming" className="card-lift flex h-full flex-col p-4">
-                <span className="font-display font-bold">Upcoming phones</span>
-                <span className="mt-1 text-sm text-fg-muted">Announced for Pakistan, coming soon</span>
-              </Link>
-            </li>
-          </ul>
-        </section>
-        {appliances ? groupSection(appliances) : null}
-        {latest.length ? (
-          <section aria-labelledby="latest">
-            <h2 id="latest" className="font-display text-xl font-bold">
-              Price changes this week
-            </h2>
-            <div className="mt-4">
-              <ApplianceGrid items={latest} />
-            </div>
-          </section>
-        ) : null}
         <ApplianceSourcingNote />
         <FAQAccordion faqs={faqs} locale="en" />
       </div>
@@ -468,6 +551,11 @@ function CityPricesTable({ a }: { a: ApplianceView }) {
         {a.name} price in Lahore, Karachi, Islamabad and other cities
       </h2>
       <p className="mt-1 text-sm text-fg-muted">This week&apos;s market prices{a.unit ? ` for ${a.unit}` : ''}, cheapest city first.</p>
+      {rows.length >= 3 ? (
+        <div className="mt-3">
+          <CityBarChart rows={rows} />
+        </div>
+      ) : null}
       <table className="mt-3 w-full min-w-[420px] border-collapse text-start text-sm">
         <thead>
           <tr className="border-b border-border text-fg-muted">
@@ -497,8 +585,12 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
   const grocery = a.brand.kind === 'source'
   const maker = a.brand.kind === 'maker'
   const ld = productJsonLd(a)
+  const dataset = datasetJsonLd(a)
   const off = discountText(a)
   const bulk = grocery ? bulkPrice(a) : null
+  const series = seriesOf(a)
+  const week = changeOver(series, 7)
+  const month = changeOver(series, 30)
   const crumbs = [
     { label: 'Home', href: '/' },
     { label: 'Prices', href: PRICES_HUB },
@@ -516,107 +608,124 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
             { name: full, url: applianceHref(a) },
           ]),
           ...(ld ? [ld] : []),
+          ...(dataset ? [dataset] : []),
           ...(faqs.length ? [faqJsonLd(faqs)] : []),
         ]}
       />
-      <PageHero
-        title={itemH1(a)}
-        description={applianceSummary(a)}
-        icon={Plug}
-        color={COLOR}
-        eyebrow={grocery ? `${a.category.name}${a.nameUr ? ` · ${a.nameUr}` : ''}` : `${a.brand.name} ${a.category.singular}`}
-        crumbs={crumbs}
-      />
-      <div className="container-wide mt-8 grid gap-8 lg:grid-cols-[320px_1fr]">
-        <aside className="space-y-4">
-          <div className="card-surface flex items-center justify-center p-6">
-            <ApplianceImage a={a} size={240} priority />
-          </div>
-          <div className="card-surface space-y-3 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-              {grocery ? 'Average price in Pakistan this week' : maker ? 'Ex-factory price' : 'Price in Pakistan'}
-            </p>
-            <p className="font-display text-3xl font-extrabold tabular-nums" data-testid="price">
-              {priceText(a)}
-            </p>
-            {a.listPricePkr && off ? <p className="text-sm text-fg-muted">Was {formatPkr(a.listPricePkr)}. {off}.</p> : null}
-            {a.unit ? <p className="text-sm font-medium">{a.unit}</p> : null}
-            {bulk ? (
-              <p className="text-sm" data-testid="bulk-price">
-                <span className="font-semibold">{bulk.kg} kg: about {formatPkr(bulk.pkr)}</span>
-                <span className="text-fg-muted"> at the retail rate per kg × {bulk.kg}; wholesale bags usually cost less</span>
-              </p>
-            ) : null}
-            <p className="text-sm text-fg-muted">
-              {a.priceUpdatedAt ? `From ${sourceText(a)}, checked ${dateText(a.priceUpdatedAt)}` : 'We update this page when the source shows a price.'}
-              {a.inStock === false && a.brand.kind === 'store' ? ' · Out of stock right now' : ''}
-            </p>
-            <OfficialLink a={a} className="w-full" />
-            <p className="text-xs text-fg-subtle">Opens {hostOf(a.officialUrl)}. Zaviya does not sell anything or earn from this link.</p>
-          </div>
-        </aside>
-        <div className="min-w-0 space-y-8">
-          {a.cityPrices.length ? <CityPricesTable a={a} /> : null}
-          {a.specs.length ? (
-            <section aria-labelledby="specs">
-              <h2 id="specs" className="font-display text-xl font-bold">
-                {grocery ? `${a.name}: survey details` : `${full} specifications`}
-              </h2>
-              <dl className="mt-3 divide-y divide-border rounded-2xl border border-border">
-                {a.model ? (
-                  <div className="grid grid-cols-[40%_1fr] gap-3 p-3 text-sm">
-                    <dt className="text-fg-muted">Model</dt>
-                    <dd className="font-medium">{a.model}</dd>
-                  </div>
-                ) : null}
-                {a.specs.map((s) => (
-                  <div key={s.label} className="grid grid-cols-[40%_1fr] gap-3 p-3 text-sm">
-                    <dt className="text-fg-muted">{s.label}</dt>
-                    <dd className="font-medium">{s.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ) : null}
-          <section aria-labelledby="history">
-            <h2 id="history" className="font-display text-xl font-bold">
-              Price history
-            </h2>
-            {a.priceHistory.length ? (
-              <ul className="mt-3 space-y-1 text-sm">
-                {a.priceHistory.slice(0, 15).map((r, i) => (
-                  <li key={`${r.date}-${i}`} className="flex justify-between border-b border-border py-1.5">
-                    <span>{dateText(r.date)}</span>
-                    <span className="font-semibold tabular-nums">{formatPkr(r.pricePkr)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-fg-muted">No price change recorded yet. We check the source {grocery ? 'every week' : 'every day'}.</p>
-            )}
-          </section>
-          {similar.length ? (
-            <section aria-labelledby="similar">
-              <h2 id="similar" className="font-display text-xl font-bold">
-                {grocery ? `More ${a.category.name.toLowerCase()} prices` : `Similar ${a.category.name.toLowerCase()} at a similar price`}
-              </h2>
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {similar.slice(0, 4).map((x) => (
-                  <li key={x.slug}>
-                    <Link href={compareHref(a.slug, x.slug)} className="chip">
-                      Compare with {fullName(x)}
+      <section className="border-b border-border py-5 md:py-8" style={{ background: `color-mix(in oklab, ${COLOR} 6%, var(--bg))` }}>
+        <div className="container-wide max-w-[960px]">
+          <nav aria-label="Breadcrumb" className="mb-3 text-sm text-fg-muted">
+            <ol className="flex flex-wrap items-center gap-1">
+              {crumbs.map((c, i) => (
+                <li key={i} className="flex items-center gap-1">
+                  {i > 0 ? <span aria-hidden>›</span> : null}
+                  {c.href ? (
+                    <Link href={c.href} className="hover:text-accent">
+                      {c.label}
                     </Link>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4">
-                <ApplianceGrid items={similar} />
+                  ) : (
+                    <span className="text-fg">{c.label}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </nav>
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow" style={{ color: COLOR }}>
+                {grocery ? `${a.category.name}${a.nameUr ? ` · ${a.nameUr}` : ''}` : `${a.brand.name} ${a.category.singular}`}
+              </p>
+              <h1 className="mt-1 font-display text-[clamp(1.5rem,1.2rem+1.4vw,2.3rem)] font-extrabold leading-tight">{itemH1(a)}</h1>
+            </div>
+            {a.imageUrl ? <ApplianceImage a={a} size={96} priority className="shrink-0 md:hidden" /> : null}
+          </div>
+          <div className="mt-4 grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">{grocery ? 'Average price in Pakistan this week' : maker ? 'Ex-factory price' : 'Price in Pakistan'}</p>
+              <p className="font-display text-[clamp(2.4rem,1.8rem+3vw,3.6rem)] font-extrabold leading-none tabular-nums" data-testid="price">
+                {priceText(a)}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <ChangeBadge change={week} label="this week" />
+                <ChangeBadge change={!week || week.abs === 0 ? month : null} label="this month" />
+                {a.unit ? <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold">{a.unit}</span> : null}
               </div>
-            </section>
-          ) : null}
-          <ApplianceSourcingNote group={a.category.group} />
-          <FAQAccordion faqs={faqs} locale="en" />
+              {a.listPricePkr && off ? <p className="mt-2 text-sm text-fg-muted">Was {formatPkr(a.listPricePkr)}. {off}.</p> : null}
+              {bulk ? (
+                <p className="mt-2 text-sm" data-testid="bulk-price">
+                  <span className="font-semibold">{bulk.kg} kg: about {formatPkr(bulk.pkr)}</span>
+                  <span className="text-fg-muted"> at the retail rate per kg × {bulk.kg}; wholesale bags usually cost less</span>
+                </p>
+              ) : null}
+              <p className="mt-2 text-sm text-fg-muted">
+                {a.priceUpdatedAt ? `From ${sourceText(a)}. Last checked ${dateText(a.priceUpdatedAt)}.` : 'We update this page when the source shows a price.'}
+                {a.inStock === false && a.brand.kind === 'store' ? ' Out of stock right now.' : ''}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 md:w-[300px]">
+              <OfficialLink a={a} className="w-full" />
+              <WhatsAppShare a={a} path={applianceHref(a)} className="w-full" />
+              <p className="text-xs text-fg-subtle">Opens {hostOf(a.officialUrl)}. Zaviya does not sell anything or earn from this link.</p>
+            </div>
+          </div>
         </div>
+      </section>
+      <div className="container-wide mt-6 max-w-[960px] space-y-6">
+        <PriceTrendSection a={a} />
+        {a.cityPrices.length ? <CityPricesTable a={a} /> : null}
+        {a.specs.length ? (
+          <section aria-labelledby="specs">
+            <h2 id="specs" className="font-display text-xl font-bold">
+              {grocery ? `${a.name}: survey details` : `${full} specifications`}
+            </h2>
+            <dl className="mt-3 divide-y divide-border rounded-2xl border border-border bg-surface">
+              {a.model ? (
+                <div className="grid grid-cols-[40%_1fr] gap-3 p-3 text-sm">
+                  <dt className="text-fg-muted">Model</dt>
+                  <dd className="font-medium">{a.model}</dd>
+                </div>
+              ) : null}
+              {a.specs.map((s) => (
+                <div key={s.label} className="grid grid-cols-[40%_1fr] gap-3 p-3 text-sm">
+                  <dt className="text-fg-muted">{s.label}</dt>
+                  <dd className="font-medium">{s.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
+        <section aria-labelledby="source" className="card-surface p-4 text-sm md:p-5">
+          <h2 id="source" className="font-display text-lg font-bold">
+            Source and last check
+          </h2>
+          <p className="mt-2 text-fg-muted">
+            {sourceText(a)}.{a.priceUpdatedAt ? ` We last read this price on ${dateText(a.priceUpdatedAt)}${grocery ? ' (PBS publishes weekly, usually on Fridays)' : ' and check it every day'}.` : ''}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <OfficialLink a={a} />
+          </div>
+        </section>
+        {similar.length ? (
+          <section aria-labelledby="similar">
+            <h2 id="similar" className="font-display text-xl font-bold">
+              {grocery ? `More ${a.category.name.toLowerCase()} prices` : `Similar ${a.category.name.toLowerCase()} at a similar price`}
+            </h2>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {similar.slice(0, 4).map((x) => (
+                <li key={x.slug}>
+                  <Link href={compareHref(a.slug, x.slug)} className="chip">
+                    Compare with {fullName(x)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4">
+              <ApplianceGrid items={similar} />
+            </div>
+          </section>
+        ) : null}
+        <ApplianceSourcingNote group={a.category.group} />
+        <FAQAccordion faqs={faqs} locale="en" />
       </div>
     </div>
   )

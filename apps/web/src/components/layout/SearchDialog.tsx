@@ -2,13 +2,13 @@
 
 import { Search, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Locale } from '@zaviya/shared'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { t, localePath } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { QUICK_TOOLS } from '@/components/home/tools'
+import { PriceSearch } from '@/components/appliances/PriceSearch'
 
 export interface SearchSuggestion {
   label: string
@@ -28,14 +28,6 @@ export function SearchDialog({
   const isUr = locale === 'ur'
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
-  const router = useRouter()
-
-  const submit = useCallback(() => {
-    const query = q.trim()
-    if (!query) return
-    router.push(`${localePath(locale, '/search')}?q=${encodeURIComponent(query)}`)
-    setOpen(false)
-  }, [q, router, locale])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -48,7 +40,7 @@ export function SearchDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const placeholder = isUr ? 'خبریں، بچوں کے نام، نماز کے اوقات، سونے کا ریٹ…' : 'Search news, baby names, namaz timings, gold rate…'
+  const placeholder = isUr ? 'کوئی بھی قیمت تلاش کریں: آٹا، انڈے، ہونڈا 70…' : 'Search any price: atta, eggs, honda 70, fridge…'
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -74,22 +66,8 @@ export function SearchDialog({
       </DialogTrigger>
       <DialogContent className="max-w-2xl gap-0 p-0">
         <DialogTitle className="sr-only">{d.search}</DialogTitle>
-        <div className="flex items-center gap-3 border-b border-border ps-5 pe-12">
-          <Search className="h-5 w-5 shrink-0 text-fg-muted" aria-hidden />
-          <label className="sr-only" htmlFor="search-dialog">
-            {d.search}
-          </label>
-          <input
-            id="search-dialog"
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-            placeholder={placeholder}
-            className="h-16 w-full bg-transparent text-lg outline-none"
-          />
-        </div>
-        <div className="space-y-5 p-5">
+        <PriceSearch locale={locale} variant="dialog" inline autoFocus newsHref={localePath(locale, '/search')} onNavigate={() => setOpen(false)} onQueryChange={setQ} />
+        <div className={cn('space-y-5 p-5', q.trim().length >= 2 && 'hidden')}>
           {suggestions.length > 0 && (
             <div>
               <p className="eyebrow mb-3 text-fg-subtle">{isUr ? 'ٹرینڈنگ' : 'Trending now'}</p>
