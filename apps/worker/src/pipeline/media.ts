@@ -248,6 +248,7 @@ export async function processMediaJob(
       categoryColor: accent,
       locale: 'en',
       photo,
+      photoCredit: real?.credit,
       breaking,
     })
     // No Urdu card: Satori cannot shape Nastaliq (letters come out reversed and broken)

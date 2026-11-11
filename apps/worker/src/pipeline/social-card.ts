@@ -21,6 +21,8 @@ export interface SocialCardRenderInput {
   photo?: string | null
   /** Adds a red BREAKING tag */
   breaking?: boolean
+  /** Credit line of the real photo ("Photo: author / licence / Wikimedia Commons"); photo cards only ever carry real photos */
+  photoCredit?: string | null
 }
 
 export interface RenderedSocialCard {
@@ -176,7 +178,7 @@ function buildPhotoCard(input: SocialCardRenderInput & { photo: string }, size: 
           'div',
           { display: 'flex', width: textW, flexDirection: row, justifyContent: 'space-between', alignItems: 'center', fontSize: og ? 20 : 26, fontFamily: font, color: '#d6dae1' },
           el('div', { display: 'flex', fontWeight: 700 }, isUr ? 'مکمل خبر: zaviya.pk' : 'Full story at zaviya.pk'),
-          el('div', { display: 'flex', fontSize: og ? 14 : 16, color: BRAND.fgMuted }, isUr ? 'تصویر: AI' : 'AI image'),
+          ...(input.photoCredit ? [el('div', { display: 'flex', fontSize: og ? 14 : 16, color: BRAND.fgMuted }, truncateForCard(input.photoCredit, og ? 48 : 56))] : []),
         ),
       ),
     ),
