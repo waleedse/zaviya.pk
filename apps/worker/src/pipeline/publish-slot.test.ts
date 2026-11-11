@@ -87,3 +87,47 @@ describe('publish slot', () => {
     expect(redis.store.size).toBe(0)
   })
 })
+
+describe('stale social cards', () => {
+  const setup = () => {
+    const payload = {
+      getCluster: vi.fn(async () => ({ items: [], triage: { category: 'pakistan' } })),
+      getSettings: vi.fn(async () => ({ articlesPublishedToday: 0, lastPublishedAt: null, minIntervalMin: 0, dailyCaps: { articles: 100 } })),
+      postArticle: vi.fn(async () => ({ id: '7' })),
+      patchCluster: vi.fn(async () => ({})),
+      request: vi.fn(async () => ({ docs: [] })),
+    }
+    const socialQueue = { add: vi.fn(async () => ({})) }
+    const rerenderCards = vi.fn(async () => ['https://x/new-post.png'])
+    return { payload, socialQueue, rerenderCards }
+  }
+  const urls = (q: { add: ReturnType<typeof vi.fn> }) => q.add.mock.calls.map((c) => (c[1] as { mediaUrls: string[] }).mediaUrls)
+
+  it('remakes cards made before the current card version', async () => {
+    const { payload, socialQueue, rerenderCards } = setup()
+    await processPublishJob(
+      { clusterId: '1', write: write as never, qaScore: 1, priority: 'breaking', socialMediaUrls: ['https://x/old-post.png'] },
+      { payload: payload as never, socialQueue: socialQueue as never, rerenderCards },
+    )
+    expect(rerenderCards).toHaveBeenCalledOnce()
+    expect(urls(socialQueue)).toEqual([['https://x/new-post.png'], ['https://x/new-post.png'], ['https://x/new-post.png']])
+  })
+
+  it('keeps current cards, and keeps old cards when the remake fails', async () => {
+    const a = setup()
+    await processPublishJob(
+      { clusterId: '1', write: write as never, qaScore: 1, priority: 'breaking', socialMediaUrls: ['https://x/cur.png'], cardVersion: 99 },
+      { payload: a.payload as never, socialQueue: a.socialQueue as never, rerenderCards: a.rerenderCards },
+    )
+    expect(a.rerenderCards).not.toHaveBeenCalled()
+    expect(urls(a.socialQueue)[0]).toEqual(['https://x/cur.png'])
+
+    const b = setup()
+    b.rerenderCards.mockRejectedValueOnce(new Error('chromium down'))
+    await processPublishJob(
+      { clusterId: '1', write: write as never, qaScore: 1, priority: 'breaking', socialMediaUrls: ['https://x/old.png'] },
+      { payload: b.payload as never, socialQueue: b.socialQueue as never, rerenderCards: b.rerenderCards },
+    )
+    expect(urls(b.socialQueue)[0]).toEqual(['https://x/old.png'])
+  })
+})
