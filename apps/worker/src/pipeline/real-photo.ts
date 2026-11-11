@@ -236,8 +236,16 @@ export function buildMeta(subject: string, c: Candidate): PhotoMeta {
  */
 export function isCommonTopic(subject: string): boolean {
   const words = subject.trim().split(/\s+/)
-  return words.length >= 2 && words.slice(1).every((w) => /^[a-z]/.test(w))
+  if (words.length >= 2 && words.slice(1).every((w) => /^[a-z]/.test(w))) return true
+  // Title-cased tags made of everyday words ("First Test", "Second ODI", "Final Day") name no one; Commons files
+  // for them can be anything ("Smile's first test X-ray image"), so they need a Pakistan file too.
+  return words.length >= 2 && words.every((w) => GENERIC_WORDS.has(w.toLowerCase().replace(/[^a-z0-9-]/g, '')))
 }
+
+const GENERIC_WORDS = new Set([
+  'first', 'second', 'third', 'fourth', 'fifth', '1st', '2nd', '3rd', '4th', '5th', 'final', 'opening', 'last', 'next', 'semi-final', 'semifinal',
+  'test', 'tests', 'odi', 'odis', 't20', 't20i', 'match', 'series', 'day', 'innings', 'round', 'session', 'meeting', 'phase', 'stage', 'leg', 'quarter',
+])
 
 const PK_FILE = /pakistan|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|sialkot|gujranwala|sindh|khyber|balochistan|gilgit|azad kashmir|\bpso\b/i
 

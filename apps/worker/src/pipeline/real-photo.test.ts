@@ -192,6 +192,11 @@ describe('common-noun topics need a Pakistani photo', () => {
     expect(isCommonTopic('Supreme Court of Pakistan')).toBe(false)
     expect(isCommonTopic('Gaddafi Stadium')).toBe(false)
     expect(isCommonTopic('Islamabad')).toBe(false)
+    expect(isCommonTopic('First Test')).toBe(true)
+    expect(isCommonTopic('Second ODI')).toBe(true)
+    expect(isCommonTopic('Sri Lanka Cricket')).toBe(false)
+    expect(localEnough('First Test', 'Smile’s first test X-ray image shows Cassiopeia A ESA529158.png')).toBe(false)
+    expect(localEnough('First Test', 'Pakistan vs Sri Lanka first Test Rawalpindi.jpg')).toBe(true)
   })
   it('rejects a foreign shot of a common topic and keeps named subjects anywhere', () => {
     expect(localEnough('Petrol prices', 'Annangrove Petrol Prices.jpg')).toBe(false)
