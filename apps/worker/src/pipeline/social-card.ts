@@ -348,7 +348,8 @@ function buildCardTree(input: SocialCardRenderInput, size: (typeof SOCIAL_CARD_S
             color: BRAND.gold,
             fontFamily: 'Inter',
           },
-          isUr ? 'AI سے تیار کردہ گرافک' : 'AI-generated graphic',
+          // A text card is our own design, not AI imagery: no AI label
+          isUr ? 'مکمل خبر: zaviya.pk' : 'Full story at zaviya.pk',
         ),
         el(
           'div',
