@@ -44,6 +44,7 @@ export const PK_CITIES: PkCity[] = [
   { slug: 'bahawalpur', en: 'Bahawalpur', ur: 'بہاولپور', lat: 29.3956, lng: 71.6836 },
   { slug: 'sukkur', en: 'Sukkur', ur: 'سکھر', lat: 27.7052, lng: 68.8574 },
   { slug: 'abbottabad', en: 'Abbottabad', ur: 'ایبٹ آباد', lat: 34.1688, lng: 73.2215 },
+  { slug: 'murree', en: 'Murree', ur: 'مری', lat: 33.907, lng: 73.3943 },
   { slug: 'mardan', en: 'Mardan', ur: 'مردان', lat: 34.1986, lng: 72.0404 },
   { slug: 'muzaffarabad', en: 'Muzaffarabad', ur: 'مظفرآباد', lat: 34.37, lng: 73.4711 },
   { slug: 'gilgit', en: 'Gilgit', ur: 'گلگت', lat: 35.9208, lng: 74.3089 },
