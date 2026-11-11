@@ -4,6 +4,7 @@ import type { Locale, RateTick } from '@zaviya/shared'
 import { NextPrayerPill } from '@/components/namaz/NextPrayerPill'
 import { LanguageSwitch } from '@/components/layout/LanguageSwitch'
 import { formatNumber } from '@/lib/format'
+import { pkHijriDate } from '@/lib/islamic-calendar'
 import { localePath } from '@/lib/i18n'
 import { PK_CITIES, prayerTimes, pktNow } from '@/lib/prayer-times'
 
@@ -21,7 +22,7 @@ function dates(locale: Locale) {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(now)
+  }).format(pkHijriDate(now))
   return { greg, hijri }
 }
 

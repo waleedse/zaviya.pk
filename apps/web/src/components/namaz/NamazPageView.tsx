@@ -8,7 +8,7 @@ import { FAQAccordion } from '@/components/article/FAQAccordion'
 import { JsonLd } from '@/components/seo/JsonLd'
 import { breadcrumbJsonLd, faqJsonLd } from '@/lib/seo'
 import { localePath } from '@/lib/i18n'
-import { upcomingIslamicEvents } from '@/lib/islamic-calendar'
+import { pkHijriDate, upcomingIslamicEvents } from '@/lib/islamic-calendar'
 import { addDays, formatClock, PK_CITIES, pktNow, prayerTimes, qiblaBearing, type PkCity } from '@/lib/prayer-times'
 
 export function namazPath(city?: PkCity) {
@@ -44,7 +44,7 @@ export function NamazPageView({ locale, city }: { locale: Locale; city: PkCity }
     }
   })
   const greg = new Intl.DateTimeFormat(isUr ? 'ur-PK' : 'en-GB', { timeZone: 'Asia/Karachi', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
-  const hijri = new Intl.DateTimeFormat(isUr ? 'ur-PK-u-ca-islamic-umalqura' : 'en-GB-u-ca-islamic-umalqura', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
+  const hijri = new Intl.DateTimeFormat(isUr ? 'ur-PK-u-ca-islamic-umalqura' : 'en-GB-u-ca-islamic-umalqura', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'long', year: 'numeric' }).format(pkHijriDate())
   const qibla = qiblaBearing(city)
   const events = upcomingIslamicEvents(now, 6)
   const cityName = isUr ? city.ur : city.en

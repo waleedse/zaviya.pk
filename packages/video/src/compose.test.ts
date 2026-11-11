@@ -161,7 +161,7 @@ describe('hook, outro, headlines', () => {
   it('morning and evening hook titles use the real count', () => {
     const m = compose(input(4), 'headlines30', TRACKS).scenes[0]
     expect(m?.kind === 'hook' && m.title).toEqual(['4 STORIES', 'TO KNOW TODAY'])
-    expect(m?.kind === 'hook' && m.dateLine).toBe('SAT 17 OCT · 6 JUMADA I')
+    expect(m?.kind === 'hook' && m.dateLine).toBe('SAT 17 OCT · 5 JUMADA I')
     const e = compose(input(5, RATES, { edition: 'evening' }), 'headlines30', TRACKS).scenes[0]
     expect(e?.kind === 'hook' && e.title).toEqual(['TODAY IN', '30 SECONDS'])
   })

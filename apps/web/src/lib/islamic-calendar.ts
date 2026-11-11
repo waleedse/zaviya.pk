@@ -17,6 +17,17 @@ const EVENTS: { month: number; day: number; en: string; ur: string }[] = [
   { month: 12, day: 10, en: 'Eid ul-Adha', ur: 'عید الاضحیٰ' },
 ]
 
+/**
+ * Pakistan usually starts each Hijri month one day after Umm al-Qura
+ * (Jumada II 1448: Umm al-Qura 11 Nov 2026, Pakistan 12 Nov).
+ */
+export const PK_HIJRI_OFFSET_DAYS = -1
+
+/** The date to feed an Umm al-Qura formatter so it shows the Pakistan Hijri date. */
+export function pkHijriDate(date: Date = new Date()): Date {
+  return new Date(date.getTime() + PK_HIJRI_OFFSET_DAYS * 86_400_000)
+}
+
 const hijriFmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { timeZone: 'UTC', day: 'numeric', month: 'numeric', year: 'numeric' })
 
 function hijriParts(date: Date) {
@@ -38,10 +49,10 @@ export function upcomingIslamicEvents(from: { y: number; m: number; d: number },
   const hijriLabel = new Intl.DateTimeFormat('en-GB-u-ca-islamic-umalqura', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
   for (let i = 1; i <= 400 && out.length < limit; i++) {
     const date = new Date(Date.UTC(from.y, from.m - 1, from.d + i))
-    const h = hijriParts(date)
+    const h = hijriParts(pkHijriDate(date))
     const ev = EVENTS.find((e) => e.month === h.month && e.day === h.day)
     if (ev) {
-      out.push({ en: ev.en, ur: ev.ur, date: date.toISOString().slice(0, 10), daysAway: i, hijri: hijriLabel.format(date) })
+      out.push({ en: ev.en, ur: ev.ur, date: date.toISOString().slice(0, 10), daysAway: i, hijri: hijriLabel.format(pkHijriDate(date)) })
     }
   }
   return out
