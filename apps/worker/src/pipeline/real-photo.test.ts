@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptable, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
+import { acceptable, isCommonTopic, localEnough, partOfLongerName, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
 
 describe('real photo subjects', () => {
@@ -166,5 +166,32 @@ describe('person-first photos', () => {
   it('treats a failed person check as "no people known"', async () => {
     const fetchFn = (async () => new Response('', { status: 500 })) as unknown as typeof fetch
     expect((await livingPeople(['Elon Musk'], fetchFn)).size).toBe(0)
+  })
+})
+
+describe('common-noun topics need a Pakistani photo', () => {
+  it('tells common topics from named subjects', () => {
+    expect(isCommonTopic('Petrol prices')).toBe(true)
+    expect(isCommonTopic('Traffic police')).toBe(true)
+    expect(isCommonTopic('Donald Trump')).toBe(false)
+    expect(isCommonTopic('Supreme Court of Pakistan')).toBe(false)
+    expect(isCommonTopic('Gaddafi Stadium')).toBe(false)
+    expect(isCommonTopic('Islamabad')).toBe(false)
+  })
+  it('rejects a foreign shot of a common topic and keeps named subjects anywhere', () => {
+    expect(localEnough('Petrol prices', 'Annangrove Petrol Prices.jpg')).toBe(false)
+    expect(localEnough('Traffic police', 'Kuala_Lumpur_Malaysia_Traffic-police-03.jpg')).toBe(false)
+    expect(localEnough('Traffic police', 'Lahore traffic police warden.jpg')).toBe(true)
+    expect(localEnough('Petrol prices', 'PSO petrol station Karachi.jpg')).toBe(true)
+    expect(localEnough('Donald Trump', 'Donald Trump swearing in ceremony.jpg')).toBe(true)
+  })
+})
+
+describe('file names that hold a longer name', () => {
+  it('rejects a different person whose name contains the subject', () => {
+    expect(partOfLongerName('Mufti Syed Shujaat Ali Qadir with.jpg', 'Shujaat Ali')).toBe(true)
+    expect(partOfLongerName('Donald Trump swearing in ceremony.jpg', 'Donald Trump')).toBe(false)
+    expect(partOfLongerName('President Donald Trump in 2025.jpg', 'Donald Trump')).toBe(false)
+    expect(partOfLongerName('Shehbaz_Sharif_2023.jpg', 'Shehbaz Sharif')).toBe(false)
   })
 })

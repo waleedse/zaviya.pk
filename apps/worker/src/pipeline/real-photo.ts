@@ -181,6 +181,25 @@ async function fileInfo(fileName: string, fetchFn: typeof fetch): Promise<ImageI
   return pages[0]?.imageinfo?.[0]
 }
 
+/** Capitalised words that can sit next to a name in a file title without being part of it. */
+const NAME_NEIGHBOURS = new Set(['in', 'at', 'on', 'of', 'the', 'and', 'with', 'during', 'speaking', 'meets', 'meeting', 'visit', 'visits', 'official', 'portrait', 'photo', 'president', 'prime', 'minister', 'pm', 'dr', 'mr', 'mrs', 'ms', 'sir', 'senator', 'governor', 'general', 'chief', 'justice', 'cropped', 'file', 'img', 'dsc'])
+
+/**
+ * Does the file title use the subject as part of a longer name? "Mufti Syed Shujaat Ali Qadir" is not "Shujaat Ali":
+ * a capitalised word right before or after the match (other than a title or a link word) means a different person.
+ */
+export function partOfLongerName(fileTitle: string, subject: string): boolean {
+  const t = fold(fileTitle.replace(/\.[a-z0-9]+$/i, '').replace(/[_]+/g, ' '))
+  const raw = fileTitle.replace(/\.[a-z0-9]+$/i, '').replace(/[_]+/g, ' ')
+  const s = fold(subject.trim())
+  const at = t.indexOf(s)
+  if (at < 0) return false
+  const before = raw.slice(0, at).trim().split(/[\s,()-]+/).filter(Boolean).pop() ?? ''
+  const after = raw.slice(at + s.length).trim().split(/[\s,()-]+/).filter(Boolean)[0] ?? ''
+  const isName = (w: string) => /^[A-Z][a-z]{1,}$/.test(w) && !NAME_NEIGHBOURS.has(w.toLowerCase())
+  return isName(before) || isName(after)
+}
+
 /** The article's lead image if it is a free Commons file of the right shape; else the best Commons file named after the subject. */
 async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<PhotoOpts>): Promise<Candidate | null> {
   const q = encodeURIComponent(subject)
@@ -195,7 +214,7 @@ async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<
   if (!isSpecific(subject)) return null
   const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${subject} filetype:bitmap`)}&${INFO}`))
     .map((p) => ({ title: (p.title ?? '').replace(/^File:/, ''), info: p.imageinfo?.[0], rank: p.index ?? 9 }))
-    .filter((f) => f.title.toLowerCase().includes(s) && acceptable(f.title, f.info, o, true))
+    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, subject) && acceptable(f.title, f.info, o, true))
   // Landscape first (they crop least), then search order
   files.sort((a, b) => Number(b.info!.width >= b.info!.height * 1.3) - Number(a.info!.width >= a.info!.height * 1.3) || a.rank - b.rank)
   const best = files[0]
@@ -210,6 +229,23 @@ export function buildMeta(subject: string, c: Candidate): PhotoMeta {
   return { subject, file: c.file, author, licence, creditLine, sourceUrl, width: c.info.width, height: c.info.height, mediaCredit: sourceUrl ? `${creditLine} | ${sourceUrl}` : creditLine }
 }
 
+/**
+ * A common-noun subject ("Petrol prices", "Traffic police") rather than a named person, place or body: every word after
+ * the first is lower case. Commons files for these come from anywhere (an Australian pump, Malaysian police), so such a
+ * photo is used only when its file name places it in Pakistan.
+ */
+export function isCommonTopic(subject: string): boolean {
+  const words = subject.trim().split(/\s+/)
+  return words.length >= 2 && words.slice(1).every((w) => /^[a-z]/.test(w))
+}
+
+const PK_FILE = /pakistan|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|sialkot|gujranwala|sindh|khyber|balochistan|gilgit|azad kashmir|\bpso\b/i
+
+/** A photo of a common-noun topic must be from Pakistan; named subjects are fine anywhere. */
+export function localEnough(subject: string, file: string): boolean {
+  return !isCommonTopic(subject) || PK_FILE.test(file)
+}
+
 /** Try each subject in turn; the first free-licence photo that downloads wins. */
 export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof fetch = fetch, opts: PhotoOpts = SOCIAL): Promise<RealPhoto | null> {
   const o = { ...SOCIAL, ...opts }
@@ -217,6 +253,10 @@ export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof f
     try {
       const hit = await candidateFor(subject, fetchFn, o)
       if (!hit) continue
+      if (!localEnough(subject, hit.file)) {
+        logger.info({ subject, file: hit.file }, 'real photo skipped: common topic, photo not from Pakistan')
+        continue
+      }
       const img = await fetchFn(hit.url, { headers: UA, signal: AbortSignal.timeout(30_000) })
       const type = (img.headers.get('content-type') ?? '').split(';')[0] ?? ''
       if (!img.ok || !/^image\/(jpeg|png)$/.test(type)) continue
