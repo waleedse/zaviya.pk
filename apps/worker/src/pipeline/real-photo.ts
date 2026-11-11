@@ -254,6 +254,17 @@ export function localEnough(subject: string, file: string): boolean {
   return !isCommonTopic(subject) || PK_FILE.test(file)
 }
 
+const WORSHIP_SITE = /mosque|masjid|shrine|darbar|dargah|mazar|imambargah|shareef|church|cathedral|temple|mandir|gurdwara|synagogue|\btomb\b/i
+
+/**
+ * A city's Wikipedia lead image is often a mosque or shrine (Kohat -> Ghamkol Shareef, Islamabad -> Faisal Mosque).
+ * On a police-killing or crime card that reads as a religious claim, so a place photo of a worship site is used only
+ * when the subject is that site itself.
+ */
+export function worshipSiteMismatch(subject: string, file: string): boolean {
+  return WORSHIP_SITE.test(file.replace(/_/g, ' ')) && !WORSHIP_SITE.test(subject)
+}
+
 /** Try each subject in turn; the first free-licence photo that downloads wins. */
 export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof fetch = fetch, opts: PhotoOpts = SOCIAL): Promise<RealPhoto | null> {
   const o = { ...SOCIAL, ...opts }
@@ -263,6 +274,10 @@ export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof f
       if (!hit) continue
       if (!localEnough(subject, hit.file)) {
         logger.info({ subject, file: hit.file }, 'real photo skipped: common topic, photo not from Pakistan')
+        continue
+      }
+      if (worshipSiteMismatch(subject, hit.file)) {
+        logger.info({ subject, file: hit.file }, 'real photo skipped: worship site for a place subject')
         continue
       }
       const img = await fetchFn(hit.url, { headers: UA, signal: AbortSignal.timeout(30_000) })
