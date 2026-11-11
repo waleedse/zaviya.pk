@@ -321,7 +321,13 @@ export async function findRealPhoto(title: string, tags: string[], fetchFn: type
   return named.length ? findPhotoForSubjects(named, fetchFn, PERSON_FALLBACK) : null
 }
 
-/** Article heroes: named entities, then topic fallbacks (US election -> the Capitol). */
+/**
+ * Article heroes: named entities, then topic fallbacks (US election -> the Capitol). People the headline names come first,
+ * so "Trump Nobel Peace Prize push by Shehbaz Sharif" shows Trump or Shehbaz, not a 1994 Nobel ceremony.
+ */
 export async function findHeroPhoto(input: { title: string; dek?: string; brief?: string; tags: string[] }, fetchFn: typeof fetch = fetch): Promise<RealPhoto | null> {
-  return findPhotoForSubjects(heroSubjects(input), fetchFn, HERO)
+  const subjects = heroSubjects(input)
+  const named = subjectsFor(input.title, input.tags, 4)
+  const people = named.length ? await livingPeople(named, fetchFn) : new Set<string>()
+  return findPhotoForSubjects(peopleFirst(subjects, people), fetchFn, HERO)
 }
