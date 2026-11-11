@@ -56,6 +56,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/sbp-policy-rate`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/income-tax-return-deadline-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/aqi-pakistan`, changeFrequency: 'hourly', priority: 0.9 })
+  entries.push({ url: `${siteUrl}/weather`, changeFrequency: 'hourly', priority: 0.9 })
+  for (const c of PK_CITIES) {
+    entries.push({ url: `${siteUrl}/weather/${c.slug}`, changeFrequency: 'hourly', priority: 0.8 })
+  }
   entries.push({ url: `${siteUrl}/riyal-dirham-rate-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push(...(await phoneSitemapEntries(siteUrl)))
   entries.push(...(await applianceSitemapEntries(siteUrl)))

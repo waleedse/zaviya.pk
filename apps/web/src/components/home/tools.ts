@@ -1,4 +1,4 @@
-import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, GraduationCap, MoonStar, Radio, Tag, Snowflake, type LucideIcon } from 'lucide-react'
+import { Baby, CalendarDays, Coins, Compass, DollarSign, Fuel, GraduationCap, MoonStar, Radio, Tag, Snowflake, CloudSun, type LucideIcon } from 'lucide-react'
 
 export interface ToolLink {
   path: string
@@ -24,6 +24,7 @@ export const TOOLS: ToolLink[] = [
   { path: '/prices', en: 'Prices', ur: 'قیمتیں', subEn: 'Mobiles, appliances & daily rates', subUr: 'موبائل، الیکٹرانکس اور روزانہ ریٹ', icon: Tag, tile: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
   { path: '/results', en: 'Board results', ur: 'بورڈ کے نتائج', subEn: 'BISE, FBISE, BSEK dates & links', subUr: 'بورڈز کی تاریخیں اور لنکس', icon: GraduationCap, tile: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
   { path: '/winter-vacations-2026-27', en: 'Winter vacations', ur: 'سردیوں کی چھٹیاں', subEn: 'Dates by province, school closures', subUr: 'صوبوں کی تاریخیں اور بندش', icon: Snowflake, tile: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
+  { path: '/weather', en: 'Weather tomorrow', ur: 'کل کا موسم', subEn: 'Rain, fog and temperature by city', subUr: 'شہر وار بارش، دھند اور درجہ حرارت', icon: CloudSun, tile: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
 ]
 
 export const QUICK_TOOLS = TOOLS.slice(0, 6)

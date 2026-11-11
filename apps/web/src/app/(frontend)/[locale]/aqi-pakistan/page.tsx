@@ -131,6 +131,11 @@ export default async function AqiPage({ params }: { params: Promise<{ locale: st
             </p>
           </section>
         )}
+        <p className="text-sm">
+          <Link href={localePath(locale, '/weather')} className="font-bold underline">
+            {isUr ? 'کل کا موسم: بارش، دھند اور درجہ حرارت' : 'Weather tomorrow: rain, fog and temperature'}
+          </Link>
+        </p>
         <FAQAccordion faqs={faqs} locale={locale} />
       </div>
     </div>
