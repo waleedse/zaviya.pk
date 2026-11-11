@@ -51,7 +51,7 @@ export function karachiNow(now: Date): { day: string; minutes: number; hourKey: 
   return { day: `${parts.year}-${parts.month}-${parts.day}`, minutes: hour * 60 + Number(parts.minute), hourKey: `${parts.year}${parts.month}${parts.day}${String(hour).padStart(2, '0')}`, weekday: parts.weekday! }
 }
 
-const FROM_NAME = 'Zaviya News'
+const FROM_NAME = 'Zaviya'
 const isUr = (r: Row) => r.locale === 'ur'
 const unsubscribeUrl = (site: string, r: Row) => `${site}/api/newsletter/unsubscribe?token=${encodeURIComponent(r.token)}${isUr(r) ? '&lang=ur' : ''}`
 

@@ -3,7 +3,7 @@ export const PREFERRED_SOURCE_URL = 'https://www.google.com/preferences/source?q
 
 export const PREFERRED_SOURCE_COPY = {
   en: {
-    title: 'Add Zaviya News as a preferred source on Google',
+    title: 'Add Zaviya as a preferred source on Google',
     cta: 'Add on Google',
     roman: 'Google par Zaviya ko apna pasandeeda source banayein.',
   },

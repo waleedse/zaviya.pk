@@ -20,7 +20,7 @@ export async function renderLatestPage(locale: Locale, pageNum: number) {
     <div className="pb-8">
       <PageHero
         title={isUr ? 'تازہ ترین خبریں' : 'Latest news'}
-        description={isUr ? 'زاویہ پر شائع ہونے والی تمام خبریں، نئی سے پرانی۔' : 'Every story on Zaviya News, newest first.'}
+        description={isUr ? 'زاویہ پر شائع ہونے والی تمام خبریں، نئی سے پرانی۔' : 'Every story on Zaviya, newest first.'}
         crumbs={[{ label: d.nav.home, href: localePath(locale, '/') }, { label: isUr ? 'تازہ ترین' : 'Latest' }]}
         icon={Newspaper}
         color="#0f766e"

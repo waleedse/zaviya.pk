@@ -15,7 +15,7 @@ describe('brand entity (ZAV-100)', () => {
   })
   it('serves an OpenSearch description pointing at the real search page and the WebSite SearchAction matches it (ZAV-181)', () => {
     const xml = openSearchXml()
-    expect(xml).toMatch(/<ShortName>Zaviya News<\/ShortName>/)
+    expect(xml).toMatch(/<ShortName>Zaviya<\/ShortName>/)
     const template = xml.match(/template="([^"]+)"/)![1]!
     expect(template).toMatch(/^https?:\/\/[^/]+\/search\?q=\{searchTerms\}$/)
     const action = (websiteJsonLd('en') as Record<string, any>).potentialAction
@@ -40,8 +40,8 @@ describe('brand entity (ZAV-100)', () => {
     expect(a['@type']).toBe('AboutPage')
     expect(a.url).toMatch(/\/about$/)
     expect(a.about['@id']).toBe(organizationId())
-    expect(a.about.name).toBe('Zaviya News')
-    expect(a.about.alternateName).toEqual(['Zaviya', 'Zaviya.pk'])
+    expect(a.about.name).toBe('Zaviya')
+    expect(a.about.alternateName).toEqual(['Zaviya.pk', 'Zaviya PK', 'زاویہ', 'Zaviya News'])
   })
   it('lists the official profiles from SOCIAL_PROFILE_URLS as sameAs, https only', () => {
     const prev = process.env.SOCIAL_PROFILE_URLS

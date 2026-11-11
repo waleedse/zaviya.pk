@@ -43,7 +43,7 @@ export function baseRobots(): Metadata['robots'] {
 /** Longest <title> that still shows whole in search results; the brand is added only when it fits */
 export const TITLE_MAX = 65
 
-/** "Headline | Zaviya News" when it fits in 65 characters; otherwise the headline alone (never shortened) */
+/** "Headline | Zaviya" when it fits in 65 characters; otherwise the headline alone (never shortened) */
 export function brandedTitle(headline: string, locale: Locale = 'en'): string {
   const full = `${headline} | ${locale === 'ur' ? SITE.nameUr : SITE.brandName}`
   return full.length <= TITLE_MAX ? full : headline
@@ -68,7 +68,7 @@ export function buildPageMetadata(opts: {
   section?: string
   tags?: string[]
   noindex?: boolean
-  /** Use the title as-is, without the " | Zaviya News" suffix */
+  /** Use the title as-is, without the " | Zaviya" suffix */
   absoluteTitle?: boolean
 }): Metadata {
   const { locale, title, description, enPath, ogImage, type = 'website', publishedTime, modifiedTime } = opts
@@ -80,7 +80,7 @@ export function buildPageMetadata(opts: {
   const image = ogImage?.startsWith('/') ? absoluteUrl(ogImage) : ogImage ?? absoluteUrl(`/api/og?${new URLSearchParams({ title: title.slice(0, 120) }).toString()}`)
 
   return {
-    // " | Zaviya News" is added only when the whole title stays within 65 characters (ZAV-125).
+    // " | Zaviya" is added only when the whole title stays within 65 characters (ZAV-125).
     title: { absolute: opts.absoluteTitle ? title : brandedTitle(title, locale) },
     description,
     ...(opts.keywords?.length ? { keywords: opts.keywords } : {}),
@@ -251,13 +251,13 @@ export function websiteJsonLd(locale: Locale) {
   }
 }
 
-/** OpenSearch description (/opensearch.xml): lets browsers offer "search Zaviya News" and ties the brand name to the site (ZAV-181). */
+/** OpenSearch description (/opensearch.xml): lets browsers offer "search Zaviya" and ties the brand name to the site (ZAV-181). */
 export function openSearchXml(): string {
   const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return `<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>${esc(SITE.brandName)}</ShortName>
-  <Description>Search Pakistan news on Zaviya News (zaviya.pk), in English and Urdu.</Description>
+  <Description>Search Pakistan news and prices on Zaviya (zaviya.pk), in English and Urdu.</Description>
   <InputEncoding>UTF-8</InputEncoding>
   <Url type="text/html" method="get" template="${esc(absoluteUrl('/search?q={searchTerms}'))}"/>
   <Developer>${esc(SITE.brandName)}</Developer>
@@ -273,7 +273,7 @@ export function aboutPageJsonLd(locale: Locale) {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
     url: absoluteUrl(`${prefix}/about`),
-    name: 'About Zaviya News',
+    name: 'About Zaviya',
     about: organizationJsonLd(),
     publisher: { '@id': organizationId() },
   }

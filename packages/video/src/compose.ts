@@ -298,7 +298,7 @@ export function compose(input: EditionInput, formatArg?: Format, tracks: TrackIn
   scenes.push({
     kind: 'outro',
     durationInFrames: snap(cfg.outroFrames),
-    cta: format === 'flash15' ? 'Follow for live updates' : format === 'trend25' ? 'Google: Zaviya News' : `Which story matters most? Comment 1–${total}`,
+    cta: format === 'flash15' ? 'Follow for live updates' : format === 'trend25' ? 'Google: Zaviya PK' : `Which story matters most? Comment 1–${total}`,
     count: format === 'flash15' || format === 'trend25' ? 0 : total,
     handles: HANDLES,
     site: SITE,

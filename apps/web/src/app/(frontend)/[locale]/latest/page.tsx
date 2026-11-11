@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     description:
       locale === 'ur'
         ? 'زاویہ پر شائع ہونے والی تمام تازہ ترین خبریں ایک فہرست میں۔'
-        : 'Every story published on Zaviya News, newest first: Pakistan, business, world, cricket, tech and more.',
+        : 'Every story published on Zaviya, newest first: Pakistan, business, world, cricket, tech and more.',
     enPath: '/latest',
     urPath: '/ur/latest',
   })

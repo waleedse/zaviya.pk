@@ -63,7 +63,7 @@ export function RateDayPage({
       />
       <PageHero
         title={title}
-        description={`The figures Zaviya News recorded for ${label}, with the previous and next day.`}
+        description={`The figures Zaviya recorded for ${label}, with the previous and next day.`}
         crumbs={[{ label: 'Home', href: '/' }, { label: `${family.noun} today`, href: mainPath }, { label }]}
         icon={meta.icon}
         color={meta.color}
@@ -138,7 +138,7 @@ export function RateHistoryPage({ family, days }: { family: RateFamily; days: Ra
       />
       <PageHero
         title={title}
-        description={`Every day Zaviya News has recorded the ${family.noun.toLowerCase()} in Pakistan, newest first.`}
+        description={`Every day Zaviya has recorded the ${family.noun.toLowerCase()} in Pakistan, newest first.`}
         crumbs={[{ label: 'Home', href: '/' }, { label: `${family.noun} today`, href: `/${family.slug}` }, { label: 'History' }]}
         icon={meta.icon}
         color={meta.color}

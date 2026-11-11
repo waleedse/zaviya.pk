@@ -67,7 +67,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
               </>
             ) : (
               <>
-                <p>Zaviya (zaviya.pk) is a Pakistani digital newsroom, also known as Zaviya News. We cover the stories that matter to Pakistan: national news, business, cricket, technology, jobs, and the daily gold, dollar and petrol rates, in clear English and Urdu.</p>
+                <p>Zaviya (zaviya.pk) is a Pakistani news and prices website. We cover the stories that matter to Pakistan (national news, business, cricket, technology and jobs) and track the prices people check every day: atta, sugar, eggs, chicken, LPG, petrol, gold, the dollar, bikes, cars and home appliances, in clear English and Urdu.</p>
                 <h2>How our newsroom works</h2>
                 <p>We gather news from trusted sources, cite them in every story and check the facts before publishing. AI helps with drafting, but sensitive stories always get a human editor. Read our <a href={localePath(locale, '/p/editorial-policy')}>editorial policy</a> and <a href={localePath(locale, '/p/corrections')}>corrections policy</a>.</p>
                 <h2>Contact us</h2>
@@ -76,7 +76,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             )}
             {profiles.length ? (
               <>
-                <h2>{isUr ? 'ہمیں فالو کریں' : 'Follow Zaviya News'}</h2>
+                <h2>{isUr ? 'ہمیں فالو کریں' : 'Follow Zaviya'}</h2>
                 <ul>
                   {profiles.map((u) => (
                     <li key={u}>
