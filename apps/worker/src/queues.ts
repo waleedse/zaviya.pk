@@ -18,6 +18,7 @@ import { isAllowedByRobots } from './ingest/robots.js'
 import { fetchArticleText } from './ingest/extract.js'
 import { fetchCuratedTweets } from './ingest/x.js'
 import { fetchTrends, isTrendsUrl, trendsToSourceItems } from './ingest/trends.js'
+import { runTrendGap } from './ingest/trend-gap.js'
 import { hydrateTrends, rememberTrends } from './social/hashtags.js'
 import { DEFAULT_X_QUERIES, runDiscovery, X_TRENDS_KEY } from './ingest/discovery.js'
 import { runLearningJob } from './pipeline/learning.js'
@@ -157,6 +158,11 @@ export async function createWorkerRuntime(
     new Worker(
       'ingest',
       async (job) => {
+        // ZG-21: topics trending in Pakistan that no Zaviya story covers get credible sources ingested
+        if (job.name === 'trend-gap') {
+          const run = await runTrendGap({ redis, payload, storeItems })
+          return { topics: run.topics, gaps: run.gaps.map((g) => `${g.term}: ${g.outcome}`) }
+        }
         if (job.name === 'x-poll') {
           const ids = (env.X_CURATED_USER_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
           if (!env.X_BEARER_TOKEN) return
@@ -536,7 +542,7 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     const wanted = new Set(sources.map((s) => `ingest-${s.id}`))
     // Drop schedulers for sources that were disabled or deleted since the last start.
     for (const sched of await runtime.queues.ingest.getJobSchedulers()) {
-      if (sched.key && !wanted.has(sched.key)) await runtime.queues.ingest.removeJobScheduler(sched.key)
+      if (sched.key?.startsWith('ingest-') && !wanted.has(sched.key)) await runtime.queues.ingest.removeJobScheduler(sched.key)
     }
     for (const s of sources) {
       const data = { sourceId: s.id, url: s.url, type: s.type, etag: s.etag, lang: s.language }
@@ -550,6 +556,13 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     }
   } catch (e) {
     logger.warn({ err: e }, 'Could not schedule ingest — Payload unavailable?')
+  }
+
+  // ZG-21: every 25 minutes, find trending topics with no Zaviya story and ingest credible sources for them (TREND_GAP=0 turns it off)
+  if (process.env.TREND_GAP === '0') {
+    await runtime.queues.ingest.removeJobScheduler('trend-gap').catch(() => {})
+  } else {
+    await runtime.queues.ingest.upsertJobScheduler('trend-gap', { every: 25 * 60 * 1000 }, { name: 'trend-gap', data: {} })
   }
 
   // ZAV-144: put deferred clusters whose retry job was lost back on the triage queue

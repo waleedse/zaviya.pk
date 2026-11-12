@@ -186,7 +186,7 @@ export class PayloadClient {
   }
 
   /** Creates a built-in source unless one with this key exists (ZAV-86) */
-  ensureSource(body: { key: string; name: string; url: string; type: 'rss' | 'gnews'; trustTier: 1 | 2 | 3; language?: string; categoryHint?: string; pollIntervalSec?: number }) {
+  ensureSource(body: { key: string; name: string; url: string; type: 'rss' | 'gnews' | 'data'; trustTier: 1 | 2 | 3; language?: string; categoryHint?: string; pollIntervalSec?: number }) {
     return this.request<{ id: string; created: boolean }>('POST', '/api/pipeline/sources', body)
   }
 

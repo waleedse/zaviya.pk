@@ -12,6 +12,7 @@ import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
 import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
+import { isTrendGapCluster } from '../ingest/trend-gap-mark.js'
 import { CARD_VERSION } from './card-version.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 import { ensureHeroMedia } from './hero-photo.js'
@@ -227,7 +228,8 @@ async function finishGatedLocked(
   deps: { payload: PayloadClient; socialQueue: Queue; redis: Redis; mediaQueue?: Queue },
 ): Promise<boolean> {
   // Daily cap (5 Nov): an approved story waits in the gate instead of going out over the cap.
-  if (action === 'publish' && (JSON.parse(raw) as { priority?: string }).priority !== 'breaking' && (await dailyCapReached(deps.payload).catch(() => false))) {
+  const gated = JSON.parse(raw) as { priority?: string; triage?: { trendGap?: boolean } }
+  if (action === 'publish' && gated.priority !== 'breaking' && (await dailyCapReached(deps.payload, Date.now(), Boolean(gated.triage?.trendGap)).catch(() => false))) {
     logger.info({ articleId }, 'editor approved, but the daily cap is reached: the story keeps waiting')
     return true
   }
@@ -295,8 +297,10 @@ export async function categoryOverdue(payload: PayloadClient, category: string, 
 }
 
 /** No slot for a normal story right now: the day's pace (Settings.dailyCaps.articles, else DEFAULT_DAILY_ARTICLE_CAP) is used up. */
-export async function dailyCapReached(payload: Pick<PayloadClient, 'getSettings'>, now = Date.now()): Promise<boolean> {
+export async function dailyCapReached(payload: Pick<PayloadClient, 'getSettings'>, now = Date.now(), extraSlots = false): Promise<boolean> {
   const settings = await payload.getSettings()
+  // Trend-gap and overdue-desk stories may use the extra slots: only the hard cap plus QUOTA_EXTRA_PER_DAY stops them
+  if (extraSlots) return (settings.articlesPublishedToday ?? 0) >= dailyArticleCap(settings) + QUOTA_EXTRA_PER_DAY
   return capSlotWaitMs(settings.articlesPublishedToday ?? 0, dailyArticleCap(settings), new Date(now)) > 0
 }
 
@@ -381,9 +385,10 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
   // AI and jobs must get a story at least every 4 hours: those skip the 15-minute queue when overdue.
-  const overdueCategory = triage?.category && QUOTA_CATEGORIES.includes(triage.category)
+  // A trend-gap story (ZG-21) uses the same extra slots as an overdue desk: it is never held back by the daily pace
+  const overdueCategory = isTrendGapCluster(cluster.items) || Boolean((triage as { trendGap?: boolean } | undefined)?.trendGap) || Boolean(triage?.category && QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
-    : false
+    : false)
   // Only the holder of the publish slot may check the pace and publish; the others come back in 30-90 s (breaking and live updates are exempt).
   const slotKv = deps.redis ?? deps.gate?.redis
   if (!gated && deps.publishQueue && slotKv && !deps.slotHeld && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
@@ -395,7 +400,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
     }
     // An approved draft skips the pacing below but not the daily cap (the cap was checked when it was approved, maybe hours ago)
     if (data.articleId) {
-      const capWait = await dailyCapReached(deps.payload).catch(() => false)
+      const capWait = await dailyCapReached(deps.payload, Date.now(), overdueCategory).catch(() => false)
       if (capWait) {
         await deps.publishQueue.add('publish', data, { delay: 5 * 60_000 + Math.floor(Math.random() * 90_000), priority: 5 })
         logger.info({ clusterId: data.clusterId, articleId: data.articleId }, 'approved story waits: the daily cap is reached')
