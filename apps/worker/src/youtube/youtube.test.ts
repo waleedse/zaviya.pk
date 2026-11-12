@@ -77,8 +77,8 @@ describe('wording', () => {
 })
 
 describe('content guard', () => {
-  it.each([['Imran Khan rally in Lahore'], ['Army chief meets minister'], ['Sectarian clash in Parachinar']])('blocks %s (hard block)', (text) => {
-    expect(blockedReason(text)).toMatch(/hard block/)
+  it.each([['Imran Khan rally in Lahore'], ['Army chief meets minister'], ['Sectarian clash in Parachinar']])('no longer blocks %s (13 Nov: no topic holds)', (text) => {
+    expect(blockedReason(text)).toBeNull()
   })
   it.each([['Three killed in blast near market'], ['Eid shopping rush in Lahore'], ['Cabinet approves new budget'], ['How load shedding works in Pakistan']])(
     'is no stricter than Facebook and Instagram: %s passes',
@@ -125,11 +125,11 @@ describe('itemFromDir', () => {
     expect(res.item.description).not.toContain('#Shorts')
   })
 
-  it('skips party and army content and an outdated price video, but not sensitive news', async () => {
+  it('skips an outdated price video, but not party, army or sensitive news (13 Nov)', async () => {
     const pol = await itemFromDir(writeEdition(root, '2026-11-08-a', digestFiles('PTI leader arrested')), opts, NOW)
     const viol = await itemFromDir(writeEdition(root, '2026-11-08-b', explainerFiles('Why blasts happen')), opts, NOW)
     const price = await itemFromDir(writeEdition(root, '2026-11-01-c', digestFiles('Petrol price rises by Rs 5'), 11 * DAY), opts, NOW)
-    expect(pol).toHaveProperty('skip')
+    expect(pol).toHaveProperty('item')
     expect(viol).toHaveProperty('item')
     expect(price).toEqual({ skip: 'a price or rate that has changed since' })
   })
@@ -157,12 +157,12 @@ describe('queue order, idempotency and backfill', () => {
     const store = new YtStore(fakeRedis())
     const posted = async (k: string) => k !== '2026-11-07-vetoed'
     const first = await backfill(store, root, { siteUrl: 'https://zaviya.pk', posted, now: NOW })
-    expect(first).toMatchObject({ found: 4, queued: 2, alreadyKnown: 0 })
-    expect(first.skipped.map((s) => s.key).sort()).toEqual(['2026-11-07-vetoed', '2026-11-08-army'])
+    expect(first).toMatchObject({ found: 4, queued: 3, alreadyKnown: 0 })
+    expect(first.skipped.map((s) => s.key).sort()).toEqual(['2026-11-07-vetoed'])
     expect((await store.peek())?.kind).toBe('explainer')
     const again = await backfill(store, root, { siteUrl: 'https://zaviya.pk', posted, now: NOW })
-    expect(again).toMatchObject({ queued: 0, alreadyKnown: 2 })
-    expect((await store.report()).skipped).toBe(1)
+    expect(again).toMatchObject({ queued: 0, alreadyKnown: 3 })
+    expect((await store.report()).skipped).toBe(0)
   })
 
   it('a live video jumps ahead of the backfill and is not queued twice', async () => {
@@ -393,10 +393,10 @@ describe('uploadNext', () => {
     expect(notes.at(-1)).toMatch(/Check the channel/)
   })
 
-  it('a blocked item is dropped at upload time without touching YouTube', async () => {
+  it('a party-political item is uploaded like any other (13 Nov: no topic holds)', async () => {
     await store.enqueue({ ...item('a'), title: 'PTI rally in Lahore #Shorts' })
-    expect((await uploadNext(deps())).state).toBe('dropped')
-    expect(sent).toHaveLength(0)
+    expect((await uploadNext(deps())).state).toBe('uploaded')
+    expect(sent).toHaveLength(1)
   })
 })
 

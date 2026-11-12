@@ -7,12 +7,11 @@ const idea = (over: Partial<Idea> = {}): Idea => ({ id: ideaId(over.title ?? 'x'
 const article = (over: Record<string, unknown> = {}) => ({ id: 1, title: 'Starlink opens satellite internet bookings', category: 'tech-telecom', priority: 'normal', publishedAt: new Date(NOW - 2 * HOUR).toISOString(), url: 'https://zaviya.pk/tech-telecom/x', ...over }) as never
 
 describe('scoring', () => {
-  it('excludes vetoed, expired, made and unapproved sensitive ideas', () => {
+  it('excludes vetoed, expired and made ideas, but not sensitive ones (13 Nov: no topic holds)', () => {
     expect(scoreIdea(idea({ decision: 'veto' }), NOW)).toBe(-Infinity)
     expect(scoreIdea(idea({ hookUntil: NOW - 1 }), NOW)).toBe(-Infinity)
     expect(scoreIdea(idea({ status: 'made' }), NOW)).toBe(-Infinity)
-    expect(scoreIdea(idea({ risk: 'needs-veto' }), NOW)).toBe(-Infinity)
-    expect(scoreIdea(idea({ risk: 'needs-veto', decision: 'ok' }), NOW)).toBeGreaterThan(0)
+    expect(scoreIdea(idea({ risk: 'needs-veto' }), NOW)).toBeGreaterThan(0)
   })
 
   it('lets the editor boost and lets waiting evergreen ideas creep up', () => {
@@ -51,7 +50,7 @@ describe('picking', () => {
 })
 
 describe('discovery', () => {
-  it('keeps explainable stories, marks sensitive ones, skips breaking and old ones, and adds evergreen topics', () => {
+  it('keeps explainable stories, sensitive and government ones too, skips breaking and old ones, and adds evergreen topics', () => {
     const found = discoverIdeas({
       articles: [
         article(),
@@ -68,29 +67,21 @@ describe('discovery', () => {
     const byArticle = (id: number) => found.find((i) => i.articleId === id)
     expect(byArticle(1)?.origin).toBe('trend')
     expect(byArticle(1)?.risk).toBe('low')
-    expect(byArticle(2)).toBeUndefined()
-    expect(byArticle(3)?.risk).toBe('needs-veto')
-    expect(byArticle(11)).toBeUndefined()
+    expect(byArticle(2)).toBeUndefined() // the pakistan desk is not an explainer category
+    expect(byArticle(3)?.risk).toBe('low')
+    expect(byArticle(11)).toBeDefined()
     expect(byArticle(4)).toBeUndefined()
     expect(byArticle(5)).toBeUndefined()
     expect(byArticle(6)).toBeDefined()
     expect(found.filter((i) => i.origin === 'evergreen').length).toBeGreaterThan(20)
   })
 
-  it('never makes government topics, whatever the editor says', () => {
+  it('government topics are made like any other (13 Nov)', () => {
     expect(isGovernment('Govt cuts advance tax on imported phones')).toBe(true)
-    expect(isGovernment('Federal budget 2027 explained')).toBe(true)
-    expect(isGovernment('IMF approves new tranche for Pakistan')).toBe(true)
-    expect(isGovernment('Pakistan Companies Act 2017 changes: 170 tweaks')).toBe(true)
-    expect(isGovernment('Austria jobs for Pakistanis under Red-White-Red Card scheme, visa rules')).toBe(true)
-    expect(isGovernment('CTI Merit List 2026 Out: Punjab HED publishes entries')).toBe(true)
-    expect(isGovernment('KTBA flags IRIS wealth balance issue for returning Pakistanis')).toBe(true)
     expect(isGovernment('Apple foldable phone hits stores at about $2,000')).toBe(false)
-    expect(isGovernment('How a black hole is born')).toBe(false)
-    expect(scoreIdea(idea({ title: 'Govt cuts tax on phones', decision: 'boost' }), NOW)).toBe(-Infinity)
-    expect(EVERGREEN.filter((e) => isGovernment(`${e.title} ${e.angle}`)).map((e) => e.title)).toEqual([])
+    expect(scoreIdea(idea({ title: 'Govt cuts tax on phones' }), NOW)).toBeGreaterThan(0)
     const found = discoverIdeas({ articles: [article({ id: 9, title: 'Govt announces new tax on phones', category: 'tech-telecom' }), article({ id: 10, title: 'Starlink opens bookings', category: 'tech-telecom' })], trends: [], now: NOW })
-    expect(found.find((i) => i.articleId === 9)).toBeUndefined()
+    expect(found.find((i) => i.articleId === 9)).toBeDefined()
     expect(found.find((i) => i.articleId === 10)).toBeDefined()
   })
 
@@ -107,18 +98,14 @@ describe('big trending stories (Waleed, 4 Nov)', () => {
   const war = 'What US-Iran strikes mean for petrol prices in Pakistan'
   const midterm = 'How the US midterm election works and why it moves the dollar'
 
-  it('lets a trending government, election or war idea through only with an editor ok or boost', () => {
+  it('scores a government, election or war idea normally, trending or not, with no editor ok (13 Nov)', () => {
     for (const title of [war, midterm]) {
       expect(isSensitive(title) || isGovernment(title)).toBe(true)
-      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto' }), NOW)).toBe(-Infinity)
-      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'ok' }), NOW)).toBeGreaterThan(0)
-      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'boost' }), NOW)).toBeGreaterThan(scoreIdea(idea({ title, trending: true, risk: 'needs-veto', decision: 'ok' }), NOW))
-      // the editor sees it while it waits
-      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto' }), NOW, { listing: true })).toBeGreaterThan(0)
+      expect(scoreIdea(idea({ title, trending: true, risk: 'needs-veto' }), NOW)).toBeGreaterThan(0)
+      expect(scoreIdea(idea({ title }), NOW)).toBeGreaterThan(0)
+      expect(scoreIdea(idea({ title, trending: true, decision: 'boost' }), NOW)).toBeGreaterThan(scoreIdea(idea({ title, trending: true }), NOW))
     }
     expect(scoreIdea(idea({ title: hack, trending: true, decision: 'ok' }), NOW)).toBeGreaterThan(0)
-    // an election topic that is not trending: the old government rule holds, an editor boost does not lift it
-    expect(scoreIdea(idea({ title: midterm, risk: 'needs-veto', decision: 'boost' }), NOW)).toBe(-Infinity)
   })
 
   it('a vetoed trending idea stays out, and it runs after the normal veto window with no other wait', () => {
@@ -127,7 +114,7 @@ describe('big trending stories (Waleed, 4 Nov)', () => {
     expect(picked?.title).toBe(war)
   })
 
-  it('keeps the hard blocks whatever trends or the editor says', () => {
+  it('has no hard blocks any more: blasphemy, minors, sectarian, party and army topics score normally (13 Nov)', () => {
     for (const t of [
       'Blasphemy case sparks outrage',
       'Sectarian clashes: what happened',
@@ -135,19 +122,15 @@ describe('big trending stories (Waleed, 4 Nov)', () => {
       'What the army chief said about the border',
       'ISPR press conference explained',
       'PTI long march: what happens next',
-      'PML-N and PPP coalition talks explained',
       'Why Imran Khan trended on X',
     ]) {
-      expect(isHardBlocked(t)).toBe(true)
-      expect(blockedReason(idea({ title: t, trending: true, decision: 'boost' }))).toMatch(/never made/)
-      expect(scoreIdea(idea({ title: t, trending: true, decision: 'boost' }), NOW, { listing: true })).toBe(-Infinity)
+      expect(isHardBlocked(t)).toBe(false)
+      expect(blockedReason(idea({ title: t }))).toBeNull()
+      expect(scoreIdea(idea({ title: t }), NOW)).toBeGreaterThan(0)
     }
-    for (const t of [war, midterm, hack, 'What the Israel-Gaza ceasefire means for oil', 'How the US Army uses drones']) expect(isHardBlocked(t)).toBe(false)
-    // lower-case "ppp" or "isi" in ordinary words is not the party
-    expect(isHardBlocked('How to spot a fake ppp loan site')).toBe(false)
   })
 
-  it('discovery keeps a Google Trends hit about war or elections (needs-veto, trending) and still drops one that is not trending', () => {
+  it('discovery keeps war, election, senate and party stories like any other (13 Nov)', () => {
     const found = discoverIdeas({
       articles: [
         article({ id: 20, title: 'US strikes on Iran push oil prices up', category: 'world' }),
@@ -160,13 +143,13 @@ describe('big trending stories (Waleed, 4 Nov)', () => {
       now: NOW,
     })
     const by = (id: number) => found.find((i) => i.articleId === id)
-    expect(by(20)).toMatchObject({ trending: true, risk: 'needs-veto', origin: 'trend' })
-    expect(by(21)).toMatchObject({ trending: true, risk: 'needs-veto' })
-    expect(by(22)).toBeUndefined()
-    expect(by(23)).toBeUndefined()
+    expect(by(20)).toMatchObject({ trending: true, risk: 'low', origin: 'trend' })
+    expect(by(21)).toMatchObject({ trending: true, risk: 'low' })
+    expect(by(22)).toBeDefined()
+    expect(by(23)).toMatchObject({ trending: true })
     // a breaking story that also trends is the big one: kept (the flash covers breaking news that does not trend)
     expect(by(24)).toMatchObject({ trending: true })
-    expect(found.find((i) => i.articleId === 20 && scoreIdea(i, NOW) > 0)).toBeUndefined()
+    expect(found.find((i) => i.articleId === 20 && scoreIdea(i, NOW) > 0)).toBeDefined()
   })
 
   it('merge keeps the trending flag and still never touches a decision', async () => {

@@ -63,23 +63,17 @@ const HARD_BLOCK_WORDS =
 // party and army acronyms are matched in capitals only (a lower-case "isi" or "ppp" is not the party)
 const HARD_BLOCK_ACRONYMS = /\b(PTI|PML-?N|PML-?Q|PPP|MQM|TLP|JUI-?F?|ANP|ISPR|ISI)\b/
 
-export function isHardBlocked(text: string): boolean {
-  return HARD_BLOCK_WORDS.test(text) || HARD_BLOCK_ACRONYMS.test(text)
+/** Always false since 13 Nov (Waleed: nothing is stopped for its topic); kept so older callers compile. */
+export function isHardBlocked(_text: string): boolean {
+  return false
 }
-
-/** An editor ok or boost: a second pair of eyes has seen the idea (nobody previews videos unless Telegram is set up). */
-const approved = (idea: Pick<Idea, 'decision'>) => idea.decision === 'ok' || idea.decision === 'boost'
 
 /**
  * Why an idea may not be made now, or null. Hard blocks never lift. Government topics lift only for a trending idea with an
  * editor ok or boost. `listing` skips the approval gates, for the editor's backlog view (it must see what waits for its ok).
  */
-export function blockedReason(idea: Pick<Idea, 'title' | 'angle' | 'trending' | 'decision' | 'risk'>, listing = false): string | null {
-  const text = `${idea.title} ${idea.angle}`
-  if (isHardBlocked(text)) return 'blasphemy, minors, sectarian and Pakistani party-political or army topics are never made'
-  if (isGovernment(text) && !idea.trending) return 'government and public-administration topics are made only as a big trending story (trending: true, 2+ sources)'
-  if (!listing && isGovernment(text) && !approved(idea)) return 'a trending government, election or war topic needs the editor ok or boost'
-  if (!listing && idea.risk === 'needs-veto' && !approved(idea)) return 'sensitive: needs the editor ok or boost'
+export function blockedReason(_idea: Pick<Idea, 'title' | 'angle' | 'trending' | 'decision' | 'risk'>, _listing = false): string | null {
+  // 13 Nov (Waleed): no explainer idea is blocked for its topic (sensitive, government, army, party, religion, minors): all score normally.
   return null
 }
 
@@ -181,10 +175,9 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
     const age = now - Date.parse(a.publishedAt)
     if (!(age >= 0 && age <= 36 * HOUR) || !EXPLAINABLE.has(a.category)) continue
     const text = `${a.title} ${a.dek ?? ''}`
-    if (isHardBlocked(text)) continue
     const trending = trends.some((t) => t.trim().length >= 4 && similar(t, a.title) >= 0.6)
     // the daily flash covers breaking news; a breaking story that also trends is the big one worth explaining
-    if ((a.isBreaking || isGovernment(text)) && !trending) continue
+    if (a.isBreaking && !trending) continue
     add({
       id: ideaId(a.title),
       title: a.title,
@@ -197,7 +190,7 @@ export function discoverIdeas(input: { articles: DiscoverArticle[]; trends: stri
       createdAt: now,
       hookUntil: Date.parse(a.publishedAt) + 36 * HOUR,
       ...(trending ? { trending: true } : {}),
-      risk: isSensitive(text) || isGovernment(text) ? 'needs-veto' : 'low',
+      risk: 'low',
       status: 'backlog',
     })
   }

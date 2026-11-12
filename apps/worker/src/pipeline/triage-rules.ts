@@ -29,8 +29,6 @@ export interface TriageDecision {
   retryInMs?: number
 }
 
-/** Topics where a human must look before anything goes live. */
-const HARD_FLAGS = new Set(['military', 'judiciary', 'religion', 'blasphemy', 'violence', 'death', 'minor', 'election'])
 
 /** Desks where a thin-source code reject has repeatedly binned good Pakistan stories (ZAV-6). */
 /**
@@ -161,15 +159,8 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
     weightedScore >= publishThreshold &&
     !LOW_VALUE_REASON.test(triage.reason ?? '')
 
-  const hardFlags = triage.sensitivityFlags.filter((f) => HARD_FLAGS.has(f))
-  if (hardFlags.length > 0) {
-    return {
-      outcome: 'review',
-      reason: `Sensitivity flags: ${hardFlags.join(', ')}`,
-      weightedScore,
-      modelDecision: triage.decision,
-    }
-  }
+  // 13 Nov (Waleed): no story is held, reviewed or rejected for its topic. The sensitivity flags (military, judiciary, religion,
+  // blasphemy, violence, death, minor, election) stay on the verdict as information; the score, credibility and fact checks decide.
   // "unverified" only blocks when nothing credible backs the story.
   if (triage.sensitivityFlags.includes('unverified') && ctx.maxTier === 3) {
     return {

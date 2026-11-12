@@ -26,8 +26,8 @@ const envSchema = z.object({
   X_ACCESS_SECRET: optionalStr,
   X_CURATED_USER_IDS: optionalStr,
   /**
-   * Publish without waiting for a human: "safe" auto-approves everything except blasphemy and
-   * stories about minors (legal/safety risk in Pakistan); "all" approves those too; "off" keeps the review queue.
+   * Publish without waiting for a human: "safe" and "all" both auto-approve every topic since 13 Nov (Waleed: no story is
+   * stopped for being sensitive); "off" keeps the review queue.
    */
   AUTO_APPROVE: z.enum(['off', 'safe', 'all']).default('safe'),
   /** ZAV-111: Facebook posts carry the article link as the Page's first comment instead of in the caption (set 0 to switch back) */
