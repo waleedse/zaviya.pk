@@ -106,6 +106,15 @@ describe('applyTriageRules', () => {
     expect(r.outcome).toBe('reject')
   })
 
+  it('does not let a low desk weight hold back a story that is trending on Google in Pakistan', () => {
+    const settings = { categoryWeights: { cricket: 0.6 } }
+    const t = { ...baseTriage, category: 'cricket' as const, pakistanRelevance: 0.9, newsworthiness: 0.8, sourceCredibility: 0.8 }
+    const plain = applyTriageRules(t, { maxTier: 1, distinctSources: 2, settings })
+    const trending = applyTriageRules(t, { maxTier: 1, distinctSources: 2, settings, trendsHit: true })
+    expect(trending.weightedScore).toBeGreaterThan(plain.weightedScore)
+    expect(trending.weightedScore).toBeCloseTo(0.4 * 0.9 + 0.35 * 0.8 + 0.25 * 0.8)
+  })
+
   it('computes weighted score with category weight', () => {
     const s = computeWeightedScore(baseTriage, { categoryWeights: { pakistan: 0.5 } })
     expect(s).toBeCloseTo((0.4 * 0.9 + 0.35 * 0.8 + 0.25 * 0.7) * 0.5)
