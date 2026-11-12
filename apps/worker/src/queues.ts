@@ -4,7 +4,8 @@ import { embedder, fluxCreds, subscriptionChain, type WorkerEnv } from './config
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
 import { processEmbedJob } from './pipeline/embed.js'
-import { processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './pipeline/triage.js'
+import { TriageBatcher } from './pipeline/triage-batch.js'
+import { jitter, processTriageJob, releaseDeferredClusters, releaseStuckNewClusters } from './pipeline/triage.js'
 import { processWriteJob } from './pipeline/write.js'
 import { processQaJob } from './pipeline/qa.js'
 import { processMediaJob, rerenderStaleCards } from './pipeline/media.js'
@@ -224,6 +225,9 @@ export async function createWorkerRuntime(
     }),
   )
 
+  // Up to 8 non-trending clusters are scored in one Gemini call; the triage workers below wait here for it (ZG-22)
+  const triageBatcher = new TriageBatcher(router)
+
   workers.push(
     new Worker(
       'triage',
@@ -244,6 +248,7 @@ export async function createWorkerRuntime(
             })()
           : processTriageJob(job.data, {
               router,
+              batcher: triageBatcher,
               payload,
               writeQueue: queues.write,
               triageQueue: queues.triage,
@@ -254,7 +259,7 @@ export async function createWorkerRuntime(
               pitch: env.EDITOR_GATE && env.EDITOR_PITCH,
             }),
       // The local model handles one job at a time; an API model can triage several clusters at once.
-      { connection, concurrency: env.LOCAL_MODEL === 'off' ? 4 : 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
+      { connection, concurrency: env.LOCAL_MODEL === 'off' ? 10 : 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
     ),
   )
 
@@ -277,7 +282,7 @@ export async function createWorkerRuntime(
         } catch (e) {
           // Every model (cloud and local) unavailable: try again when the quota resets.
           if (isQuotaExhausted(e)) {
-            await queues.write.add(job.name, job.data, { delay: Math.max(60_000, e.resetAt - Date.now()), priority: 4 })
+            await queues.write.add(job.name, job.data, { delay: jitter(Math.max(60_000, e.resetAt - Date.now())), priority: 4 })
             logger.warn({ clusterId, retryAt: new Date(e.resetAt).toISOString() }, 'write deferred: no model available')
             return
           }

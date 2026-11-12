@@ -47,7 +47,7 @@ describe('model selection', () => {
     expect(await ask(b, ['a'], 'urgent')).toEqual({ model: 'a' })
     expect(slept).toHaveLength(1)
     expect(slept[0]).toBeGreaterThan(50_000)
-    expect(slept[0]).toBeLessThanOrEqual(60_000)
+    expect(slept[0]).toBeLessThanOrEqual(63_100)
     expect(clock.now).toBeGreaterThan(T0 + 54_000)
   })
 

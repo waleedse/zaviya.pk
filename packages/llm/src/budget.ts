@@ -369,7 +369,8 @@ export class GeminiBudget {
       // only worth waiting when every model is short-term limited (a cooling or spent model will not open in seconds)
       const allShort = models.length > 0 && Object.values(reasons).every((r) => r === 'rpm' || r === 'tpm')
       if (allShort && soonestShort <= deadline) {
-        await this.sleep(Math.max(250, soonestShort - this.clock() + 50), o.signal)
+        // jitter: callers waiting on the same minute window must not all wake at the same instant
+        await this.sleep(Math.max(250, soonestShort - this.clock() + 50) + Math.floor(Math.random() * 3000), o.signal)
         continue
       }
       return { model: null, resetAt: Number.isFinite(soonest) ? soonest : now + 3_600_000, reasons }
