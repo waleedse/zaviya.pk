@@ -17,7 +17,7 @@ describe('TriageBatcher', () => {
 
   it('scores 8 clusters in ONE call as soon as the batch is full', async () => {
     const chat = vi.fn().mockResolvedValue({ content: JSON.stringify({ results: Array.from({ length: 8 }, (_, i) => verdict(String(i))) }) })
-    const b = new TriageBatcher({ chat } as never)
+    const b = new TriageBatcher({ chat } as never, { max: 8 })
     const all = await Promise.all(Array.from({ length: 8 }, (_, i) => b.score(cl(String(i)))))
     expect(chat).toHaveBeenCalledTimes(1)
     expect(all.every((r) => r?.decision === 'publish')).toBe(true)
@@ -46,6 +46,16 @@ describe('TriageBatcher', () => {
     const p = Promise.all(['a', 'b', 'c', 'd'].map((id) => b.score(cl(id))))
     await vi.advanceTimersByTimeAsync(100)
     expect((await p).map((r) => r?.decision ?? null)).toEqual(['publish', null, null, null])
+  })
+
+  it('reads a reply wrapped in a code fence (gemma adds a trailing ``` fence)', async () => {
+    const body = JSON.stringify({ results: [verdict('a'), verdict('b')] })
+    const chat = vi.fn().mockResolvedValue({ content: `\`\`\`json\n${body}\n\`\`\`` })
+    const b = new TriageBatcher({ chat } as never, { max: 2 })
+    expect((await Promise.all([b.score(cl('a')), b.score(cl('b'))])).map((r) => r?.decision)).toEqual(['publish', 'publish'])
+    const chat2 = vi.fn().mockResolvedValue({ content: `${body}\n\`\`\`` })
+    const b2 = new TriageBatcher({ chat: chat2 } as never, { max: 2 })
+    expect((await Promise.all([b2.score(cl('a')), b2.score(cl('b'))])).map((r) => r?.decision)).toEqual(['publish', 'publish'])
   })
 
   it('falls back to single calls when the reply is not JSON or the model refuses the batch text', async () => {
