@@ -11,6 +11,7 @@ import { TRENDS_KEY, X_TRENDS_KEY } from '../queues-keys.js'
 import { ZAVIYA_USER_AGENT } from './extract.js'
 import { parseTraffic } from './trends.js'
 import { TREND_GAP_MARK } from './trend-gap-mark.js'
+import { nudgeTrendClusters, rememberPending, type NudgeDeps, type PendingRedis } from './trend-gap-nudge.js'
 
 /**
  * Trend gap (ZG-21). On 12 Nov "bangladesh vs pakistan" (10K+), "fbr late tax filer atl rules" (5K+), the smog school
@@ -193,8 +194,11 @@ const GOSSIP = /\b(actor|actress|singer|rapper|celebrity|celebrities|wedding|mar
 
 /** Entertainment gossip and foreign celebrities are skipped unless there is a Pakistan angle. */
 export function skipAsGossip(topic: Pick<TrendTopic, 'term' | 'newsTitles'>): boolean {
-  const texts = [topic.term, ...topic.newsTitles]
-  if (!texts.some((t) => GOSSIP.test(t))) return false
+  // The topic's own words decide; Google's attached headlines only when most of them are gossip ("detangle comb for hair growth"
+  // was skipped on 12 Nov because one of three headlines said "Disney")
+  const titleHits = topic.newsTitles.filter((t) => GOSSIP.test(t)).length
+  const gossip = GOSSIP.test(topic.term) || (topic.newsTitles.length >= 2 && titleHits * 2 > topic.newsTitles.length)
+  if (!gossip) return false
   return !PK_ANGLE.test(topic.term)
 }
 
@@ -426,7 +430,7 @@ export function pktDayKey(now: number): string {
 }
 
 export interface TrendGapDeps {
-  redis: Pick<Redis, 'get' | 'set' | 'incr' | 'expire' | 'lpush' | 'ltrim'>
+  redis: Pick<Redis, 'get' | 'set' | 'incr' | 'expire' | 'lpush' | 'ltrim'> & PendingRedis
   payload: Pick<PayloadClient, 'getSources' | 'recentArticles' | 'ensureSource'>
   /** Saves items and queues them for embedding/clustering (queues.ts storeItems) */
   storeItems: (items: SourceItemInput[]) => Promise<{ inserted: { id: string; externalId: string }[]; skipped: number }>
@@ -436,6 +440,8 @@ export interface TrendGapDeps {
   dailyMax?: number
   maxPerRun?: number
   minVolume?: number
+  /** Re-queues triage or write for clusters the ingested items joined but that stalled (trend-gap-nudge.ts); off when absent */
+  nudge?: Omit<NudgeDeps, 'redis' | 'now'>
 }
 
 async function searchOne(spec: SearchSpec, fetchFn: typeof fetch): Promise<NewsHit[]> {
@@ -468,6 +474,9 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
   const dailyMax = deps.dailyMax ?? TREND_GAP_DAILY_MAX
   const maxPerRun = deps.maxPerRun ?? TREND_GAP_MAX_PER_RUN
 
+  if (deps.nudge) {
+    await nudgeTrendClusters({ ...deps.nudge, redis: deps.redis, now }).catch((e) => logger.warn({ err: e instanceof Error ? e.message : e }, 'trend gap: nudge failed'))
+  }
   const topics = await loadTopics(deps.redis, now(), deps.minVolume)
   const run: TrendGapRun = { topics: topics.length, gaps: [] }
   if (!topics.length) return run
@@ -553,6 +562,7 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
       await done('already-ingested', `${res.skipped} item(s) were already stored`, shown)
       continue
     }
+    await rememberPending(deps.redis, topic.term, res.inserted.map((i) => i.id), now()).catch(() => undefined)
     startedToday = Number(await deps.redis.incr(dayKey))
     await deps.redis.expire(dayKey, 36 * 3600)
     await done('ingested', `${res.inserted.length} new item(s) from ${new Set(picks.map((p) => p.match.source.name)).size} outlet(s)`, shown)

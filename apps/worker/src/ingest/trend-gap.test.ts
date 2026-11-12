@@ -124,6 +124,12 @@ describe('skipping', () => {
     expect(skipAsGossip({ term: 'pakistani actress wedding', newsTitles: [] })).toBe(false)
     expect(skipAsGossip({ term: 'pubg mobile 4.7', newsTitles: [] })).toBe(false)
   })
+  it('does not skip a topic because one of Google\'s headlines mentions Disney (12 Nov: detangle comb)', () => {
+    const newsTitles = ['Could this experimental electric comb be a cure for baldness?', 'Device inspired by Disney’s ‘Tangled’ could help battle hair loss', 'Comb regrows hair via electrical stimulation']
+    expect(skipAsGossip({ term: 'detangle comb for hair growth', newsTitles })).toBe(false)
+    // but a topic whose headlines are mostly gossip still is
+    expect(skipAsGossip({ term: 'fan meet viral', newsTitles: ['Singer dating rumours', 'Actress wedding photos', 'Weather today'] })).toBe(true)
+  })
 })
 
 describe('source filtering', () => {
@@ -211,9 +217,11 @@ describe('search', () => {
 function fakeRedis(initial: Record<string, string> = {}) {
   const kv = new Map(Object.entries(initial))
   const lists = new Map<string, string[]>()
+  const hashes = new Map<string, Record<string, string>>()
   return {
     kv,
     lists,
+    hashes,
     get: async (k: string) => kv.get(k) ?? null,
     set: async (k: string, v: string) => (kv.set(k, v), 'OK'),
     incr: async (k: string) => {
@@ -229,6 +237,14 @@ function fakeRedis(initial: Record<string, string> = {}) {
       return l.length
     },
     ltrim: async () => 'OK',
+    hset: async (k: string, f: string, v: string) => {
+      const h = hashes.get(k) ?? {}
+      h[f] = v
+      hashes.set(k, h)
+      return 1
+    },
+    hdel: async (k: string, f: string) => (delete (hashes.get(k) ?? {})[f], 1),
+    hgetall: async (k: string) => ({ ...(hashes.get(k) ?? {}) }),
   }
 }
 
