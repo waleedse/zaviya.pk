@@ -4,7 +4,7 @@ import { OllamaProvider } from './ollama.js'
 import { Semaphore } from './semaphore.js'
 import type { CliProvider } from './cli.js'
 import type { ChatResult, LLMProvider, LLMTask, Msg, ToolDef, JSONSchema, LlmPriority } from './types.js'
-import { TASK_PRIORITY, DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
+import { TASK_PRIORITY, DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_BULK_CHAIN, GEMINI_VISION_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
 
 export interface RouterSettings {
   activeModels?: Partial<Record<LLMTask, string>>
@@ -47,7 +47,7 @@ const LOCAL_TIMEOUT_MS = 25 * 60_000
 function geminiFallbackModel(task: LLMTask): string {
   if (task === 'embed') return DEFAULT_GEMINI_EMBED_MODEL
   if (task === 'vision') return GEMINI_VISION_CHAIN
-  return task === 'write_en' || task === 'write_ur' ? GEMINI_WRITER_CHAIN : GEMINI_LITE_CHAIN
+  return task === 'write_en' || task === 'write_ur' ? GEMINI_WRITER_CHAIN : GEMINI_BULK_CHAIN
 }
 
 export class LLMRouter {
@@ -230,7 +230,7 @@ export class LLMRouter {
   /** Today's calls, limits and headroom per Gemini model (for the heartbeat log and the 3-hourly run). */
   async budgetSummary() {
     if (!this.gemini) return []
-    const models = [...new Set([GEMINI_WRITER_CHAIN, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN].flatMap((c) => c.split(',')))]
+    const models = [...new Set([GEMINI_WRITER_CHAIN, GEMINI_BULK_CHAIN, GEMINI_VISION_CHAIN].flatMap((c) => c.split(',')))]
     return this.gemini.budget.summary(models)
   }
 

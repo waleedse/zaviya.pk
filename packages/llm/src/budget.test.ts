@@ -143,6 +143,16 @@ describe('GeminiProvider with a budget', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
+  it('triage spills onto a writer model but leaves half of its day for writing (ZG-22)', async () => {
+    vi.mocked(fetch).mockImplementation(async () => ok())
+    const p = provider({ limits: { 'gemini-3.8-flash': { rpd: 10, rpm: 100 } } })
+    for (let i = 0; i < 5; i++) await expect(p.chat({ model: 'gemini-3.8-flash', messages: msgs, task: 'triage' })).resolves.toMatchObject({ model: 'gemini-3.8-flash' })
+    // 5 of 10 used: triage must stop here, even though it is a core task
+    await expect(p.chat({ model: 'gemini-3.8-flash', messages: msgs, task: 'triage' })).rejects.toMatchObject({ name: 'QuotaExhaustedError' })
+    // writing can still use the rest of the day
+    for (let i = 0; i < 5; i++) await expect(p.chat({ model: 'gemini-3.8-flash', messages: msgs, task: 'write_en' })).resolves.toMatchObject({ content: 'ok' })
+  })
+
   it('a low-priority task backs off under 20% while a writer call still gets through', async () => {
     vi.mocked(fetch).mockImplementation(async () => ok())
     const p = provider({ limits: { 'gemini-e-flash': { rpd: 10, rpm: 100 } } })

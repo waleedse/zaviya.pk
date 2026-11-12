@@ -13,7 +13,10 @@ import type { YoutubeConfig } from './config.js'
 import { blockedReason, type YtItem } from './plan.js'
 import { fileKey, type YtStore } from './queue.js'
 
-export type UploadErrorKind = 'limit' | 'human' | 'outdated' | 'offline' | 'unsure' | 'retry'
+export type UploadErrorKind = 'limit' | 'human' | 'outdated' | 'offline' | 'unsure' | 'ui' | 'retry'
+
+/** Studio's upload dialog did not open or work: the same thing will fail again on the next video, so retrying every few minutes is pointless */
+const UI_ERROR = /^(file_input_not_found|details_not_shown|next_button_not_found|next_button_disabled|create_button_not_found|upload_menu_not_found|kids_radio_not_found|visibility_step_not_found|textbox_not_found|textbox_not_filled|content_script_unreachable)/
 
 /** What an extension error means for the queue */
 export function classifyUploadError(message: string): UploadErrorKind {
@@ -24,6 +27,7 @@ export function classifyUploadError(message: string): UploadErrorKind {
   if (/^bridge not connected/.test(m)) return 'offline'
   // publish may or may not have happened: never repeat, a person looks at the channel
   if (/^(post_unsure|bridge job timeout)/.test(m)) return 'unsure'
+  if (UI_ERROR.test(m)) return 'ui'
   return 'retry'
 }
 
@@ -151,7 +155,7 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
       const res = (await deps.bridge.send(job, BRIDGE_TIMEOUT_MS)) as { videoId?: string; url?: string }
       if (!res?.videoId || !res.url) throw new Error('post_unsure: the extension returned no video link')
       await store.complete(item, { videoId: res.videoId, url: res.url, at: deps.now(), title: item.title, short: item.short })
-      await store.setState({ inflight: null, lastUploadAt: deps.now(), pausedUntil: null, pauseReason: null })
+      await store.setState({ inflight: null, lastUploadAt: deps.now(), pausedUntil: null, pauseReason: null, uiFails: 0 })
       await record(deps, item, 'posted', { videoId: res.videoId, url: res.url })
       logger.info({ key: item.key, url: res.url }, 'YouTube upload published')
       if ((await store.report()).done === 1) await deps.notify(`First YouTube upload is live: ${res.url}`).catch(() => undefined)
@@ -182,6 +186,27 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
         await record(deps, item, 'failed', { error })
         await deps.notify(`YouTube: ${item.key} may or may not be published (${error.slice(0, 200)}). Check the channel; it will not be uploaded again.`).catch(() => undefined)
         return { state: 'failed', id: item.id, error }
+      }
+      if (kind === 'ui') {
+        // Studio's dialog is not working (13 Nov: 10 of 13 uploads failed with next_button_not_found, tab hidden or an empty dialog).
+        // The second failure in a row, on any video, stops the queue for 6 h with one message instead of burning every video's
+        // attempts; the video stays queued, and after the pause one attempt decides whether it works again.
+        const fails = ((await store.state()).uiFails ?? 0) + 1
+        await store.setState({ uiFails: fails })
+        if (fails >= 2) {
+          const hidden = /tab=hidden/.test(error)
+          const reason = hidden ? 'Chrome tab hidden (screen locked or Chrome minimized)' : 'Studio upload dialog not working'
+          if ((await store.state()).pauseReason !== reason) {
+            await deps
+              .notify(
+                hidden
+                  ? `YouTube: the Studio tab is hidden, so the upload dialog cannot open (screen locked, display off or Chrome minimized?). Unlock the laptop and keep Chrome open; uploads retry in 6 h. ${error.slice(0, 160)}`
+                  : `YouTube: Studio's upload dialog is not working (${fails} failures in a row). Open studio.youtube.com in Chrome and look for a prompt (verification, policy notice, channel switch); uploads retry in 6 h. ${error.slice(0, 160)}`,
+              )
+              .catch(() => undefined)
+          }
+          return pause(HUMAN_PAUSE_MS, reason)
+        }
       }
       const next: YtItem = { ...item, attempts: item.attempts + 1 }
       if (next.attempts >= MAX_ATTEMPTS) {

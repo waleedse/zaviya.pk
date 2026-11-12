@@ -184,7 +184,8 @@ describe('classifyUploadError', () => {
     ['bridge not connected', 'offline'],
     ['post_unsure_no_link: clicked publish', 'unsure'],
     ['bridge job timeout', 'unsure'],
-    ['file_input_not_found', 'retry'],
+    ['file_input_not_found', 'ui'],
+    ['next_button_not_found: url=/x tab=hidden', 'ui'],
     ['upload_not_finished: Uploading 40%', 'retry'],
   ])('%s -> %s', (msg, kind) => {
     expect(classifyUploadError(msg)).toBe(kind)
@@ -342,7 +343,7 @@ describe('uploadNext', () => {
   it('retries a failed attempt, then gives up after the maximum and records the error', async () => {
     await store.enqueue(item('a'))
     answer = async () => {
-      throw new Error('details_not_shown: dialog "Select files"')
+      throw new Error('upload_not_finished: Uploading 40%')
     }
     for (let i = 1; i < MAX_ATTEMPTS; i++) {
       expect((await uploadNext(deps())).state).toBe('retry')
@@ -352,6 +353,34 @@ describe('uploadNext', () => {
     expect((await store.report()).failed).toBe(1)
     expect(posts.at(-1)).toMatchObject({ status: 'failed', platform: 'youtube' })
     expect(await store.peek()).toBeNull()
+  })
+
+  it('stops after two Studio dialog failures in a row: one message, a 6 h pause, the video stays queued', async () => {
+    await store.enqueue(item('a'))
+    await store.enqueue(item('b'))
+    answer = async () => {
+      throw new Error('next_button_not_found: url=/videos/upload tab=hidden dialog=""')
+    }
+    expect((await uploadNext(deps())).state).toBe('retry')
+    now += 20 * 60_000
+    const second = await uploadNext(deps())
+    expect(second).toMatchObject({ state: 'paused', reason: expect.stringContaining('hidden') })
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toMatch(/screen locked|minimized/)
+    now += 3 * 3_600_000
+    expect((await uploadNext(deps())).state).toBe('paused') // still inside the 6 h pause
+    expect(sent).toHaveLength(2)
+    expect((await store.report()).failed).toBe(0)
+    // after the pause one attempt decides: it fails again, so another 6 h (no new message for the same reason)
+    now += 4 * 3_600_000
+    expect((await uploadNext(deps())).state).toBe('paused')
+    expect(sent).toHaveLength(3)
+    expect(notes).toHaveLength(1)
+    // a success clears the streak
+    answer = async () => ({ videoId: 'abcdefghijk', url: 'https://www.youtube.com/watch?v=abcdefghijk', visibility: 'public' })
+    now += 7 * 3_600_000
+    expect((await uploadNext(deps())).state).toBe('uploaded')
+    expect((await store.state()).uiFails).toBe(0)
   })
 
   it('never repeats an upload whose outcome is unknown', async () => {

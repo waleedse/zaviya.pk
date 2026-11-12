@@ -31,6 +31,8 @@ export interface YtState {
   lastUploadAt?: number
   /** the item being uploaded right now: after a restart its outcome is unknown, so it is never repeated blindly */
   inflight?: string
+  /** consecutive attempts that failed because Studio's upload dialog did not work (any video); a success resets it */
+  uiFails?: number
 }
 
 export interface DoneRecord {
@@ -114,6 +116,7 @@ export class YtStore {
       pauseReason: raw.pauseReason || undefined,
       lastUploadAt: raw.lastUploadAt ? Number(raw.lastUploadAt) : undefined,
       inflight: raw.inflight || undefined,
+      uiFails: raw.uiFails ? Number(raw.uiFails) : 0,
     }
   }
 

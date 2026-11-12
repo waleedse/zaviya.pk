@@ -27,4 +27,9 @@ describe('photos of living people: recent and adult (ZG-16)', () => {
     expect(acceptable('Young Imran Khan.jpg', info(), o)).toBe(true)
     expect(acceptable('Young Imran Khan.jpg', info(), o, false, 'adult')).toBe(false)
   })
+  it('a product shot is not a photo of the company or its people (Nvidia card, 12 Nov: an RTX 5070 laptop keynote file)', () => {
+    const o = { minWidth: 900, minAspect: 0.7 }
+    expect(acceptable('Nvidia RTX 5070 laptop keynote.jpg', info(), o, true)).toBe(false)
+    expect(acceptable('Nvidia headquarters, Santa Clara.jpg', info(), o, true)).toBe(true)
+  })
 })
