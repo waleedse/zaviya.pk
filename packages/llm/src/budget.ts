@@ -16,7 +16,8 @@ export interface ModelLimits {
 
 export const FLASH_LIMITS: ModelLimits = { rpm: 10, rpd: 250, tpm: 250_000 }
 export const LITE_LIMITS: ModelLimits = { rpm: 15, rpd: 1000, tpm: 250_000 }
-export const GEMMA_LIMITS: ModelLimits = { rpm: 15, rpd: 1500, tpm: 15_000 }
+// 12 Nov: gemma answered 429 at 15 rpm / 15k tpm (84 in a day), so stay under both
+export const GEMMA_LIMITS: ModelLimits = { rpm: 10, rpd: 1500, tpm: 10_000 }
 export const PREVIEW_LIMITS: ModelLimits = { rpm: 5, rpd: 100, tpm: 250_000 }
 /** A model nobody listed: stay well under any free tier. */
 export const UNKNOWN_LIMITS: ModelLimits = { rpm: 5, rpd: 100, tpm: 100_000 }
@@ -392,5 +393,5 @@ export class GeminiBudget {
 
 /** Rough prompt size for the per-minute token window (Urdu and English both land near 3 chars per token). */
 export function estimateTokens(messages: { content: string; images?: unknown[] }[]): number {
-  return messages.reduce((n, m) => n + Math.ceil(m.content.length / 3) + (m.images?.length ?? 0) * 1300, 0) + 50
+  return messages.reduce((n, m) => n + Math.ceil(m.content.length / 2.8) + (m.images?.length ?? 0) * 1300, 0) + 50
 }

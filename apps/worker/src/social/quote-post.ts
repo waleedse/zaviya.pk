@@ -230,7 +230,7 @@ export async function runQuoteRound(deps: QuoteDeps & { socialQueue: { add: (nam
       logger.info({ speaker: c.speaker }, 'quote skipped: speaker is not a known person')
       continue
     }
-    const photo: RealPhoto | null = await findPhotoForSubjects([c.wiki], fetchFn, { minWidth: 600, minAspect: 0.45 })
+    const photo: RealPhoto | null = await findPhotoForSubjects([c.wiki], fetchFn, { minWidth: 600, minAspect: 0.45 }, new Set([c.wiki]))
     if (!photo) {
       logger.info({ speaker: c.speaker, wiki: c.wiki }, 'quote skipped: no free photo of the speaker')
       continue

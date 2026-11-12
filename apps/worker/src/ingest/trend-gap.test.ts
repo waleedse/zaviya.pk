@@ -202,7 +202,7 @@ describe('search', () => {
     expect(decodeURIComponent(urls[0]!.url)).toContain('when:1d')
     expect(decodeURIComponent(urls[2]!.url)).toContain('site:fbr.gov.pk')
     expect(searchUrls('pubg mobile 4.7')).toHaveLength(2)
-    expect(decodeURIComponent(searchUrls('pak u19 vs ban u19')[2]!.url)).toContain('site:pcb.com.pk')
+    expect(decodeURIComponent(searchUrls('pak u19 vs ban u19').find((s) => s.official)!.url)).toContain('site:pcb.com.pk')
   })
   it('reads outlet and domain from the source tag', async () => {
     const xml = `<?xml version="1.0"?><rss version="2.0"><channel><item><title>Pakistan win - Dawn</title><link>https://news.google.com/rss/articles/abc</link><pubDate>Thu, 12 Nov 2026 09:00:00 GMT</pubDate><source url="https://www.dawn.com">Dawn</source></item></channel></rss>`

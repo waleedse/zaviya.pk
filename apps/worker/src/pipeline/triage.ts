@@ -17,6 +17,7 @@ import { isTrendingCluster } from './readable.js'
 import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 import type { TriageBatcher } from './triage-batch.js'
 import { prefilterReject } from './triage-prefilter.js'
+import { parseModelJson } from './json-tolerant.js'
 
 /** 0-50% extra (at most 10 min) so jobs told to come back at the same minute do not return as one wave */
 export const jitter = (ms: number) => ms + Math.floor(Math.random() * Math.min(ms * 0.5, 10 * 60_000))
@@ -141,7 +142,8 @@ export async function processTriageJob(
         // trending in Pakistan right now: first call on the daily Gemini budget
         urgent: isTrendMarked(cluster.items),
       })
-      const raw = JSON.parse(result.content) as { reason?: unknown }
+      // tolerant of a code fence or prose around the JSON: gemma adds a trailing fence, which cost a second call each time
+      const raw = parseModelJson(result.content) as { reason?: unknown }
       // ZAV-200: a reason stuck in a repetition loop is unreadable; ask again once, the schema cuts it if it loops again
       if (!final && typeof raw.reason === 'string' && repetitionCutoff(raw.reason) !== null) throw new ReasonLoopError()
       return TriageResultSchema.parse(raw)
@@ -159,7 +161,7 @@ export async function processTriageJob(
       // otherwise the cluster sits in `new` until another item happens to arrive.
       const delay = jitter(Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000)) + 5_000
       await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: 4, jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
-      logger.info({ clusterId: data.clusterId, delayMs: delay }, 'triage quota exhausted, requeued')
+      logger.info({ clusterId: data.clusterId, delayMs: delay, reasons: e.reasons }, 'triage quota exhausted, requeued')
       return
     }
     if (isInputBlocked(e)) {

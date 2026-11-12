@@ -18,7 +18,7 @@ describe('limits', () => {
   it('uses family defaults, a conservative default for unknown models, and env overrides', () => {
     expect(defaultLimits('gemini-3.8-flash').rpd).toBe(250)
     expect(defaultLimits('gemini-3.5-flash-lite').rpd).toBe(1000)
-    expect(defaultLimits('gemma-4-26b-a4b-it').tpm).toBe(15_000)
+    expect(defaultLimits('gemma-4-26b-a4b-it').tpm).toBe(10_000)
     expect(defaultLimits('gemini-9-mystery')).toEqual({ rpm: 5, rpd: 100, tpm: 100_000 })
     const { b } = budget({ limits: { '*': { rpm: 3 }, 'gemini-3.8-flash': { rpd: 7 } } })
     expect(b.limitsFor('gemini-3.8-flash')).toEqual({ rpm: 3, rpd: 7, tpm: 250_000 })

@@ -3,6 +3,7 @@ import { TriageResultSchema, repetitionCutoff, type TriageResult } from '@zaviya
 import { zodToJsonSchema, isInputBlocked, type LLMRouter } from '@zaviya/llm'
 import { triageSystemPrompt, triageUserPrompt } from '../prompts/triage.js'
 import { logger } from '../logger.js'
+import { parseModelJson } from './json-tolerant.js'
 
 type ClusterForPrompt = Parameters<typeof triageUserPrompt>[0] & { id: string }
 
@@ -10,6 +11,8 @@ type ClusterForPrompt = Parameters<typeof triageUserPrompt>[0] & { id: string }
 export const TriageBatchSchema = z.object({ results: z.array(TriageResultSchema.extend({ clusterId: z.string() })) })
 
 export const BATCH_LIMITS = { items: 4, chars: 400 }
+/** gemma often answers only some of a long list: 6 clusters a call kept more of them usable than 8 */
+export const BATCH_MAX = 6
 
 export function triageBatchSystemPrompt(): string {
   return `${triageSystemPrompt()}
@@ -48,7 +51,7 @@ export class TriageBatcher {
   score(cluster: ClusterForPrompt): Promise<TriageResult | null> {
     return new Promise((resolve, reject) => {
       this.pending.push({ cluster, resolve, reject })
-      if (this.pending.length >= (this.opts.max ?? 8)) void this.flush()
+      if (this.pending.length >= (this.opts.max ?? BATCH_MAX)) void this.flush()
       else if (!this.timer) this.timer = setTimeout(() => void this.flush(), this.opts.windowMs ?? 20_000)
     })
   }
@@ -56,7 +59,7 @@ export class TriageBatcher {
   private async flush(): Promise<void> {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
-    const batch = this.pending.splice(0, this.opts.max ?? 8)
+    const batch = this.pending.splice(0, this.opts.max ?? BATCH_MAX)
     if (this.pending.length) this.timer = setTimeout(() => void this.flush(), 0)
     if (!batch.length) return
     // One cluster alone gains nothing from a batch prompt: the single-cluster path handles it
@@ -74,7 +77,8 @@ export class TriageBatcher {
       })
       const byId = new Map<string, TriageResult>()
       try {
-        const parsed = JSON.parse(res.content) as { results?: unknown }
+        // gemma wraps its JSON in a code fence: a plain JSON.parse failed for 22 of 38 batches on 12 Nov
+        const parsed = parseModelJson(res.content) as { results?: unknown }
         for (const raw of Array.isArray(parsed.results) ? parsed.results : []) {
           const id = String((raw as { clusterId?: unknown }).clusterId ?? '')
           const reason = (raw as { reason?: unknown }).reason
