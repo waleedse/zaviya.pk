@@ -160,7 +160,7 @@ export async function createWorkerRuntime(
       async (job) => {
         // ZG-21: topics trending in Pakistan that no Zaviya story covers get credible sources ingested
         if (job.name === 'trend-gap') {
-          const run = await runTrendGap({ redis, payload, storeItems })
+          const run = await runTrendGap({ redis, payload, storeItems, nudge: { payload, writeQueue: queues.write, triageQueue: queues.triage, chain: [queues.write, queues.qa, queues.media, queues.publish] } })
           return { topics: run.topics, gaps: run.gaps.map((g) => `${g.term}: ${g.outcome}`) }
         }
         if (job.name === 'x-poll') {

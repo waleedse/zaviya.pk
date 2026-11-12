@@ -18,6 +18,9 @@ export function isStuckApproved(c: StuckCandidate, now: number, writingAgeMin: n
   if (c.status === 'writing') {
     const age = ageMin(c, now)
     if (triage.editorApproved === true) return age >= writingAgeMin
+    // ZG-21: triage's own "publish" decision puts a cluster in 'writing' too; when the write job then failed or was lost
+    // (cluster 34011, U19 semi-final: 44 items, 14 sources, no article, no job) nothing looked at it again
+    if (triage.codeOutcome === 'publish') return age >= writingAgeMin
     // ZAV-259: forced into 'writing' by hand without a triage object: nothing else ever looks at it again
     const noTriage = !c.triage || (typeof c.triage === 'object' && Object.keys(c.triage as object).length === 0)
     return noTriage && age >= writingAgeMin && age <= NO_TRIAGE_MAX_AGE_MIN
