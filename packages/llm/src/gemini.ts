@@ -1,5 +1,5 @@
 import type { ChatResult, LLMProvider, LlmPriority, LLMTask, Msg, ToolCall, ToolDef } from './types.js'
-import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, TASK_PRIORITY } from './types.js'
+import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_WRITER_CHAIN, TASK_PRIORITY, WRITER_MODEL_RESERVE_FOR_OTHERS } from './types.js'
 import { GeminiBudget, estimateTokens } from './budget.js'
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
@@ -65,6 +65,8 @@ class RateLimited extends Error {
     super('rate limited')
   }
 }
+
+const WRITER_MODELS = new Set(GEMINI_WRITER_CHAIN.split(','))
 
 /** Models the API itself rate-limited, as seen by this process (the shared view lives in the budget store). */
 const cooldowns = new Map<string, number>()
@@ -257,7 +259,10 @@ export class GeminiProvider implements LLMProvider {
       const left = candidates.filter((m) => !tried.has(m))
       if (!left.length) break
       // The first model in the chain with budget; waits a few seconds when all are only minute-limited
-      const pick = await this.budget.acquire(left, { priority, task, estTokens, signal: opts.signal })
+      // The writer models' day is kept half for writing: other tasks spill onto them only while more than half is left
+      const writing = task === 'write_en' || task === 'write_ur'
+      const reserveFloor = writing ? undefined : (m: string) => (WRITER_MODELS.has(m) ? WRITER_MODEL_RESERVE_FOR_OTHERS : 0)
+      const pick = await this.budget.acquire(left, { priority, task, estTokens, signal: opts.signal, reserveFloor })
       if (pick.model === null) {
         unavailable = { resetAt: pick.resetAt, reasons: pick.reasons }
         break

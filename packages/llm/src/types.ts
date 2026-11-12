@@ -86,6 +86,15 @@ export const GEMINI_WRITER_CHAIN = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6
 /** Cheap models for scoring, keyword research and QA. */
 export const GEMINI_LITE_CHAIN = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemma-4-26b-a4b-it'
 
+/**
+ * Triage, QA and SEO: the lite models first, then the writer models' spare daily quota (writing itself runs on the
+ * Cursor/Claude subscriptions, so the flash models sat at 0 calls on 12 Nov while gemma was rate-limited), gemma last.
+ * Non-writing tasks may use at most half of each writer model's day (WRITER_MODEL_SHARE_FOR_OTHERS).
+ */
+export const GEMINI_BULK_CHAIN = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-3-flash-preview,gemma-4-26b-a4b-it'
+/** Share of a writer model's daily budget kept for writing: triage, QA and SEO stop using it below this */
+export const WRITER_MODEL_RESERVE_FOR_OTHERS = 0.5
+
 /** Models that read screenshots (the extension's "eyes"): free-tier Gemini only, never a local or paid fallback. */
 export const GEMINI_VISION_CHAIN = 'gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite'
 

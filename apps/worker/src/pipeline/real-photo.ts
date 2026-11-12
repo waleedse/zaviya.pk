@@ -118,7 +118,7 @@ interface ImageInfo {
 }
 
 /** Files that are not photos of the subject */
-const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|diagram|emblem|icon|signature|poster|stamp|autograph|screenshot|banner|cartoon|caricature|painting|drawing/i
+const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|diagram|emblem|icon|signature|poster|stamp|autograph|screenshot|banner|cartoon|caricature|painting|drawing|laptops?|notebook|\brtx\b|\bgtx\b|geforce|radeon|\bgpu\b|graphics card|motherboard|smartphones?|iphone|unboxing/i
 
 const FREE_FILE = /\/wikipedia\/commons\/[^?]+\.(jpe?g|png)(\?|$)/i
 

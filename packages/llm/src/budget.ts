@@ -346,7 +346,7 @@ export class GeminiBudget {
    * (up to the priority's limit) for it to open; a spent day, a cooling model or a low-priority reserve count as
    * unavailable and `resetAt` says when the first one frees up.
    */
-  async acquire(models: string[], o: { priority: LlmPriority; task: string; estTokens: number; signal?: AbortSignal }): Promise<Acquired> {
+  async acquire(models: string[], o: { priority: LlmPriority; task: string; estTokens: number; signal?: AbortSignal; reserveFloor?: (model: string) => number }): Promise<Acquired> {
     const deadline = this.clock() + this.maxWaitFor(o.priority)
     for (;;) {
       const now = this.clock()
@@ -358,7 +358,7 @@ export class GeminiBudget {
           model,
           limits: this.limitsFor(model),
           estTokens: o.estTokens,
-          reserveFrac: this.reserveFor(o.priority),
+          reserveFrac: Math.max(this.reserveFor(o.priority), o.reserveFloor?.(model) ?? 0),
           task: o.task,
           now,
         })

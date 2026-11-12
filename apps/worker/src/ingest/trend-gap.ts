@@ -298,6 +298,7 @@ export function officialDomainsFor(term: string): string[] {
   if (/\b(fbr|tax|filer|atl|sro|iris|customs|income tax|sales tax)\b/.test(t)) out.push('fbr.gov.pk')
   if (/\b(school|schools|holiday|holidays|smog|exam|exams|board|admission|result|education)\b/.test(t)) out.push('punjab.gov.pk', 'sindh.gov.pk', 'kp.gov.pk', 'moe.gov.pk')
   if (/\b(sbp|state bank|policy rate|inflation)\b/.test(t)) out.push('sbp.org.pk')
+  if (/\b(weather|rain|rainfall|forecast|temperature|heatwave|heat wave|cold wave|fog|monsoon|pmd|met office)\b/.test(t)) out.push('pmd.gov.pk', 'ndma.gov.pk')
   if (/\b(pta|telecom|internet)\b/.test(t)) out.push('pta.gov.pk')
   if (/\b(petrol|diesel|ogra|gas price)\b/.test(t)) out.push('ogra.org.pk')
   return out
@@ -415,8 +416,12 @@ export function pickCredible(
   return [...first, ...rest].slice(0, TREND_GAP_MAX_ITEMS)
 }
 
-/** The bar for ingesting: 2+ items and 2+ distinct outlets, or an official item plus one more. */
-export function enoughSources(picks: Pick2[]): boolean {
+/** Topics where the government body is itself the authority (weather by PMD, taxes by FBR, rates by SBP, BISP, results): one official source is enough. */
+const OFFICIAL_IS_ENOUGH = /\b(weather|rain|rainfall|forecast|temperature|heatwave|heat wave|cold wave|fog|monsoon|pmd|met office|fbr|sbp|policy rate|nadra|pta|ogra|bisp|hec|ppsc|fpsc|datesheet|date sheet)\b/i
+
+/** The bar for ingesting: 2+ items and 2+ distinct outlets, or an official item plus one more; one official item alone for weather and government data. */
+export function enoughSources(picks: Pick2[], term = ''): boolean {
+  if (picks.length === 1 && picks[0]!.match.official && OFFICIAL_IS_ENOUGH.test(expandCricketShorthand(term))) return true
   if (picks.length < 2) return false
   return new Set(picks.map((p) => p.match.source.id)).size >= 2 || picks.some((p) => p.match.official)
 }
@@ -588,7 +593,7 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
     }
 
     const picks = pickCredible(topic.term, batches, sources, official ?? null, now())
-    if (!enoughSources(picks)) {
+    if (!enoughSources(picks, topic.term)) {
       await done('no-credible-source', `${picks.length} credible item(s) found, 2+ from different outlets needed`)
       continue
     }
