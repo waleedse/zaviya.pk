@@ -14,6 +14,7 @@ import { findSameStory } from './same-story.js'
 import { opinionCue, routeByStoryKind } from './story-kind.js'
 import { majorGlobalTopic } from './global-news.js'
 import { isTrendingCluster } from './readable.js'
+import { isTrendGapCluster } from '../ingest/trend-gap-mark.js'
 
 class ReasonLoopError extends Error {
   constructor() {
@@ -152,7 +153,9 @@ export async function processTriageJob(
   // ZAV-301: a major world story Pakistanis follow (US-Iran, US elections, Gulf, crypto hack...) is news, with a "what it means for Pakistan" angle
   const headlines = [cluster.headline, ...cluster.items.map((i) => i.title)]
   const globalTopic = majorGlobalTopic(...headlines)
-  const trendsHit = cluster.items.some((i) => /^google trends/i.test(i.source?.name ?? ''))
+  // A topic the trend-gap job found uncovered counts as a Google Trends hit too (ZG-21), and may use the extra publish slots
+  const trendGap = isTrendGapCluster(cluster.items)
+  const trendsHit = trendGap || cluster.items.some((i) => /^google trends/i.test(i.source?.name ?? ''))
 
   // Opinion is not news and a feature about an event abroad is not Pakistan news (ZAV-155)
   const kind = routeByStoryKind(triage, cluster.items, { globalTopic })
@@ -193,9 +196,10 @@ export async function processTriageJob(
   }
 
   // ZAV-237: the 4 h Jobs/AI floor is not held back by the daily cap (publish.ts already skips the pacing queue for it)
-  const quotaOverdue = QUOTA_CATEGORIES.includes(triage.category)
+  const quotaOverdue = trendGap || (QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
-    : false
+    : false)
+  if (trendGap) triage = { ...triage, trendGap: true } as TriageResult
 
   const decision = applyTriageRules(triage, {
     maxTier: cluster.maxTier,

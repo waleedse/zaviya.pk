@@ -106,7 +106,7 @@ const pipelineEndpoints: Endpoint[] = [
         key: z.string().min(2).max(60),
         name: z.string().min(2).max(120),
         url: z.string().url(),
-        type: z.enum(['rss', 'gnews']),
+        type: z.enum(['rss', 'gnews', 'data']),
         trustTier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
         language: z.enum(['en', 'ur', 'mixed']).optional(),
         categoryHint: z.string().max(40).optional(),
