@@ -38,6 +38,13 @@ export function versionAtLeast(version: string | null, min: string): boolean {
   return true
 }
 
+/**
+ * How long the worker waits for the extension. The extension's own worst case is a download (up to 5 min), a first try that fails
+ * after about 90 s, and a second try with the upload itself (a 20 MB explainer over a home line took over 10 min) and a 15 min cap on
+ * Studio's "Done" button: the worker must outlast all of it, or a good upload is recorded as "unknown outcome".
+ */
+export const BRIDGE_TIMEOUT_MS = 50 * 60_000
+
 export const MAX_ATTEMPTS = 3
 /** a failed attempt waits this long before the next one (the same Studio page may need a moment) */
 export const RETRY_PAUSE_MS = 10 * 60_000
@@ -141,7 +148,7 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
     }
     logger.info({ key: item.key, kind: item.kind, short: item.short, title: item.title }, 'YouTube upload starting')
     try {
-      const res = (await deps.bridge.send(job, 25 * 60_000)) as { videoId?: string; url?: string }
+      const res = (await deps.bridge.send(job, BRIDGE_TIMEOUT_MS)) as { videoId?: string; url?: string }
       if (!res?.videoId || !res.url) throw new Error('post_unsure: the extension returned no video link')
       await store.complete(item, { videoId: res.videoId, url: res.url, at: deps.now(), title: item.title, short: item.short })
       await store.setState({ inflight: null, lastUploadAt: deps.now(), pausedUntil: null, pauseReason: null })
@@ -151,7 +158,7 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
       return { state: 'uploaded', id: item.id, url: res.url }
     } catch (e) {
       const error = (e instanceof Error ? e.message : String(e)).slice(0, 1500)
-      await store.setState({ inflight: null })
+      await store.setState({ inflight: null, lastUploadAt: deps.now() })
       const kind = classifyUploadError(error)
       logger.warn({ key: item.key, kind, error }, 'YouTube upload did not finish')
       const pause = async (ms: number, reason: string) => {
