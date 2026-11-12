@@ -15,6 +15,11 @@ import { opinionCue, routeByStoryKind } from './story-kind.js'
 import { majorGlobalTopic } from './global-news.js'
 import { isTrendingCluster } from './readable.js'
 import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
+import type { TriageBatcher } from './triage-batch.js'
+import { prefilterReject } from './triage-prefilter.js'
+
+/** 0-50% extra (at most 10 min) so jobs told to come back at the same minute do not return as one wave */
+export const jitter = (ms: number) => ms + Math.floor(Math.random() * Math.min(ms * 0.5, 10 * 60_000))
 
 class ReasonLoopError extends Error {
   constructor() {
@@ -59,8 +64,12 @@ export async function releaseDeferredClusters(
   return released
 }
 
-/** A lone tier 1-2 cluster that no second outlet joined for this long goes to triage anyway (ZAV-147). */
-export const LONELY_TRIAGE_MIN = 180
+/**
+ * A lone tier 1-2 cluster that no second outlet joined for this long goes to triage anyway (ZAV-147). 6 h since ZG-22
+ * (was 3 h): one item with no trend match is not worth a call from the small free Gemini quota until a second outlet
+ * joins; a trending story is never lone (trend-gap ingests 2+ items) and does not wait on this sweep.
+ */
+export const LONELY_TRIAGE_MIN = 360
 
 /**
  * ZAV-147: embed only queues triage when a cluster is corroborated at the moment an item arrives. A cluster that was
@@ -90,6 +99,8 @@ export async function processTriageJob(
     autoApprove?: 'off' | 'safe' | 'all'
     /** Chrome extension bridge: reads the lede of headline-only sources at pitch time (ZAV-149) */
     bridge?: Pick<BridgeServer, 'isOnline' | 'send'>
+    /** Scores several non-trending clusters in one Gemini call (ZG-22); absent: one call per cluster */
+    batcher?: TriageBatcher
     /** Pitch normal stories to the editor instead of writing them at once */
     pitch?: boolean
     /** ZAV-301: finds readable text for a headline-only cluster (publisher RSS, another outlet's report); true when it saved something */
@@ -100,8 +111,21 @@ export async function processTriageJob(
   const cluster = await deps.payload.getCluster(data.clusterId)
   const settings = await deps.payload.getSettings().catch(() => ({}) as import('../payload-client.js').PipelineSettings)
 
-  let triage: TriageResult
+  // Trending in Pakistan (Google Trends / trend-gap mark / a major world story): scored alone and first, never filtered
+  const trendingNow = isTrendMarked(cluster.items) || Boolean(majorGlobalTopic(cluster.headline, ...cluster.items.map((i) => i.title)))
+  // What the rules close anyway is not sent to the model at all (ZG-22: calls are the scarce thing)
+  const skip = prefilterReject(cluster, { trending: trendingNow })
+  if (skip) {
+    await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { codeOutcome: 'reject', deferReason: skip } })
+    logger.info({ clusterId: data.clusterId, reason: skip }, 'triage: closed by rule, no model call')
+    return
+  }
+
+  let triage!: TriageResult
   try {
+    // Up to 8 non-trending clusters share one call; null means "ask for this one on its own"
+    const viaBatch = deps.batcher && !trendingNow ? await deps.batcher.score({ ...cluster, id: data.clusterId }) : null
+    if (viaBatch) triage = viaBatch
     const format = zodToJsonSchema(TriageResultSchema, { target: 'openApi3' }) as Record<string, unknown>
     const timeoutMs = 180_000
     const ask = async (limits: { items: number; chars: number }, final = false) => {
@@ -122,7 +146,7 @@ export async function processTriageJob(
       if (!final && typeof raw.reason === 'string' && repetitionCutoff(raw.reason) !== null) throw new ReasonLoopError()
       return TriageResultSchema.parse(raw)
     }
-    try {
+    if (!viaBatch) try {
       triage = await ask({ items: 8, chars: 700 })
     } catch (e) {
       if (!(e instanceof SyntaxError) && !(e instanceof ReasonLoopError)) throw e
@@ -133,7 +157,7 @@ export async function processTriageJob(
     if (isQuotaExhausted(e)) {
       // Out of quota is not a verdict on the story: look at it again once the first model frees up,
       // otherwise the cluster sits in `new` until another item happens to arrive.
-      const delay = Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000) + 5_000
+      const delay = jitter(Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000)) + 5_000
       await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: 4, jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
       logger.info({ clusterId: data.clusterId, delayMs: delay }, 'triage quota exhausted, requeued')
       return

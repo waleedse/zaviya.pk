@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { zodToJsonSchema, type LLMRouter } from '@zaviya/llm'
 import type { Redis } from 'ioredis'
@@ -99,6 +100,17 @@ export async function researchSeo(
   deps: { router: LLMRouter; payload: PayloadClient; redis?: Redis; fetchFn?: typeof fetch },
 ): Promise<SeoResearch | null> {
   const summary = storySummary(cluster)
+  // ZG-22: a rewrite after a QA failure (and a requeued write) used to repeat both SEO calls for the same story;
+  // the plan is kept for 6 h per cluster (key includes a hash of the summary so a changed cluster is planned again)
+  const cacheKey = `seo:plan:${cluster.id}:${createHash('sha1').update(summary).digest('hex').slice(0, 12)}`
+  if (deps.redis) {
+    try {
+      const hit = await deps.redis.get(cacheKey)
+      if (hit) return JSON.parse(hit) as SeoResearch
+    } catch {
+      /* no cache: plan again */
+    }
+  }
   try {
     const seeds = SeedQueriesSchema.parse(await chatJson(() => deps.router.chat('seo', {
       messages: [
@@ -159,7 +171,9 @@ export async function researchSeo(
       const firstSeed = seeds.en[0] ?? ''
       plan.primaryKeyword = suggestions[firstSeed]?.[0] ?? firstSeed
     }
-    return { plan, suggestions, matchedTrends, existing }
+    const research: SeoResearch = { plan, suggestions, matchedTrends, existing }
+    if (deps.redis) await deps.redis.set(cacheKey, JSON.stringify(research), 'EX', 6 * 3600).catch(() => {})
+    return research
   } catch (e) {
     logger.warn({ err: e instanceof Error ? e.message : e, clusterId: cluster.id, seoSkipped: true }, 'SEO research skipped')
     return null

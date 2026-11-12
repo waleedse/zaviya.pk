@@ -45,6 +45,9 @@ export async function runLearningJob(deps: { payload: PayloadClient; router: LLM
       logger.warn({ err: e instanceof Error ? e.message : e, articleId: c.articleId }, 'retitle failed')
     }
   }
+  // ZG-22: how much of today's free Gemini quota went where (the day ends at midnight Pacific)
+  const gemini = (await deps.router.budgetSummary().catch(() => [])).filter((r) => r.calls || r.rateLimited || r.recitation)
+  const geminiLine = gemini.length ? geminiReportLine(gemini) : ''
   const weights = Object.entries(res.categoryWeights)
     .filter(([, w]) => w !== 1)
     .map(([k, w]) => `${k} ×${w}`)
@@ -56,9 +59,23 @@ export async function runLearningJob(deps: { payload: PayloadClient; router: LLM
       res.gscConfigured ? `Search Console: ${res.gscPages} pages tracked` : 'Search Console not connected yet',
       res.topQueries.length ? `Top searches: ${res.topQueries.slice(0, 5).map((q) => q.query).join(', ')}` : '',
       changed.length ? `Headlines improved:\n${changed.join('\n')}` : '',
+      geminiLine,
     ]
       .filter(Boolean)
       .join('\n'),
   )
-  return { ...res, retitled: changed.length }
+  return { ...res, retitled: changed.length, gemini }
+}
+
+/** "Gemini today: 312 calls | gemma-4-26b-a4b-it 254/1500 (83% left; triage 193, seo 42) 19x429 ..." */
+export function geminiReportLine(
+  rows: { model: string; calls: number; limits: { rpd: number }; headroomPct: number; byTask: Record<string, number>; rateLimited: number; recitation: number }[],
+): string {
+  const total = rows.reduce((n, r) => n + r.calls, 0)
+  const parts = rows.map((r) => {
+    const tasks = Object.entries(r.byTask).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(', ')
+    const extra = [r.rateLimited ? `${r.rateLimited}x 429` : '', r.recitation ? `${r.recitation}x recitation` : ''].filter(Boolean).join(', ')
+    return `${r.model} ${r.calls}/${r.limits.rpd} (${r.headroomPct}% left${tasks ? `; ${tasks}` : ''})${extra ? ` ${extra}` : ''}`
+  })
+  return `Gemini today: ${total} calls | ${parts.join(' | ')}`
 }
