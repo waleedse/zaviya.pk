@@ -55,6 +55,16 @@ export function clusterAcceptsItems(
   return true
 }
 
+/** Cluster id an item already belongs to (Payload returns the id or, at depth > 0, the document), or null. */
+export function existingClusterId(cluster: unknown): string | null {
+  if (cluster === null || cluster === undefined || cluster === '') return null
+  if (typeof cluster === 'object') {
+    const id = (cluster as { id?: unknown }).id
+    return id === null || id === undefined ? null : String(id)
+  }
+  return String(cluster)
+}
+
 /** maxTier = best (most trusted) source tier in cluster — numerically minimum (1 beats 3). */
 export async function refreshClusterStats(payload: Payload, clusterId: string): Promise<void> {
   const items = await payload.find({
@@ -162,6 +172,10 @@ export async function runClusterMatch(
     depth: 0,
     overrideAccess: true,
   })
+  // The same embed job can run again (a worker restart leaves jobs to be re-run as "stalled"): an item that already
+  // sits in a cluster keeps it instead of opening yet another (empty, duplicate) cluster for itself.
+  const already = existingClusterId(item.cluster)
+  if (already) return { clusterId: already, isNew: false, similarity }
   const sourceId = typeof item.source === 'object' ? String(item.source.id) : String(item.source)
   const src = await payload.findByID({
     collection: 'sources',
