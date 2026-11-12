@@ -1,6 +1,5 @@
-import { embedder, loadConfig, subscriptionChain } from './config.js'
+import { loadConfig } from './config.js'
 import { PayloadClient } from './payload-client.js'
-import { LLMRouter } from '@zaviya/llm'
 import { createWorkerRuntime, shutdownRuntime } from './queues.js'
 import { BridgeServer } from './bridge/server.js'
 import { createTelegramBot } from './telegram/bot.js'
@@ -11,7 +10,7 @@ import { zodToJsonSchema } from '@zaviya/llm'
 import { triageSystemPrompt, triageUserPrompt } from './prompts/triage.js'
 import { logger } from './logger.js'
 import { Queue } from 'bullmq'
-import { createConnection } from './queues.js'
+import { buildRouter, createConnection } from './queues.js'
 import { queueHeroBackfill, backfillRealPhotos } from './pipeline/hero-backfill.js'
 
 const cmd = process.argv[2]
@@ -19,7 +18,7 @@ const cmd = process.argv[2]
 async function run() {
   const env = loadConfig()
   const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
-  const router = new LLMRouter({ ollamaUrl: env.OLLAMA_URL, geminiApiKey: env.GEMINI_API_KEY, localModel: env.LOCAL_MODEL, apiBaseUrl: env.LLM_API_BASE_URL, apiKey: env.LLM_API_KEY, apiFallbackModel: env.LLM_API_FALLBACK_MODEL, apiLightModel: env.LLM_API_LIGHT_MODEL, subscriptionChain: subscriptionChain(env), embedder: embedder(env) })
+  const router = buildRouter(env)
 
   // Take stories without a Gemini image offline and queue an image for each (the running worker does the rest).
   //   backfill-heroes --dry-run   only count them;  --ids=54,55  redo these articles

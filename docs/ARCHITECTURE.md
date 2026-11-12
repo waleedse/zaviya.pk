@@ -369,6 +369,8 @@ Implementations: `OllamaProvider` (`http://127.0.0.1:11434`), `GeminiProvider`.
 
 A `Router` picks the provider for each task using `settings.activeModels`. It switches to Gemini automatically when Ollama's health check fails, or when a job has waited more than its time limit (breaking: 3 minutes).
 
+**Gemini budget** (`packages/llm/src/budget.ts`): LLM work uses only Gemini's free tier (no paid API; `LLM_API_*` is ignored; Ollama only if it answers). Every call first reserves budget on a model: per-model RPM, RPD and TPM counters in Redis (`llm:budget:*`, Lua, shared by all worker processes; in-process fallback if Redis fails). The provider takes the first model in the chain with budget and waits up to 60 s (urgent) / 45 s (core) / 30 s (qa) / 8 s (low) when all are only minute-limited; a spent day is unavailable until midnight Pacific (`QuotaExhaustedError.resetAt`). Priorities: `urgent` (triage/write of a trending or trend-gap story) and `core` (triage, writing) can use the whole day; `qa` leaves 8% of each model's day; `low` (SEO, social) leaves 20%. A Gemma "copyright/recitation" 400 means "try the next model". Limits default to the free-tier family values (`defaultLimits`) and are overridden with `GEMINI_LIMITS` (JSON), `GEMINI_RESERVE_QA`, `GEMINI_RESERVE_LOW`. Metrics: the worker logs `gemini budget today` every ~10 min and keeps `llm:budget:summary` (JSON: calls, limit, left, headroom %, per-task calls, 429s, recitation) in Redis.
+
 Default model per task:
 
 | Task | Primary | Fallback |
