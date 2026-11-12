@@ -5,6 +5,7 @@ import {
   type BridgeJob,
   type HealActionMessage,
   type HealReport,
+  type JobDebug,
   type HealRequest,
 } from '@zaviya/shared'
 import { getSettings, type PlatformKey } from './storage'
@@ -53,6 +54,11 @@ export class BridgeClient {
       })
       this.sendRaw(req)
     })
+  }
+
+  /** A failed job's screenshot and page summary, for the worker's log */
+  sendDebug(debug: JobDebug): void {
+    this.sendRaw(debug)
   }
 
   sendReport(report: HealReport): void {
@@ -219,6 +225,8 @@ function jobPlatform(job: BridgeJob): PlatformKey | null {
       return 'instagram'
     case 'gemini.image':
       return 'gemini'
+    case 'youtube.upload':
+      return 'youtube'
     default:
       return null
   }

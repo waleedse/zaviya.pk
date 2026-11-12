@@ -1,4 +1,4 @@
-import type { BridgeJob, GeminiImageResult } from '@zaviya/shared'
+import type { BridgeJob, GeminiImageResult, JobDebug, YoutubeUploadResult } from '@zaviya/shared'
 import type { GeminiSelectors, GeneratedImage } from './gemini-dom'
 import { getSettings } from './storage'
 import { ensureGeminiWindowTab, ensureOwnTab, ensureTab, findTabForPlatform, navigateLeavingDrafts, sendToTab, showBriefly, withTimeout } from './tabs'
@@ -31,6 +31,8 @@ export async function runBridgeJob(job: BridgeJob): Promise<unknown> {
       return runInstagramReadProfile(job)
     case 'page.read':
       return readPage(job.payload.url)
+    case 'youtube.upload':
+      return runYoutubeUpload(job)
     case 'gemini.image': {
       // Hard ceiling per image so one stuck run can never block every later job.
       const run = geminiChain.then(() => withTimeout(runGeminiImage(job), 300_000, 'gemini_job_timeout'))
@@ -287,4 +289,106 @@ async function runGeminiImage(job: Extract<BridgeJob, { type: 'gemini.image' }>)
   if (!res.ok) throw new Error(`gemini_image_fetch_${res.status}`)
   const blob = await res.blob()
   return { base64: await blobToBase64(blob), mimeType: blob.type || 'image/png', width: generated.width, height: generated.height }
+}
+
+// ---- YouTube Studio upload ------------------------------------------------------------------------------------------------
+
+let sendDebug: (d: JobDebug) => void = () => undefined
+/** The bridge client hands over how a failed job's evidence (screenshot and page summary) reaches the worker */
+export function setDebugSender(fn: (d: JobDebug) => void): void {
+  sendDebug = fn
+}
+
+/** JPEG screenshot of a tab through the DevTools protocol: works for a background tab too. */
+async function screenshotJpeg(tabId: number): Promise<string | undefined> {
+  const target = { tabId }
+  let attached = false
+  try {
+    await chrome.debugger.attach(target, '1.3')
+    attached = true
+    const shot = (await chrome.debugger.sendCommand(target, 'Page.captureScreenshot', { format: 'jpeg', quality: 55 })) as { data?: string }
+    return shot.data
+  } catch {
+    return undefined
+  } finally {
+    if (attached) await chrome.debugger.detach(target).catch(() => undefined)
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(bin)
+}
+
+/** Raw bytes of the MP4 (an error names what went wrong: a short-lived URL that expired answers 404) */
+async function downloadVideo(url: string, expected?: number): Promise<Uint8Array> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 5 * 60_000)
+  try {
+    const res = await fetch(url, { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`video_download_failed: HTTP ${res.status}`)
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    if (bytes.length < 50_000) throw new Error(`video_download_failed: only ${bytes.length} bytes`)
+    if (expected && bytes.length !== expected) throw new Error(`video_download_failed: got ${bytes.length} bytes, expected ${expected}`)
+    return bytes
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('video_download_failed')) throw e
+    throw new Error(`video_download_failed: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const CHUNK_BYTES = 3 * 1024 * 1024
+
+/** Errors where nothing was published and Studio simply did not show the dialog: one more try with the tab in front is safe */
+const RETRY_IN_FRONT = /^(file_input_not_found|details_not_shown|create_button_not_found|upload_menu_not_found|buffer_lost|content_script_unreachable)/
+
+async function runYoutubeUpload(job: Extract<BridgeJob, { type: 'youtube.upload' }>): Promise<YoutubeUploadResult> {
+  const p = job.payload
+  const bytes = await downloadVideo(p.videoUrl, p.sizeBytes)
+  const url = p.channelId ? `https://studio.youtube.com/channel/${p.channelId}/videos/upload?d=ud` : 'https://studio.youtube.com/'
+  const [previous] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+
+  const attempt = async (front: boolean): Promise<YoutubeUploadResult> => {
+    const tabId = await ensureOwnTab(url, 'youtube')
+    let reported = false
+    try {
+      if (front) await chrome.tabs.update(tabId, { active: true })
+      // Studio redirects once or twice while it loads: let it settle before the file goes in
+      await sleep(6_000)
+      const send = <T>(msg: object, replyMs = 60_000) => sendToTab<T>(tabId, { kind: 'zaviya', ...msg }, 8, replyMs)
+      unwrapTabResponse(await send({ action: 'youtube.begin', size: bytes.length }))
+      for (let off = 0; off < bytes.length; off += CHUNK_BYTES) {
+        unwrapTabResponse(await send({ action: 'youtube.chunk', b64: bytesToBase64(bytes.subarray(off, off + CHUNK_BYTES)) }))
+      }
+      const res = await send<{ videoId?: string; url?: string; visibility?: string; error?: string; page?: string }>(
+        { action: 'youtube.upload', fileName: p.fileName, title: p.title, description: p.description, syntheticMedia: p.syntheticMedia },
+        20 * 60_000,
+      )
+      if (typeof res?.error === 'string') {
+        // evidence first (screenshot and page summary go to the worker's log), then the error
+        reported = true
+        sendDebug({ type: 'job.debug', id: job.id, note: `${res.error}\n${res.page ?? ''}`.slice(0, 8000), jpegBase64: await screenshotJpeg(tabId) })
+        throw new Error(`${res.error}${res.page ? ` [${res.page.slice(0, 400)}]` : ''}`.slice(0, 1500))
+      }
+      if (!res.videoId || !res.url) throw new Error('post_unsure_no_result: Studio reported no video link')
+      return { videoId: res.videoId, url: res.url, visibility: res.visibility }
+    } catch (e) {
+      if (!reported) sendDebug({ type: 'job.debug', id: job.id, note: (e instanceof Error ? e.message : String(e)).slice(0, 8000), jpegBase64: await screenshotJpeg(tabId) })
+      throw e
+    }
+  }
+
+  try {
+    try {
+      return await attempt(false)
+    } catch (e) {
+      if (!RETRY_IN_FRONT.test(e instanceof Error ? e.message : String(e))) throw e
+      return await attempt(true)
+    }
+  } finally {
+    if (previous?.id !== undefined) await chrome.tabs.update(previous.id, { active: true }).catch(() => undefined)
+  }
 }

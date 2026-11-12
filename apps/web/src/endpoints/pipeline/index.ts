@@ -679,8 +679,8 @@ const pipelineEndpoints: Endpoint[] = [
       const schema = z.object({
         idempotencyKey: z.string(),
         article: z.string(),
-        platform: z.enum(['facebook', 'instagram', 'x', 'whatsapp']),
-        format: z.enum(['link', 'card', 'carousel', 'reel', 'text']),
+        platform: z.enum(['facebook', 'instagram', 'x', 'whatsapp', 'youtube']),
+        format: z.enum(['link', 'card', 'carousel', 'reel', 'text', 'short', 'video']),
         copy: z.string(),
         mediaUrls: z.array(z.string()).optional(),
         status: z.enum(['queued', 'posting', 'posted', 'failed', 'deleted']),

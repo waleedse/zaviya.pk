@@ -6,6 +6,9 @@ import { logger } from '../logger.js'
 import { PayloadClient } from '../payload-client.js'
 import { TRENDS_KEY } from '../queues-keys.js'
 import { postFacebookReel, postInstagramReel } from '../social/reels.js'
+import { loadYoutubeConfig } from '../youtube/config.js'
+import { enqueueLive } from '../youtube/producer.js'
+import { YtStore, type YtRedis } from '../youtube/queue.js'
 import type { VideoConfig } from './config.js'
 import type { JobDeps, RedisLike } from './job.js'
 import { imageDecodes, makeGradientImage, renderEdition, renderNarrated, type ApiArticle, type ApiDataPoint } from './lib.js'
@@ -37,6 +40,7 @@ async function getJson<T>(url: string, tries = 3): Promise<T> {
 export function createJobDeps(env: WorkerEnv, cfg: VideoConfig, redis: Redis, hub?: MediaHub, scriptQueue?: Queue): JobDeps {
   const base = env.PAYLOAD_URL.replace(/\/+$/, '')
   const payload = new PayloadClient(env.PAYLOAD_URL, env.PAYLOAD_API_KEY)
+  const yt = loadYoutubeConfig()
   return {
     cfg,
     redis: redis as unknown as RedisLike,
@@ -113,6 +117,12 @@ export function createJobDeps(env: WorkerEnv, cfg: VideoConfig, redis: Redis, hu
       if (!env.META_PAGE_ID) return { ok: false, error: 'META_PAGE_ID is not set' }
       return postFacebookReel({ file: input.file, description: input.text, title: input.title }, { pageId: env.META_PAGE_ID, token })
     },
+    // YouTube Shorts: YOUTUBE_SHORTS=0 turns it off
+    enqueueYoutube: yt.enabled
+      ? async (dir, articleId) => {
+          await enqueueLive(new YtStore(redis as unknown as YtRedis), dir, { siteUrl: cfg.siteUrl, articleId })
+        }
+      : undefined,
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     now: () => Date.now(),
   }
@@ -142,6 +152,7 @@ export function createExplainerDeps(env: WorkerEnv, cfg: VideoConfig, redis: Red
     renderNarrated: jobDeps.renderNarrated!,
     telegram: jobDeps.telegram,
     postReel: jobDeps.postReel,
+    enqueueYoutube: jobDeps.enqueueYoutube,
     payload: jobDeps.payload,
     sleep: jobDeps.sleep,
     now: jobDeps.now,

@@ -627,8 +627,8 @@ export interface ReviewQueue {
 export interface SocialPost {
   id: number;
   article: number | Article;
-  platform: 'facebook' | 'instagram' | 'x' | 'whatsapp';
-  format: 'link' | 'card' | 'carousel' | 'reel' | 'text';
+  platform: 'facebook' | 'instagram' | 'x' | 'whatsapp' | 'youtube';
+  format: 'link' | 'card' | 'carousel' | 'reel' | 'text' | 'short' | 'video';
   copy: string;
   mediaUrls?:
     | {

@@ -144,7 +144,7 @@ Seed data: `pakistan`, `world`, `business`, `tech-telecom`, `autos`, `cricket`, 
 
 **review-queue**: cluster, article, reason, flags[], telegramMessageId, decision (`approve`, `reject`, `hold`, `edit`), decidedBy, decidedAt.
 
-**social-posts**: article, platform (`facebook`, `instagram`, `x`, `whatsapp`), format (`link`, `card`, `carousel`, `reel`, `text`), copy, mediaUrls[], status (`queued`, `posting`, `posted`, `failed`, `deleted`), scheduledAt, postedAt, externalId, via (`api`, `extension`), idempotencyKey (unique), error, metrics (json).
+**social-posts**: article, platform (`facebook`, `instagram`, `x`, `whatsapp`, `youtube`), format (`link`, `card`, `carousel`, `reel`, `text`, `short`, `video`), copy, mediaUrls[], status (`queued`, `posting`, `posted`, `failed`, `deleted`), scheduledAt, postedAt, externalId, via (`api`, `extension`), idempotencyKey (unique), error, metrics (json).
 
 **audit-log**: entity, entityId, action, actor (`ai:<model>`, `user:<id>`, `system`), payload (json), at.
 
@@ -402,6 +402,7 @@ Default model per task:
 { "id": "job_123", "type": "x.post", "payload": { "text": "...", "mediaUrls": ["..."] } }
 { "id": "job_124", "type": "x.readList", "payload": { "listUrl": "...", "sinceId": "..." } }
 { "id": "job_125", "type": "gemini.image", "payload": { "prompt": "..." } }
+{ "id": "job_126", "type": "youtube.upload", "payload": { "videoUrl": "https://.../media/yt/<token>.mp4", "title": "... #Shorts", "description": "..." } }  // see docs/YOUTUBE.md
 // extension -> worker
 { "id": "job_123", "ok": true, "result": { "externalId": "1789..." } }
 { "id": "job_123", "ok": false, "error": "checkpoint_detected" }

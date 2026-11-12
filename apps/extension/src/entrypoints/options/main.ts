@@ -6,6 +6,7 @@ const platformX = document.getElementById('platformX') as HTMLInputElement
 const platformInstagram = document.getElementById('platformInstagram') as HTMLInputElement
 const platformFacebook = document.getElementById('platformFacebook') as HTMLInputElement
 const platformGemini = document.getElementById('platformGemini') as HTMLInputElement
+const platformYoutube = document.getElementById('platformYoutube') as HTMLInputElement
 const geminiSelectors = document.getElementById('geminiSelectors') as HTMLTextAreaElement
 const testPrompt = document.getElementById('testPrompt') as HTMLInputElement
 const testGemini = document.getElementById('testGemini') as HTMLButtonElement
@@ -25,6 +26,7 @@ async function load(): Promise<void> {
   platformInstagram.checked = s.platforms.instagram
   platformFacebook.checked = s.platforms.facebook
   platformGemini.checked = s.platforms.gemini
+  platformYoutube.checked = s.platforms.youtube
   geminiSelectors.value = s.geminiSelectorsJson
   delayMin.value = String(s.actionDelayMinMs)
   delayMax.value = String(s.actionDelayMaxMs)
@@ -39,6 +41,7 @@ saveBtn.addEventListener('click', async () => {
       instagram: platformInstagram.checked,
       facebook: platformFacebook.checked,
       gemini: platformGemini.checked,
+      youtube: platformYoutube.checked,
     },
     geminiSelectorsJson: geminiSelectors.value.trim(),
     actionDelayMinMs: Number(delayMin.value) || DEFAULT_SETTINGS.actionDelayMinMs,

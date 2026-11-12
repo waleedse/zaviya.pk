@@ -5,11 +5,12 @@ const PLATFORM_PATTERNS: Record<PlatformKey, RegExp[]> = {
   instagram: [/^https?:\/\/(www\.)?instagram\.com\//i],
   facebook: [/^https?:\/\/(www\.)?facebook\.com\//i, /^https?:\/\/(www\.)?web\.facebook\.com\//i],
   gemini: [/^https?:\/\/gemini\.google\.com\//i],
+  youtube: [/^https?:\/\/studio\.youtube\.com\//i],
 }
 
 export async function scanOpenPlatforms(): Promise<Record<PlatformKey, boolean>> {
   const tabs = await chrome.tabs.query({})
-  const out: Record<PlatformKey, boolean> = { x: false, instagram: false, facebook: false, gemini: false }
+  const out: Record<PlatformKey, boolean> = { x: false, instagram: false, facebook: false, gemini: false, youtube: false }
   for (const tab of tabs) {
     const url = tab.url ?? ''
     for (const key of Object.keys(PLATFORM_PATTERNS) as PlatformKey[]) {

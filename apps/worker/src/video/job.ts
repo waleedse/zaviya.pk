@@ -42,6 +42,8 @@ export interface JobDeps {
   renderNarrated?(args: { timeline: NarratedTimeline; outDir: string; assetsDir: string }): Promise<{ mp4: string; cover: string; durationMs: number }>
   telegram: VideoTelegram
   postReel(platform: VideoPlatform, input: { file: string; text: string; title?: string }): Promise<ReelResult>
+  /** queue the finished video (its folder) for YouTube; absent when YouTube is off */
+  enqueueYoutube?(dir: string, articleId?: string): Promise<void>
   sleep(ms: number): Promise<void>
   now(): number
 }
@@ -217,6 +219,9 @@ export async function runEdition(deps: JobDeps, slot: Slot, opts: RunOptions = {
     await redis.set(`video:done:${key}`, 'skipped', 'EX', DONE_TTL)
     return { status: 'skipped', key, dir, mp4, renderMs }
   }
+
+  // 6b. YouTube: every daily video goes there too, queued the moment it is cleared to post (the uploader paces it)
+  await deps.enqueueYoutube?.(dir, leadId !== undefined ? String(leadId) : undefined).catch((e: unknown) => log.warn({ err: String(e) }, 'could not queue the video for YouTube'))
 
   // 7. post, each platform claimed first so it can never go out twice
   const results: Record<string, string> = {}

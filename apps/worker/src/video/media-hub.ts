@@ -9,7 +9,7 @@
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { logger } from '../logger.js'
 
@@ -246,11 +246,38 @@ function send(res: ServerResponse, status: number, body?: unknown): void {
 /** Extra authenticated routes (the explainer ideas for the editor): return null to say "not mine". */
 export type ExtraRoutes = (method: string, pathname: string, body: unknown) => Promise<{ status: number; body?: unknown } | null>
 
-export function startMediaHubServer(hub: MediaHub, opts: { port: number; token: string; host?: string; extra?: ExtraRoutes }): Server {
+/**
+ * Files served without the agent token: the URL itself is the secret (a random token the uploader minted, valid for minutes).
+ * `resolve` turns the request path into a file on disk, or null.
+ */
+export type PublicFiles = (pathname: string) => Promise<string | null>
+
+/** The MP4 behind a short-lived YouTube token (/yt/<32 hex>.mp4), only from inside `root` */
+export function youtubeFileResolver(redis: { get(k: string): Promise<string | null> }, root: string): PublicFiles {
+  return async (pathname) => {
+    const m = /^\/yt\/([a-f0-9]{32})\.mp4$/.exec(pathname)
+    if (!m) return null
+    const file = await redis.get(`yt:file:${m[1]}`)
+    if (!file) return null
+    const resolved = path.resolve(file)
+    return resolved.startsWith(path.resolve(root) + path.sep) && existsSync(resolved) ? resolved : null
+  }
+}
+
+export function startMediaHubServer(hub: MediaHub, opts: { port: number; token: string; host?: string; extra?: ExtraRoutes; publicFiles?: PublicFiles }): Server {
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://hub')
       if (url.pathname === '/health') return send(res, 200, { ok: true })
+      if (req.method === 'GET' && opts.publicFiles) {
+        const file = await opts.publicFiles(url.pathname)
+        if (file) {
+          const size = statSync(file).size
+          res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': size, 'cache-control': 'no-store' })
+          createReadStream(file).pipe(res)
+          return
+        }
+      }
       if (!authorised(req, opts.token)) return send(res, 401, { error: 'unauthorised' })
       await hub.markAgentSeen()
 

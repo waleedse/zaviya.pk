@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws'
-import { BridgeJobSchema, BridgeMessageSchema, type BridgeJob, type HealActionMessage, type HealReport, type HealRequest } from '@zaviya/shared'
+import { BridgeJobSchema, BridgeMessageSchema, type BridgeJob, type HealActionMessage, type HealReport, type HealRequest, type JobDebug } from '@zaviya/shared'
 import { logger } from '../logger.js'
 
 interface Pending {
@@ -44,6 +44,13 @@ export class BridgeServer {
   stop(): void {
     this.wss?.close()
     this.wss = null
+  }
+
+  private onDebug: ((d: JobDebug) => void) | null = null
+
+  /** A failed job's screenshot and page summary from the extension (YouTube uploads) */
+  setDebugHandler(fn: (d: JobDebug) => void): void {
+    this.onDebug = fn
   }
 
   /** The extension's "eyes": answers heal.request with an allowed action and records heal.report */
@@ -94,6 +101,15 @@ export class BridgeServer {
         .then((reply) => {
           if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(reply))
         })
+      return
+    }
+    if ('type' in data && data.type === 'job.debug') {
+      if (ws !== this.socket || !this.authenticated) return
+      try {
+        this.onDebug?.(data)
+      } catch (e) {
+        logger.warn({ err: e }, 'job debug handler failed')
+      }
       return
     }
     if ('type' in data && data.type === 'heal.report') {

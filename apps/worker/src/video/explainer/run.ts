@@ -50,6 +50,8 @@ export interface ExplainerDeps {
   renderNarrated(args: { timeline: NarratedTimeline; outDir: string; assetsDir: string }): Promise<{ mp4: string; cover: string; durationMs: number }>
   telegram: VideoTelegram
   postReel(platform: VideoPlatform, input: { file: string; text: string; title?: string }): Promise<ReelResult>
+  /** queue the finished video (its folder) for YouTube; absent when YouTube is off */
+  enqueueYoutube?(dir: string, articleId?: string): Promise<void>
   payload: { upsertSocialPost(body: Record<string, unknown> & { idempotencyKey: string; article: string; platform: string }): Promise<unknown> }
   sleep(ms: number): Promise<void>
   now(): number
@@ -301,6 +303,7 @@ export async function runExplainerRound(deps: ExplainerDeps, opts: ExplainerOpti
 
   // 7. post (each platform claimed first so it can never go out twice)
   const anchor = String(idea.articleId ?? articles[0]?.id ?? 1)
+  await deps.enqueueYoutube?.(dir, anchor).catch((e: unknown) => log.warn({ err: String(e) }, 'could not queue the explainer for YouTube'))
   const results: Record<string, string> = {}
   for (const platform of cfg.platforms) {
     const claimed = await redis.set(`explainer:posted:${key}:${platform}`, '1', 'EX', 172800, 'NX')
