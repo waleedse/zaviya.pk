@@ -18,7 +18,6 @@ import { opinionCue } from './story-kind.js'
 export const REVIEW_DRAIN_MIN = 30
 export const REVIEW_DRAIN_BATCH = 5
 const DEFAULT_REVIEW = 0.5
-const GUARDED_FLAGS = ['blasphemy', 'minor']
 
 export type DrainVerdict = { action: 'write'; reason: string; score: number } | { action: 'reject'; reason: string; score: number }
 
@@ -54,8 +53,6 @@ export function decideStaleReview(
   }
   const reject = (reason: string): DrainVerdict => ({ action: 'reject', reason: `review drain: ${reason}`, score })
 
-  const guarded = flags.filter((f) => GUARDED_FLAGS.includes(f))
-  if (guarded.length) return reject(`${guarded.join(' and ')} stories are never auto-published (legal risk in Pakistan)`)
   if (/^QA failed/i.test(c.review?.reason ?? '')) return reject(`QA could not verify the draft against the sources (${(c.review?.reason ?? '').slice(0, 140)})`)
   if (flags.includes('unverified')) return reject('unverified claim, no credible outlet backs it')
   if (items.length && !hasFreshSource(items, now)) return reject('stale sources: no source from the last 18 hours')

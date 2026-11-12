@@ -1,7 +1,7 @@
 /** The explainer backlog over HTTP for the editor agent (and for Waleed): list, add, decide, and make one now. */
 import { z } from 'zod'
 import type { ExtraRoutes } from '../media-hub.js'
-import { blockedReason, HOUR, ideaId, isGovernment, isSensitive, scoreIdea, type Idea, IdeaStore } from './ideas.js'
+import { blockedReason, HOUR, ideaId, scoreIdea, type Idea, IdeaStore } from './ideas.js'
 
 const AddSchema = z.object({
   title: z.string().min(8).max(160),
@@ -46,7 +46,6 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
       const p = AddSchema.safeParse(body)
       if (!p.success) return { status: 400, body: { error: p.error.issues[0]?.message ?? 'invalid' } }
       if (p.data.trending && p.data.sources.length < 2) return { status: 400, body: { error: 'a trending story needs 2 or more source URLs (several outlets)' } }
-      const text = `${p.data.title} ${p.data.angle}`
       const blocked = blockedReason({ title: p.data.title, angle: p.data.angle, trending: p.data.trending, decision: 'ok', risk: 'low' }, true)
       if (blocked) return { status: 400, body: { error: blocked } }
       const t = now()
@@ -61,7 +60,7 @@ export function explainerRoutes(store: IdeaStore, now: () => number, runNow: (o:
         createdAt: t,
         ...(p.data.hours ? { hookUntil: t + p.data.hours * HOUR } : {}),
         ...(p.data.trending ? { trending: true } : {}),
-        risk: isSensitive(text) || isGovernment(text) ? 'needs-veto' : 'low',
+        risk: 'low',
         status: 'backlog',
       }
       await store.put(idea)

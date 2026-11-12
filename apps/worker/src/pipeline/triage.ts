@@ -271,8 +271,8 @@ export async function processTriageJob(
 
   if (decision.outcome === 'reject') return
 
-  // Auto-approve: sensitive-topic stories go straight to writing (QA still checks every fact).
-  const neverAuto = deps.autoApprove === 'all' ? [] : ['blasphemy', 'minor']
+  // Auto-approve: sensitive-topic stories go straight to writing, none excluded since 13 Nov (QA still checks every fact).
+  const neverAuto: string[] = []
   if (
     decision.outcome === 'review' &&
     deps.autoApprove &&

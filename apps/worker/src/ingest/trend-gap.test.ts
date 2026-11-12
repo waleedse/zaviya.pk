@@ -319,11 +319,18 @@ describe('runTrendGap', () => {
     expect(s.stored).toHaveLength(0)
   })
 
-  it('skips sensitive and gossip topics without searching', async () => {
+  it('skips gossip without searching, but searches sensitive topics like any other (13 Nov)', async () => {
     const s = setup({ trends: [{ query: 'imran khan court hearing', traffic: 50_000 }, { query: 'taylor swift wedding', traffic: 30_000 }], news: u19News })
     const run = await runTrendGap(s.deps as never)
-    expect(run.gaps.map((g) => g.outcome)).toEqual(['skipped-sensitive', 'skipped-entertainment'])
-    expect(s.fetchFn).not.toHaveBeenCalled()
+    // the political topic is searched (no credible coverage in this fixture); the celebrity one is still skipped
+    expect(run.gaps.map((g) => g.outcome)).toEqual(['no-credible-source', 'skipped-entertainment'])
+    expect(s.fetchFn).toHaveBeenCalled()
+  })
+  it('ingests a sensitive trend when credible outlets cover it', async () => {
+    const news = (term: string) => [hit(`${term} latest report`, 'Dawn', 'www.dawn.com'), hit(`${term} reported by Geo`, 'Geo News', 'www.geo.tv')]
+    const s = setup({ trends: [{ query: 'army chief meeting update', traffic: 40_000 }], news })
+    const run = await runTrendGap(s.deps as never)
+    expect(run.gaps.map((g) => g.outcome)).toEqual(['ingested'])
   })
 
   it('starts at most 6 trend-gap stories a day', async () => {

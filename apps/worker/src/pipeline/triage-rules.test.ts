@@ -28,12 +28,11 @@ describe('applyTriageRules', () => {
     expect(t.outcome).toBe('review')
   })
 
-  it('sends sensitive stories to review', () => {
-    const d = applyTriageRules(
-      { ...baseTriage, sensitivityFlags: ['military'] },
-      { maxTier: 1, distinctSources: 3, settings: {} },
-    )
-    expect(d.outcome).toBe('review')
+  it('does not hold a story for its topic: sensitivity flags no longer force review (13 Nov)', () => {
+    for (const flag of ['military', 'judiciary', 'religion', 'blasphemy', 'violence', 'death', 'minor', 'election'] as const) {
+      const d = applyTriageRules({ ...baseTriage, sensitivityFlags: [flag] }, { maxTier: 1, distinctSources: 3, settings: {} })
+      expect(d.outcome).toBe('publish')
+    }
   })
 
   it('rejects tier-3 single source unless high news', () => {

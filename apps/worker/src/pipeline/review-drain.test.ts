@@ -24,10 +24,9 @@ describe('decideStaleReview (ZAV-301)', () => {
     expect(decideStaleReview(cluster(), items, {}, NOW).action).toBe('write')
   })
 
-  it.each(['blasphemy', 'minor'])('keeps the %s guard: never auto-published', (flag) => {
+  it.each(['blasphemy', 'minor'])('no longer guards the %s flag: written like any other story (13 Nov)', (flag) => {
     const v = decideStaleReview(cluster({ triage: { ...baseTriage, sensitivityFlags: [flag] } }), items, {}, NOW)
-    expect(v.action).toBe('reject')
-    expect(v.reason).toMatch(/never auto-published/)
+    expect(v.action).toBe('write')
   })
 
   it('closes a draft QA could not verify', () => {
@@ -72,9 +71,9 @@ describe('drainReviewQueue (ZAV-301)', () => {
     return { payload, writeQueue }
   }
 
-  it('asks for clusters idle 30 min, writes the good ones without an editor gate and closes the rest with a reason', async () => {
+  it('asks for clusters idle 30 min, writes the good ones without an editor gate and closes the unverified with a reason', async () => {
     const good = cluster({ id: '1' })
-    const bad = cluster({ id: '2', triage: { ...baseTriage, sensitivityFlags: ['minor'] }, review: { id: '20', reason: 'Sensitivity flags: minor', flags: ['minor'], decision: null } })
+    const bad = cluster({ id: '2', triage: { ...baseTriage, sensitivityFlags: ['unverified'] }, review: { id: '20', reason: 'unverified claim', flags: ['unverified'], decision: null } })
     const d = setup([good, bad])
     const r = await drainReviewQueue(d as never, NOW)
     expect(d.payload.reviewBacklog).toHaveBeenCalledWith(30)

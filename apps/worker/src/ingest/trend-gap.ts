@@ -201,7 +201,7 @@ export function findCoveringArticle(topic: Pick<TrendTopic, 'term' | 'newsTitles
 
 // ---- what is skipped ------------------------------------------------------------------------------------------------
 
-/** Politics, army, religion, courts, elections: a human looks at these (HARD_FLAGS in triage-rules.ts), so the trend job does not start them. */
+/** Kept for the log and tests only: since 13 Nov no trend is skipped for these topics. */
 const SENSITIVE: { why: string; re: RegExp }[] = [
   { why: 'army', re: /\b(army|armed forces|military|ispr|isi|generals?|corps commander|field marshal|asim munir|martial law|cantonment|soldiers?|martyred|shaheed|terror\w*|attack(ed)? on|ceasefire|airstrikes?|drone strikes?)\b/i },
   { why: 'politics', re: /\b(imran khan|nawaz|shehbaz|zardari|bilawal|maryam nawaz|pti|pml-?n|ppp|mqm|tlp|jui-?f|anp|politic\w*|parliament|senate|national assembly|prime minister|chief minister|cm punjab|opposition|protest\w*|rigging|no[- ]confidence|constitutional amendment|27th amendment|28th amendment|governor rule|arrest(ed)? of)\b/i },
@@ -550,11 +550,8 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
       await record(deps, entry, key)
     }
 
-    const why = sensitiveReason(topic)
-    if (why) {
-      await done('skipped-sensitive', why)
-      continue
-    }
+    // 13 Nov (Waleed): trends about the army, politics, courts, religion or violence are ingested like any other trend; the
+    // credible-source rules below still apply.
     if (skipAsGossip(topic)) {
       await done('skipped-entertainment', 'gossip or foreign celebrity without a Pakistan angle')
       continue
