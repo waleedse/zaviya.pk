@@ -11,6 +11,8 @@ import {
 } from '@/lib/weather'
 
 const CREDIT_URL = 'https://open-meteo.com/'
+/** Official warnings and bulletins: linked only, never read by us (their site blocks automated readers) */
+const PMD_URL = 'https://pmd.gov.pk'
 
 export function weatherCitySeo(city: PkCity, locale: Locale, now: Date = new Date()) {
   const tom = shortDate(addDays(pktToday(now), 1), locale === 'ur')
@@ -33,8 +35,8 @@ export function weatherHubSeo(locale: Locale, now: Date = new Date()) {
         description: 'پاکستان کے بڑے شہروں میں کل کا موسم: بارش، دھند اور درجہ حرارت، اور ہر شہر کی 10 دن کی پیشگوئی۔',
       }
     : {
-        title: `Weather Tomorrow in Pakistan: Lahore, Karachi, Islamabad (${tom})`,
-        description: 'Weather tomorrow in Pakistan: rain, fog and temperature for Lahore, Karachi, Islamabad and other major cities, with a 10-day forecast for each.',
+        title: `Weather Tomorrow in Pakistan: Karachi Weather, Lahore Weather Tomorrow (${tom})`,
+        description: 'Weather tomorrow in Pakistan, city by city: Karachi weather, Lahore weather tomorrow, Islamabad and more. Temperature, rain and fog from the Open-Meteo model, with a 10-day forecast and a link to PMD for official warnings.',
       }
 }
 
@@ -53,7 +55,9 @@ function Credit({ isUr }: { isUr: boolean }) {
     <p className="mt-3 text-sm text-fg-muted">
       {isUr ? 'موسمی ڈیٹا: ' : 'Weather data: '}
       <a href={CREDIT_URL} rel="noopener" className="underline">Open-Meteo</a>
-      {isUr ? ' (CC BY 4.0)، تقریباً ہر 30 منٹ بعد اپ ڈیٹ۔ یہ ماڈل کی پیشگوئی ہے، محکمہ موسمیات کی نہیں۔' : ' (CC BY 4.0), refreshed about every 30 minutes. This is a model forecast, not an official PMD bulletin.'}
+      {isUr ? ' (CC BY 4.0)، تقریباً ہر 30 منٹ بعد اپ ڈیٹ۔ یہ ماڈل کی پیشگوئی ہے، محکمہ موسمیات کی نہیں۔ سرکاری وارننگز کے لیے ' : ' (CC BY 4.0), refreshed about every 30 minutes. This is a model forecast, not an official PMD bulletin. For official warnings see the '}
+      <a href={PMD_URL} rel="noopener" className="underline">{isUr ? 'پاکستان محکمہ موسمیات (PMD)' : 'Pakistan Meteorological Department (PMD)'}</a>
+      {isUr ? ' دیکھیں۔' : '.'}
     </p>
   )
 }
@@ -229,13 +233,23 @@ export function WeatherHubView({ locale, weather, now = new Date() }: { locale: 
   const tomDate = addDays(pktToday(now), 1)
   const rows = weather.map((w) => ({ w, d: dayFor(w, tomDate) })).filter((r): r is { w: CityWeather; d: WeatherDay } => Boolean(r.d))
   const seo = weatherHubSeo(locale, now)
+  // One short line per main city for the searches "karachi weather", "lahore weather tomorrow"
+  const line = (w: CityWeather, d: WeatherDay) => {
+    const c = conditionFor(d.code)
+    return isUr
+      ? `${w.ur}: ${c.ur}، ${d.min}° سے ${d.max}°C${d.rainChance === null ? '' : `، بارش کا امکان ${d.rainChance}%`}۔`
+      : `${w.en} weather tomorrow: ${c.en.toLowerCase()}, ${d.min}° to ${d.max}°C${d.rainChance === null ? '' : `, ${d.rainChance}% chance of rain`}.`
+  }
+  const city = (slug: string) => rows.find((r) => r.w.slug === slug)
   const faqs = [
     isUr
       ? { q: 'کل پاکستان میں موسم کیسا رہے گا؟', a: rows.length ? 'ہر شہر کا کل کا کم از کم اور زیادہ سے زیادہ درجہ حرارت، بارش کا امکان اور دھند اوپر کی جدول میں ہے۔ مکمل 10 دن کی پیشگوئی کے لیے شہر پر کلک کریں۔' : 'موسم کا ڈیٹا فی الحال دستیاب نہیں، کچھ دیر بعد دیکھیں۔' }
       : { q: 'What is the weather tomorrow in Pakistan?', a: rows.length ? 'The table above lists tomorrow\'s low and high, chance of rain and morning fog for each major city. Click a city for its full 10-day forecast.' : 'Weather data is temporarily unavailable. Please check again shortly.' },
+    ...(!isUr && city('karachi') ? [{ q: 'What is the Karachi weather tomorrow?', a: line(city('karachi')!.w, city('karachi')!.d) }] : []),
+    ...(!isUr && city('lahore') ? [{ q: 'What is the Lahore weather tomorrow?', a: line(city('lahore')!.w, city('lahore')!.d) }] : []),
     isUr
-      ? { q: 'یہ پیشگوئی کہاں سے آتی ہے؟', a: 'Open-Meteo کے موسمی ماڈل سے، تقریباً ہر 30 منٹ بعد اپ ڈیٹ۔ یہ سرکاری محکمہ موسمیات کا بلیٹن نہیں۔' }
-      : { q: 'Where does this forecast come from?', a: 'From the Open-Meteo weather model, refreshed about every 30 minutes. It is a model forecast, not an official Pakistan Meteorological Department bulletin.' },
+      ? { q: 'یہ پیشگوئی کہاں سے آتی ہے؟', a: 'Open-Meteo کے موسمی ماڈل سے، تقریباً ہر 30 منٹ بعد اپ ڈیٹ۔ یہ سرکاری محکمہ موسمیات کا بلیٹن نہیں؛ سرکاری وارننگز کے لیے pmd.gov.pk دیکھیں۔' }
+      : { q: 'Where does this forecast come from?', a: 'From the Open-Meteo weather model, refreshed about every 30 minutes. It is a model forecast, not an official Pakistan Meteorological Department (PMD) bulletin; for official warnings see pmd.gov.pk.' },
   ]
 
   return (
@@ -254,8 +268,24 @@ export function WeatherHubView({ locale, weather, now = new Date() }: { locale: 
           <nav aria-label="Breadcrumb" className="text-sm text-fg-muted">
             <Link href={localePath(locale, '/')} className="hover:underline">{isUr ? 'ہوم' : 'Home'}</Link> › {isUr ? 'موسم' : 'Weather'}
           </nav>
-          <h1 className="font-display text-[clamp(1.9rem,1.4rem+2vw,3rem)] font-extrabold leading-tight">{seo.title}</h1>
+          <h1 className="font-display text-[clamp(1.9rem,1.4rem+2vw,3rem)] font-extrabold leading-tight">{isUr ? seo.title : 'Weather tomorrow in Pakistan: Karachi, Lahore, Islamabad and more'}</h1>
           {rows.length === 0 && <Unavailable isUr={isUr} />}
+          {rows.length > 0 && (
+            <ul className="max-w-[720px] space-y-1 text-fg-muted">
+              {['karachi', 'lahore', 'islamabad', 'rawalpindi', 'peshawar', 'quetta', 'multan', 'faisalabad']
+                .map((slug) => city(slug))
+                .filter((r): r is { w: CityWeather; d: WeatherDay } => Boolean(r))
+                .map(({ w, d }) => (
+                  <li key={w.slug}>
+                    <Link href={localePath(locale, cityPath(w.slug))} className="underline">{line(w, d)}</Link>
+                  </li>
+                ))}
+            </ul>
+          )}
+          <p className="max-w-[720px] text-sm text-fg-muted">
+            {isUr ? 'ڈیٹا کا ماخذ: Open-Meteo ماڈل۔ سرکاری وارننگز: ' : 'Data source: Open-Meteo model forecast. Official warnings: '}
+            <a href={PMD_URL} rel="noopener" className="underline">{isUr ? 'PMD' : 'Pakistan Meteorological Department (PMD)'}</a>.
+          </p>
         </div>
       </section>
       <div className="container-wide mt-8 max-w-[860px] space-y-8">
