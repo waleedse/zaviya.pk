@@ -143,7 +143,11 @@ export function applyTriageRules(rawTriage: TriageResult, ctx: TriageContext): T
     : rawTriage
   const triage = applyGlobalTopic(deskTriage, ctx.globalTopic ?? null)
   const now = ctx.now ?? new Date()
-  const weightedScore = computeWeightedScore(triage, ctx.settings)
+  // A desk's learned weight reflects its usual readers; a story Pakistanis are searching right now (Google Trends PK)
+  // is never held below its plain score by that (12 Nov: cricket fell to 0.6 while "pakistan vs bangladesh" had 10K+).
+  const weightedScore = ctx.trendsHit
+    ? Math.max(computeWeightedScore(triage, ctx.settings), computeWeightedScore(triage, {}))
+    : computeWeightedScore(triage, ctx.settings)
   const publishThreshold = ctx.settings.thresholds?.publish ?? DEFAULT_PUBLISH
   const reviewThreshold = ctx.settings.thresholds?.review ?? DEFAULT_REVIEW
   const isBreaking = triage.suggestedPriority === 'breaking'
