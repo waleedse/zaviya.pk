@@ -18,6 +18,7 @@ import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 import type { TriageBatcher } from './triage-batch.js'
 import { prefilterReject } from './triage-prefilter.js'
 import { parseModelJson } from './json-tolerant.js'
+import { BACKOFF_MIN_MS, SWEEP_TRIAGE_PRIORITY, loneLowDeskReject, triagePriority } from './triage-order.js'
 
 /** 0-50% extra (at most 10 min) so jobs told to come back at the same minute do not return as one wave */
 export const jitter = (ms: number) => ms + Math.floor(Math.random() * Math.min(ms * 0.5, 10 * 60_000))
@@ -58,7 +59,7 @@ export async function releaseDeferredClusters(
   const slot = Math.floor(now / (15 * 60_000))
   let released = 0
   for (const c of clusters) {
-    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: 4, jobId: `triage-release-${c.id}-${slot}`, removeOnComplete: true })
+    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: SWEEP_TRIAGE_PRIORITY, jobId: `triage-release-${c.id}-${slot}`, removeOnComplete: true })
     logger.info({ clusterId: c.id, reason: c.reason }, 'deferred cluster released')
     released++
   }
@@ -84,7 +85,7 @@ export async function releaseStuckNewClusters(
   const { clusters } = await deps.payload.stuckNewClusters(DEFER_RELEASE_MIN, LONELY_TRIAGE_MIN, deps.minSources ?? 2)
   const slot = Math.floor(now / (15 * 60_000))
   for (const c of clusters) {
-    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: 4, jobId: `triage-new-${c.id}-${slot}`, removeOnComplete: true })
+    await deps.triageQueue.add('triage', { clusterId: c.id }, { priority: SWEEP_TRIAGE_PRIORITY, jobId: `triage-new-${c.id}-${slot}`, removeOnComplete: true })
     logger.info({ clusterId: c.id, sources: c.distinctSources }, 'stuck new cluster queued for triage')
   }
   return clusters.length
@@ -115,7 +116,7 @@ export async function processTriageJob(
   // Trending in Pakistan (Google Trends / trend-gap mark / a major world story): scored alone and first, never filtered
   const trendingNow = isTrendMarked(cluster.items) || Boolean(majorGlobalTopic(cluster.headline, ...cluster.items.map((i) => i.title)))
   // What the rules close anyway is not sent to the model at all (ZG-22: calls are the scarce thing)
-  const skip = prefilterReject(cluster, { trending: trendingNow })
+  const skip = prefilterReject(cluster, { trending: trendingNow }) ?? (trendingNow ? null : loneLowDeskReject(cluster, { weights: settings.categoryWeights }))
   if (skip) {
     await deps.payload.patchCluster(data.clusterId, { status: 'rejected', triage: { codeOutcome: 'reject', deferReason: skip } })
     logger.info({ clusterId: data.clusterId, reason: skip }, 'triage: closed by rule, no model call')
@@ -159,8 +160,10 @@ export async function processTriageJob(
     if (isQuotaExhausted(e)) {
       // Out of quota is not a verdict on the story: look at it again once the first model frees up,
       // otherwise the cluster sits in `new` until another item happens to arrive.
-      const delay = jitter(Math.min(Math.max(e.resetAt - Date.now(), 60_000), 60 * 60_000)) + 5_000
-      await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: 4, jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
+      // Every model cooling or token-limited: come back in 10-15 min (a longer reset up to an hour), jittered, not every minute.
+      // The retry keeps the cluster's place in the quota order: trend hit, outlets, desk weight, recency.
+      const delay = jitter(Math.min(Math.max(e.resetAt - Date.now(), BACKOFF_MIN_MS), 60 * 60_000)) + 5_000
+      await deps.triageQueue?.add('triage', { clusterId: data.clusterId }, { delay, priority: triagePriority(cluster, { weights: settings.categoryWeights }), jobId: `triage-retry-${data.clusterId}`, removeOnComplete: true })
       logger.info({ clusterId: data.clusterId, delayMs: delay, reasons: e.reasons }, 'triage quota exhausted, requeued')
       return
     }

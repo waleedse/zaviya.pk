@@ -2,6 +2,7 @@ import type { LLMRouter } from '@zaviya/llm'
 import type { PayloadClient } from '../payload-client.js'
 import type { Queue } from 'bullmq'
 import { logger } from '../logger.js'
+import { triagePriority } from './triage-order.js'
 
 const triageDebounce = new Map<string, { itemCount: number; at: number }>()
 const DEBOUNCE_MS = 10 * 60 * 1000
@@ -57,10 +58,12 @@ export async function processEmbedJob(
   const debounceExpired = !prev || now - prev.at > DEBOUNCE_MS
   if (match.isNew || (itemCountChanged && debounceExpired)) {
     triageDebounce.set(match.clusterId, { itemCount: cluster.itemCount, at: now })
+    // the free Gemini quota goes to the best clusters first (trend hit, outlets, desk weight, recency)
+    const settings = await deps.payload.getSettings().catch(() => ({}) as { categoryWeights?: Record<string, number> })
     await deps.triageQueue.add(
       'triage',
       { clusterId: match.clusterId },
-      { priority: 5, removeOnComplete: 100 },
+      { priority: triagePriority(cluster, { weights: settings.categoryWeights }), removeOnComplete: 100 },
     )
   }
 }
