@@ -136,25 +136,41 @@ export async function uploadToStudio(input: UploadInput, log: (s: string) => voi
   }
   guard()
 
-  // 1. the upload dialog (the background page opens .../videos/upload?d=ud, which shows it; otherwise press Create > Upload videos)
-  const findInput = () => document.querySelector<HTMLInputElement>('ytcp-uploads-dialog input[type="file"], ytcp-uploads-file-picker input[type="file"], input[type="file"]')
+  // 1. the upload dialog. 13 Nov: Studio no longer opens it from the bare /videos/upload path (it lands on "Channel content" with no
+  // dialog), and a stray hidden <input type=file> elsewhere on that page used to be taken for the dialog's, so the file went nowhere and
+  // the run failed later with next_button_not_found. Only an input INSIDE the open upload dialog counts. Ways in, in order:
+  //   (1) the background page opens .../videos/upload?d=ud, which shows the dialog when Studio honours it;
+  //   (2) Create > Upload videos;
+  //   (3) the "Upload videos" button on the empty Content page.
+  const findInput = () => {
+    const dialog = pick(['ytcp-uploads-dialog'])
+    if (!dialog) return null
+    return dialog.querySelector<HTMLInputElement>('input[type="file"]') ?? document.querySelector<HTMLInputElement>('ytcp-uploads-file-picker input[type="file"]')
+  }
+  const waitInput = (ms: number, detail = '') =>
+    waitFor(() => {
+      guard()
+      return findInput()
+    }, ms, 'file_input_not_found', detail)
   let fileEl: HTMLInputElement
   try {
-    fileEl = await waitFor(() => {
-      guard()
-      return findInput()
-    }, 12_000, 'file_input_not_found')
+    fileEl = await waitInput(10_000)
   } catch (e) {
     if (!(e instanceof StudioError) || e.code !== 'file_input_not_found') throw e
-    log('no dialog yet: opening it from the Create menu')
-    const create = await waitFor(() => pick(['#create-icon', 'ytcp-button#create-icon', '[aria-label="Create"]']) ?? byText(/^create$/i), 20_000, 'create_button_not_found', describePage())
-    create.click()
-    const item = await waitFor(() => pick(['#text-item-0', 'tp-yt-paper-item#text-item-0']) ?? byText(/upload videos?/i), 10_000, 'upload_menu_not_found', describePage())
-    item.click()
-    fileEl = await waitFor(() => {
-      guard()
-      return findInput()
-    }, 20_000, 'file_input_not_found', dialogText().slice(0, 200))
+    log('no dialog from ?d=ud: opening it from the Create menu')
+    try {
+      const create = await waitFor(() => pick(['#create-icon', 'ytcp-button#create-icon', '[aria-label="Create"]']) ?? byText(/^create$/i), 15_000, 'create_button_not_found', describePage())
+      create.click()
+      const item = await waitFor(() => pick(['#text-item-0', 'tp-yt-paper-item#text-item-0']) ?? byText(/upload videos?/i), 8_000, 'upload_menu_not_found', describePage())
+      item.click()
+      fileEl = await waitInput(15_000)
+    } catch (e2) {
+      if (!(e2 instanceof StudioError) || !/^(file_input_not_found|create_button_not_found|upload_menu_not_found)$/.test(e2.code)) throw e2
+      log('Create menu did not open it: clicking "Upload videos" on the page')
+      const button = await waitFor(() => byText(/^upload videos?$/i), 10_000, 'upload_menu_not_found', describePage())
+      button.click()
+      fileEl = await waitInput(20_000, dialogText().slice(0, 200))
+    }
   }
 
   // 2. hand the file over exactly like a pick from the file dialog would

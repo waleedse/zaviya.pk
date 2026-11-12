@@ -246,7 +246,7 @@ describe('uploadNext', () => {
     posts = []
     notes = []
     online = true
-    extVersion = '0.5.0'
+    extVersion = '0.5.1'
     answer = async () => ({ videoId: 'abcdefghijk', url: 'https://www.youtube.com/watch?v=abcdefghijk', visibility: 'public' })
   })
 
@@ -312,7 +312,7 @@ describe('uploadNext', () => {
     expect(sent).toHaveLength(0)
   })
 
-  it('sends nothing to an extension older than 0.5.0 (it would ignore the job and time out)', async () => {
+  it('sends nothing to an extension older than 0.5.1 (it would ignore the job and time out)', async () => {
     await store.enqueue(item('a'))
     extVersion = '0.4.0'
     const r = await uploadNext(deps())
