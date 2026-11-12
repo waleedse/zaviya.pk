@@ -204,21 +204,53 @@ export function partOfLongerName(fileTitle: string, subject: string): boolean {
   return isName(before) || isName(after)
 }
 
+/**
+ * Names that mean a different thing outside Pakistan: a bare "Supreme Court" finds the US building. They are searched with
+ * the Pakistani name, while the photo keeps the headline's own subject (the QA checks that the headline names it).
+ */
+const PK_ALIAS: Record<string, string> = {
+  'supreme court': 'Supreme Court of Pakistan',
+  'high court': '',
+  senate: 'Senate of Pakistan',
+  'national assembly': 'National Assembly of Pakistan',
+  parliament: 'Parliament House, Islamabad',
+  'election commission': 'Election Commission of Pakistan',
+}
+
+/** What to search Wikipedia for */
+export function searchTerm(subject: string): string {
+  return PK_ALIAS[subject.trim().toLowerCase()] || subject
+}
+
+/** A Wikipedia page title that contains every word of a 2-4 word name, in order (a middle name or "Khan" may sit between). */
+export function titleHoldsName(title: string | undefined, name: string): boolean {
+  const words = fold(name).split(/[^a-z0-9]+/).filter(Boolean)
+  if (!title || words.length < 2 || words.length > 4) return false
+  const t = fold(title).split(/[^a-z0-9]+/).filter(Boolean)
+  let i = 0
+  for (const w of t) if (w === words[i]) i++
+  return i === words.length && t.length <= words.length + 2
+}
+
 /** The article's lead image if it is a free Commons file of the right shape; else the best Commons file named after the subject. */
 async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<PhotoOpts>): Promise<Candidate | null> {
-  const q = encodeURIComponent(subject)
-  const s = subject.toLowerCase()
-  const lead = (await query(fetchFn, `generator=search&gsrlimit=3&gsrsearch=${q}&prop=pageimages&piprop=original|name&redirects=1`)).find(
-    (p) => p.title?.toLowerCase() === s && p.pageimage && p.original && p.original.width >= o.minWidth && p.original.width >= p.original.height * o.minAspect,
-  )
+  // A bare "High Court" could be any of five: no photo rather than a guess
+  if (PK_ALIAS[subject.trim().toLowerCase()] === '') return null
+  const search = searchTerm(subject)
+  const q = encodeURIComponent(search)
+  const s = search.toLowerCase()
+  const bigEnough = (p: WikiPage) => Boolean(p.pageimage && p.original && p.original.width >= o.minWidth && p.original.width >= p.original.height * o.minAspect)
+  const pages = await query(fetchFn, `generator=search&gsrlimit=5&gsrsearch=${q}&prop=pageimages&piprop=original|name&redirects=1`)
+  // Exact page title first; then a page whose title holds every word of the name ("Abdul Majeed Achakzai" is "Abdul Majeed Khan Achakzai" on Wikipedia)
+  const lead = pages.find((p) => p.title?.toLowerCase() === s && bigEnough(p)) ?? pages.find((p) => titleHoldsName(p.title, search) && bigEnough(p))
   if (lead?.pageimage) {
     const info = await fileInfo(lead.pageimage, fetchFn)
     if (acceptable(lead.pageimage, info, o)) return { url: info.thumburl ?? info.url, info, file: lead.pageimage }
   }
-  if (!isSpecific(subject)) return null
-  const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${subject} filetype:bitmap`)}&${INFO}`))
+  if (!isSpecific(search)) return null
+  const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${search} filetype:bitmap`)}&${INFO}`))
     .map((p) => ({ title: (p.title ?? '').replace(/^File:/, ''), info: p.imageinfo?.[0], rank: p.index ?? 9 }))
-    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, subject) && acceptable(f.title, f.info, o, true))
+    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, search) && acceptable(f.title, f.info, o, true))
   // Landscape first (they crop least), then search order
   files.sort((a, b) => Number(b.info!.width >= b.info!.height * 1.3) - Number(a.info!.width >= a.info!.height * 1.3) || a.rank - b.rank)
   const best = files[0]

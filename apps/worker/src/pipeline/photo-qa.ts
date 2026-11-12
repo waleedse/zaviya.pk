@@ -34,6 +34,24 @@ export function documentPixelReason(bytes: Buffer, mime?: string): string | null
   return stats ? documentReason(stats) : null
 }
 
+/**
+ * Weapons being fired, combat and explosion photos (an Afghan Army "in combat during the 2021 offensive" on an arrest story).
+ * Used only when the story is literally about a battle or war; never for arrest, court or crime stories.
+ */
+const COMBAT_WORDS = /\b(rpg|firing|fires|fired|shooting|gun ?fire|gunfight|combat|battle|battlefield|airstrike|air strike|explosions?|exploding|bombing|bombed|missile|grenade|mortar|artillery|shelling|insurgents?|ambush|offensive|machine ?gun|ak-?47|rifle|warfare|fighting|firefight|war zone|skirmish)\b/i
+const WAR_STORY = /\b(war|battle|airstrikes?|air strikes?|offensive|clashes|combat|invasion|shelling|ceasefire|missiles?|bombardment|frontline|troops)\b/i
+const CRIME_STORY = /\b(arrest(ed|s)?|held|detain(ed|s)?|custody|sentenc\w*|court|trial|bail|remand|convict\w*|jail\w*|police|crime|murder\w*|fir|charged|accused|alleg\w*|suspects?|case|verdict|judge)\b/i
+
+/** Why this photo must not illustrate this story, or null. `text` is the headline (and dek) the photo would sit under. */
+export function combatReason(text: string, ...names: (string | undefined | null)[]): string | null {
+  const name = names.map((n) => (n ?? '').replace(/[_]+/g, ' ')).join(' ')
+  const m = COMBAT_WORDS.exec(name)
+  if (!m) return null
+  if (CRIME_STORY.test(text)) return `combat photo ("${m[0]}") on an arrest, court or crime story`
+  if (!WAR_STORY.test(text)) return `combat photo ("${m[0]}") but the story is not about a battle or war`
+  return null
+}
+
 export type PhotoVerdict = { ok: true } | { ok: false; reason: string }
 
 export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string): PhotoVerdict {
@@ -51,7 +69,7 @@ export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string):
     const aspect = m.width / Math.max(1, m.height)
     if (aspect < QA_MIN_ASPECT || aspect > QA_MAX_ASPECT) return { ok: false, reason: `odd shape (${m.width}x${m.height})` }
   }
-  const doc = documentNameReason(m.file, m.subject) ?? documentPixelReason(photo.bytes, (photo as { mime?: string }).mime)
+  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? documentPixelReason(photo.bytes, (photo as { mime?: string }).mime)
   if (doc) return { ok: false, reason: doc }
   return { ok: true }
 }
@@ -61,14 +79,14 @@ export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string):
  * Unlike social cards the subject need not be named in the text (a topic photo of "Pakistan police" is fine).
  * A failed check is logged as 'hero rejected' by the caller; the next candidate or the next step of the hero order follows.
  */
-export function heroPhotoQa(photo: Pick<RealPhoto, 'meta' | 'bytes' | 'mime'>): PhotoVerdict {
+export function heroPhotoQa(photo: Pick<RealPhoto, 'meta' | 'bytes' | 'mime'>, text = ''): PhotoVerdict {
   const m = photo.meta
   if (!licenceOk(m.licence)) return { ok: false, reason: `licence "${m.licence || 'unknown'}" is not free` }
   if (!/^https:\/\//.test(m.sourceUrl)) return { ok: false, reason: 'no file page to credit' }
   if (photo.bytes.length < 20_000) return { ok: false, reason: `file too small (${photo.bytes.length} bytes)` }
   if (m.width !== undefined && m.height !== undefined && m.width < 600) return { ok: false, reason: `too narrow (${m.width}px)` }
   if (m.file && m.provider !== 'openverse' && worshipSiteMismatch(m.subject, m.file)) return { ok: false, reason: `worship site photo "${m.file}" for subject "${m.subject}"` }
-  const doc = documentNameReason(m.file, m.subject) ?? documentPixelReason(photo.bytes, photo.mime)
+  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? documentPixelReason(photo.bytes, photo.mime)
   if (doc) return { ok: false, reason: doc }
   return { ok: true }
 }

@@ -75,3 +75,48 @@ describe('document and screenshot rejection', () => {
     expect(photoQa(real(photoJpeg(), commons), 'Peshawar blast')).toEqual({ ok: true })
   })
 })
+
+import { combatReason } from './photo-qa.js'
+import { searchTerm, titleHoldsName } from './real-photo.js'
+import { heroProblem } from './hero-backfill.js'
+
+describe('combat and weapon photos', () => {
+  const file = 'Afghan_National_Army_in_combat_during_2021_offensive_1.png'
+  it('never illustrate an arrest, court or crime story', () => {
+    expect(combatReason('Former Afghan army member held in Khyber over alleged attacks', file)).toMatch(/arrest, court or crime/)
+    expect(combatReason('Court sentences militant over attack', 'Man firing an RPG.jpg')).toMatch(/crime/)
+    expect(combatReason('Gunman arrested after shooting in Lahore', 'Soldier firing rifle.jpg')).not.toBeNull()
+  })
+  it('are rejected unless the story is literally about a battle or war', () => {
+    expect(combatReason('Afghan economy slows in October', file)).toMatch(/not about a battle or war/)
+    expect(combatReason('Fierce battle for the northern city as offensive widens', file)).toBeNull()
+    expect(combatReason('Missile strikes hit the frontline as war enters a third week', 'Soldier firing RPG.jpg')).toBeNull()
+  })
+  it('leave ordinary photos alone', () => {
+    expect(combatReason('Former Afghan army member held in Khyber', 'Peshawar street.jpg')).toBeNull()
+  })
+  it('hero QA and the social gate both apply it', () => {
+    const meta = { subject: 'Afghan National Army', file, author: 'A', licence: 'Public domain', creditLine: '', sourceUrl: 'https://commons.wikimedia.org/wiki/File:X.png', mediaCredit: '', width: 2000, height: 1300 }
+    const p = real(photoJpeg(), meta)
+    expect(heroPhotoQa(p, 'Former Afghan army member held in Khyber over alleged attacks')).toMatchObject({ ok: false, reason: expect.stringMatching(/combat/) })
+    expect(photoQa(p, 'Former Afghan National Army member held in Khyber')).toMatchObject({ ok: false })
+  })
+  it('the backfill flags an existing combat hero', async () => {
+    const hero = { id: 1, license: 'wikimedia', filename: 'afghan-army-member-arrested-in-pakistan.png', credit: `Photo: x / Public domain | https://commons.wikimedia.org/wiki/File:${file}` }
+    expect(await heroProblem(hero, undefined, 'Former Afghan army member held in Khyber over alleged attacks')).toMatchObject({ problem: 'combat' })
+  })
+})
+
+describe('name lookup fixes', () => {
+  it('finds a person whose Wikipedia title has a middle word', () => {
+    expect(titleHoldsName('Abdul Majeed Khan Achakzai', 'Abdul Majeed Achakzai')).toBe(true)
+    expect(titleHoldsName('Abdul Majid', 'Abdul Majeed Achakzai')).toBe(false)
+    expect(titleHoldsName('Hamid Khan Achakzai', 'Abdul Majeed Achakzai')).toBe(false)
+    expect(titleHoldsName('Imaan Mazari', 'Imaan Zainab Mazari-Hazir')).toBe(false)
+  })
+  it('searches the Pakistani court and chambers, not the US ones', () => {
+    expect(searchTerm('Supreme Court')).toBe('Supreme Court of Pakistan')
+    expect(searchTerm('Senate')).toBe('Senate of Pakistan')
+    expect(searchTerm('Donald Trump')).toBe('Donald Trump')
+  })
+})
