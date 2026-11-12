@@ -38,7 +38,12 @@ const envSchema = z.object({
   WRITE_URDU: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).default(false),
   /** Distinct outlets a story needs before it is triaged */
   TRIAGE_MIN_SOURCES: z.coerce.number().min(1).default(2),
-  /** OpenAI-compatible API (DeepSeek: https://api.deepseek.com/v1, Qwen intl: https://dashscope-intl.aliyuncs.com/compatible-mode/v1) */
+  /** Per-model Gemini budget overrides (JSON), e.g. {"gemini-3.8-flash":{"rpd":500},"*":{"rpm":4}} */
+  GEMINI_LIMITS: optionalStr,
+  /** Share of each model's daily budget kept back from QA / from SEO and social */
+  GEMINI_RESERVE_QA: z.preprocess(emptyToUndef, z.coerce.number().min(0).max(1).optional()),
+  GEMINI_RESERVE_LOW: z.preprocess(emptyToUndef, z.coerce.number().min(0).max(1).optional()),
+  /** Ignored: LLM work is Gemini free tier only. Kept so an old env file still loads. OpenAI-compatible API (DeepSeek: https://api.deepseek.com/v1, Qwen intl: https://dashscope-intl.aliyuncs.com/compatible-mode/v1) */
   LLM_API_BASE_URL: optionalUrl,
   LLM_API_KEY: optionalStr,
   /** Model on that API used when Gemini's free quota runs out, e.g. deepseek-flash or qwen3.7-flash */

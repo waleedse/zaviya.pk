@@ -14,6 +14,7 @@ import { researchSeo, seoBrief, type SeoPlan } from './seo.js'
 import { scrubWriterCopy } from './seo-scrub.js'
 import { opinionCue, pageFromWrongOutlet, pageUnrelatedToHeadline } from './story-kind.js'
 import { globalTopicBrief } from './global-news.js'
+import { isTrendMarked } from '../ingest/trend-gap-mark.js'
 
 export interface WriteResult {
   en: WriterOutput & { title: string }
@@ -89,6 +90,8 @@ async function runLocaleWrite(
     userContent: string
     urlLog: Set<string>
     locale: 'en' | 'ur'
+    /** a story trending in Pakistan: first call on the daily Gemini budget */
+    urgent?: boolean
   },
 ): Promise<WriterOutput & { title: string; model: string }> {
   const format = zodToJsonSchema(WriterOutputSchema, { target: 'openApi3' }) as Record<string, unknown>
@@ -97,7 +100,7 @@ async function runLocaleWrite(
     { role: 'user' as const, content: deps.userContent },
   ]
   // One request per locale: the sources and links are already in the prompt.
-  const res = await deps.router.chat(task, { messages, format, temperature: 0.4, maxTokens: 8192, timeoutMs: 180_000 })
+  const res = await deps.router.chat(task, { messages, format, temperature: 0.4, maxTokens: 8192, timeoutMs: 180_000, urgent: deps.urgent })
   let model = `${res.provider}:${res.model}`
   let parsed: WriterOutput
   try {
@@ -114,6 +117,7 @@ async function runLocaleWrite(
         format,
         temperature: 0,
         timeoutMs: 180_000,
+        urgent: deps.urgent,
       })
       model = `${repair.provider}:${repair.model}`
       parsed = WriterOutputSchema.parse(parseModelJson(repair.content))
@@ -121,7 +125,7 @@ async function runLocaleWrite(
       if (isQuotaExhausted(err2)) throw err2
       // ZAV-210: the repair failed too; one fresh attempt before the cluster is left stuck in 'writing'
       logger.warn({ task, err: err2 instanceof Error ? err2.message : err2 }, 'writer JSON repair failed, retrying once')
-      const retry = await deps.router.chat(task, { messages, format, temperature: 0.2, maxTokens: 8192, timeoutMs: 180_000 })
+      const retry = await deps.router.chat(task, { messages, format, temperature: 0.2, maxTokens: 8192, timeoutMs: 180_000, urgent: deps.urgent })
       model = `${retry.provider}:${retry.model}`
       parsed = WriterOutputSchema.parse(parseModelJson(retry.content))
     }
@@ -232,6 +236,7 @@ export async function processWriteJob(
   }
   const seo = await researchSeo(cluster, deps)
   if (seo) logger.info({ clusterId: data.clusterId, keyword: seo.plan.primaryKeyword, trends: seo.matchedTrends }, 'SEO plan ready')
+  const urgent = isTrendMarked(cluster.items) || Boolean((cluster.triage as { trendGap?: boolean } | undefined)?.trendGap)
   const urlLog = new Set<string>()
   for (const it of cluster.items) urlLog.add(it.url)
 
@@ -253,6 +258,7 @@ export async function processWriteJob(
       userContent: `Write the English article for this cluster.\n\n${globalBrief ? `${globalBrief}\n\n` : ''}${seo ? `${seoBrief(seo.plan, 'en')}\n\n` : ''}${sourcesBlock}${linksEn}${feedbackBlock}`,
       urlLog,
       locale: 'en',
+      urgent,
     })
   } catch (e) {
     if (isQuotaExhausted(e)) throw e
@@ -268,6 +274,7 @@ export async function processWriteJob(
       userContent: `Write the Urdu article using sources and the English reference.\n\n${seo ? `${seoBrief(seo.plan, 'ur')}\n\n` : ''}${sourcesBlock}${linksUr}${feedbackBlock}`,
       urlLog,
       locale: 'ur',
+      urgent,
     })
   } catch (e) {
     if (isQuotaExhausted(e)) throw e

@@ -110,6 +110,15 @@ export async function sendHeartbeat(runtime: WorkerRuntime): Promise<void> {
   }
 }
 
+/** Writes `llm:budget:summary` (JSON) and logs the models that were used today. */
+export async function logBudget(runtime: WorkerRuntime): Promise<void> {
+  const rows = await runtime.router.budgetSummary()
+  if (!rows.length) return
+  const slim = rows.map((r) => ({ model: r.model, day: r.day, calls: r.calls, rpd: r.limits.rpd, rpm: r.limits.rpm, left: r.rpdLeft, headroomPct: r.headroomPct, tokens: r.tokens, rateLimited: r.rateLimited, recitation: r.recitation, blocked: r.blocked, byTask: r.byTask, cooling: r.coolingUntil ? new Date(r.coolingUntil).toISOString() : null }))
+  await runtime.redis.set('llm:budget:summary', JSON.stringify({ at: new Date().toISOString(), models: slim }), 'EX', 3600)
+  logger.info({ gemini: slim.filter((r) => r.calls || r.rateLimited || r.recitation) }, 'gemini budget today')
+}
+
 export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInterval> {
   let beats = 0
   let ticks = 0
@@ -128,6 +137,8 @@ export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInt
         (e) => logger.warn({ err: e }, 'live expiry failed'),
       )
     }
+    // Every ~10 minutes: today's Gemini calls, limits and headroom per model (log line + Redis key for the 3-hourly run)
+    if (ticks % 30 === 5) void logBudget(runtime).catch((e) => logger.warn({ err: e }, 'gemini budget summary failed'))
     // Every ~5 minutes: a published story without a hero (released by the editor straight through Payload) gets one
     if (ticks % 15 === 3) void sweepMissingHeroes(runtime.payload).catch((e) => logger.warn({ err: e }, 'hero sweep failed'))
     // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one

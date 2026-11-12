@@ -1,5 +1,5 @@
 import { DelayedError, Queue, Worker, type ConnectionOptions } from 'bullmq'
-import { LLMRouter, isQuotaExhausted } from '@zaviya/llm'
+import { LLMRouter, RedisBudgetStore, isQuotaExhausted, parseLimitsEnv } from '@zaviya/llm'
 import { embedder, fluxCreds, subscriptionChain, type WorkerEnv } from './config.js'
 import { PayloadClient, type SourceItemInput } from './payload-client.js'
 import { logger } from './logger.js'
@@ -94,14 +94,19 @@ export function createConnection(env: WorkerEnv): ConnectionOptions {
 }
 
 export function buildRouter(env: WorkerEnv): LLMRouter {
+  // The per-model Gemini budget lives in Redis so every worker process counts against the same limits;
+  // a dedicated connection that fails fast, so a Redis hiccup falls back to in-process counting instead of hanging a call.
+  const budgetRedis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false })
+  budgetRedis.on('error', () => {})
   return new LLMRouter({
     ollamaUrl: env.OLLAMA_URL,
     geminiApiKey: env.GEMINI_API_KEY,
     localModel: env.LOCAL_MODEL,
-    apiBaseUrl: env.LLM_API_BASE_URL,
-    apiKey: env.LLM_API_KEY,
-    apiFallbackModel: env.LLM_API_FALLBACK_MODEL,
-    apiLightModel: env.LLM_API_LIGHT_MODEL,
+    budgetStore: new RedisBudgetStore(budgetRedis, (e) => logger.warn({ err: e instanceof Error ? e.message : e }, 'gemini budget: Redis unavailable, counting in-process')),
+    budget: {
+      limits: parseLimitsEnv(env.GEMINI_LIMITS),
+      reserve: { ...(env.GEMINI_RESERVE_QA !== undefined && { qa: env.GEMINI_RESERVE_QA }), ...(env.GEMINI_RESERVE_LOW !== undefined && { low: env.GEMINI_RESERVE_LOW }) },
+    },
     subscriptionChain: subscriptionChain(env),
     embedder: embedder(env),
   })

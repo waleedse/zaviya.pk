@@ -14,7 +14,7 @@ import { findSameStory } from './same-story.js'
 import { opinionCue, routeByStoryKind } from './story-kind.js'
 import { majorGlobalTopic } from './global-news.js'
 import { isTrendingCluster } from './readable.js'
-import { isTrendGapCluster } from '../ingest/trend-gap-mark.js'
+import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 
 class ReasonLoopError extends Error {
   constructor() {
@@ -114,6 +114,8 @@ export async function processTriageJob(
         // A verdict is a few hundred tokens; a cap stops a runaway reply from being cut mid-string (ZAV-21)
         maxTokens: 2048,
         timeoutMs,
+        // trending in Pakistan right now: first call on the daily Gemini budget
+        urgent: isTrendMarked(cluster.items),
       })
       const raw = JSON.parse(result.content) as { reason?: unknown }
       // ZAV-200: a reason stuck in a repetition loop is unreadable; ask again once, the schema cuts it if it loops again

@@ -54,12 +54,32 @@ export interface LLMProvider {
     temperature?: number
     maxTokens?: number
     signal?: AbortSignal
+    /** Gemini budget: who gets the daily quota first (default comes from the task) */
+    priority?: LlmPriority
+    task?: LLMTask
   }): Promise<ChatResult>
   embed(model: string, input: string[]): Promise<number[][]>
   health(): Promise<boolean>
 }
 
 export type LLMTask = 'triage' | 'write_en' | 'write_ur' | 'qa' | 'embed' | 'social' | 'seo' | 'vision'
+
+/**
+ * Who gets the daily Gemini budget first. `urgent` is triage/writing of a story trending in Pakistan
+ * (the Google Trends / trend-gap mark), then `core` (triage and writing), `qa`, and `low` (SEO, social, keywords).
+ */
+export type LlmPriority = 'urgent' | 'core' | 'qa' | 'low'
+
+export const TASK_PRIORITY: Record<LLMTask, LlmPriority> = {
+  triage: 'core',
+  write_en: 'core',
+  write_ur: 'core',
+  vision: 'qa',
+  qa: 'qa',
+  embed: 'low',
+  social: 'low',
+  seo: 'low',
+}
 
 /** Writing models: best first. Each model has its own free-tier quota, so the chain rotates when one runs out. */
 export const GEMINI_WRITER_CHAIN = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview'

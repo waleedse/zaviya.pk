@@ -1,10 +1,10 @@
 import { GeminiProvider } from './gemini.js'
-import { OpenAICompatProvider } from './openai-compat.js'
+import { GeminiBudget, type BudgetConfig, type BudgetStore } from './budget.js'
 import { OllamaProvider } from './ollama.js'
 import { Semaphore } from './semaphore.js'
 import type { CliProvider } from './cli.js'
-import type { ChatResult, LLMProvider, LLMTask, Msg, ToolDef, JSONSchema } from './types.js'
-import { DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
+import type { ChatResult, LLMProvider, LLMTask, Msg, ToolDef, JSONSchema, LlmPriority } from './types.js'
+import { TASK_PRIORITY, DEFAULT_ACTIVE_MODELS, DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN, GEMINI_WRITER_CHAIN } from './types.js'
 
 export interface RouterSettings {
   activeModels?: Partial<Record<LLMTask, string>>
@@ -18,13 +18,10 @@ export interface LLMRouterOptions {
   defaultTimeoutMs?: number
   /** Ollama model for fallbacks (default qwen3:8b); "off" disables the local model */
   localModel?: string
-  /** OpenAI-compatible API (DeepSeek, Qwen, OpenRouter…) */
-  apiBaseUrl?: string
-  apiKey?: string
-  /** Model on that API used when Gemini is out of quota (instead of the local model) */
-  apiFallbackModel?: string
-  /** Cheap model on that API for short JSON jobs when the local model is off (triage, SEO, QA) */
-  apiLightModel?: string
+  /** Where the per-model Gemini budget is counted (Redis, shared by every worker process); in-process when omitted */
+  budgetStore?: BudgetStore
+  /** Per-model limit overrides and priority reserves */
+  budget?: BudgetConfig
   /**
    * Subscription CLIs tried first, in order, for the listed tasks (e.g. Cursor, then Claude Haiku
    * for writing). A resting or failing engine is skipped and the normal chain takes over.
@@ -60,21 +57,17 @@ export class LLMRouter {
   private readonly defaultTimeoutMs: number
   private settings: RouterSettings
   private readonly localModel: string
-  private readonly api: OpenAICompatProvider | null
-  private readonly apiFallbackModel?: string
-  private readonly apiLightModel?: string
   private readonly subscriptionChain: NonNullable<LLMRouterOptions['subscriptionChain']>
   private readonly embedder?: LLMRouterOptions['embedder']
 
   constructor(opts: LLMRouterOptions = {}) {
     this.ollama = new OllamaProvider(opts.ollamaUrl)
-    this.gemini = opts.geminiApiKey ? new GeminiProvider(opts.geminiApiKey) : null
+    this.gemini = opts.geminiApiKey
+      ? new GeminiProvider(opts.geminiApiKey, undefined, undefined, undefined, new GeminiBudget(opts.budgetStore, opts.budget))
+      : null
     this.settings = opts.settings ?? {}
     this.defaultTimeoutMs = opts.defaultTimeoutMs ?? 120_000
     this.localModel = opts.localModel ?? DEFAULT_LOCAL_MODEL
-    this.api = opts.apiBaseUrl && opts.apiKey ? new OpenAICompatProvider(opts.apiBaseUrl, opts.apiKey) : null
-    this.apiFallbackModel = opts.apiFallbackModel
-    this.apiLightModel = opts.apiLightModel
     this.subscriptionChain = opts.subscriptionChain ?? []
     this.embedder = opts.embedder
   }
@@ -105,17 +98,13 @@ export class LLMRouter {
     let { provider, model } = parseModelRef(ref)
     // Local model switched off (it slows the machine): send its text jobs to the cheap Gemini chain.
     if (provider === 'ollama' && task !== 'embed' && this.localModel === 'off') {
-      if (this.api && this.apiLightModel) {
-        provider = 'api'
-        model = this.apiLightModel
-      } else {
-        provider = 'gemini'
-        model = geminiFallbackModel(task)
-      }
+      provider = 'gemini'
+      model = geminiFallbackModel(task)
     }
+    // Only Gemini (free tier) and a local Ollama that actually answers: paid `api:` refs in old settings go to Gemini
     if (provider === 'api') {
-      if (!this.api) throw new Error('api:* model configured but LLM_API_BASE_URL / LLM_API_KEY are missing')
-      return { primary: this.api, primaryModel: model }
+      provider = 'gemini'
+      model = geminiFallbackModel(task)
     }
     const primary = provider === 'gemini' ? this.gemini : this.ollama
     if (!primary) {
@@ -147,8 +136,11 @@ export class LLMRouter {
       maxTokens?: number
       timeoutMs?: number
       signal?: AbortSignal
+      /** A story trending in Pakistan (Google Trends / trend-gap mark): first call on the daily Gemini budget */
+      urgent?: boolean
     },
   ): Promise<ChatResult> {
+    const priority: LlmPriority = opts.urgent ? 'urgent' : TASK_PRIORITY[task]
     // Plain-text jobs only: the CLIs do not take our tool definitions.
     // (never for screenshots: those go to Gemini only)
     if (!opts.tools?.length && task !== 'vision') {
@@ -186,6 +178,8 @@ export class LLMRouter {
           temperature: opts.temperature,
           maxTokens: opts.maxTokens,
           signal: opts.signal ?? AbortSignal.timeout(timeoutFor(provider)),
+          priority,
+          task,
         })
       if (provider.id === 'ollama') return this.ollamaSemaphore.run(exec)
       return exec()
@@ -196,13 +190,10 @@ export class LLMRouter {
     } catch (err) {
       // Screenshots only go to Gemini: a text-only local or paid fallback would answer blind
       if (task === 'vision') throw err
-      if ((primary.id === 'ollama' || primary.id === 'api') && this.gemini) {
+      if (primary.id === 'ollama' && this.gemini) {
         return run(this.gemini, geminiFallbackModel(task))
       }
-      // Gemini failed or its free quota is used up: a cheap paid API if configured, else the local model.
-      if (primary.id === 'gemini' && this.api && this.apiFallbackModel) {
-        return run(this.api, this.apiFallbackModel)
-      }
+      // Gemini failed or its free quota is used up: the local model, but only if Ollama really answers (no paid fallback).
       if (primary.id === 'gemini' && this.localModel !== 'off' && (await this.providerHealth(this.ollama))) {
         return run(this.ollama, this.localModel)
       }
@@ -229,11 +220,18 @@ export class LLMRouter {
     try {
       return await run(primary, primaryModel)
     } catch (err) {
-      if ((primary.id === 'ollama' || primary.id === 'api') && this.gemini) {
+      if (primary.id === 'ollama' && this.gemini) {
         return run(this.gemini, geminiFallbackModel(task))
       }
       throw err
     }
+  }
+
+  /** Today's calls, limits and headroom per Gemini model (for the heartbeat log and the 3-hourly run). */
+  async budgetSummary() {
+    if (!this.gemini) return []
+    const models = [...new Set([GEMINI_WRITER_CHAIN, GEMINI_LITE_CHAIN, GEMINI_VISION_CHAIN].flatMap((c) => c.split(',')))]
+    return this.gemini.budget.summary(models)
   }
 
   async health(): Promise<{ ollama: boolean; gemini: boolean }> {

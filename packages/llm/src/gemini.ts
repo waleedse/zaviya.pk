@@ -1,5 +1,6 @@
-import type { ChatResult, LLMProvider, Msg, ToolCall, ToolDef } from './types.js'
-import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL } from './types.js'
+import type { ChatResult, LLMProvider, LlmPriority, LLMTask, Msg, ToolCall, ToolDef } from './types.js'
+import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, TASK_PRIORITY } from './types.js'
+import { GeminiBudget, estimateTokens } from './budget.js'
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
@@ -33,7 +34,7 @@ const MAX_INLINE_WAIT_MS = 20_000
 
 /** Every model in the chain is out of quota; `resetAt` is when the first one frees up. */
 export class QuotaExhaustedError extends Error {
-  constructor(readonly resetAt: number) {
+  constructor(readonly resetAt: number, readonly reasons: Record<string, string> = {}) {
     super(`Gemini quota exhausted for all models until ${new Date(resetAt).toISOString()}`)
     this.name = 'QuotaExhaustedError'
   }
@@ -56,6 +57,8 @@ export function isInputBlocked(e: unknown): e is InputBlockedError {
 }
 
 const BLOCKED_RE = /input blocked|sensitive words|prompt could not be submitted/i
+/** Gemma answers 400 "Request blocked due to copyright/recitation" on text it thinks it has memorised: another model may answer. */
+const RECITATION_RE = /recitation|copyright/i
 
 class RateLimited extends Error {
   constructor(readonly retryInMs: number) {
@@ -63,7 +66,7 @@ class RateLimited extends Error {
   }
 }
 
-/** Per-model cool-down shared by every provider instance in the process. */
+/** Models the API itself rate-limited, as seen by this process (the shared view lives in the budget store). */
 const cooldowns = new Map<string, number>()
 
 export function geminiModelStatus(): Record<string, string> {
@@ -169,6 +172,7 @@ export class GeminiProvider implements LLMProvider {
     private readonly defaultChatModel = DEFAULT_GEMINI_MODEL,
     private readonly defaultEmbedModel = DEFAULT_GEMINI_EMBED_MODEL,
     private readonly thinkingLevel: ThinkingLevel = 'low',
+    readonly budget: GeminiBudget = new GeminiBudget(),
   ) {}
 
   private headers() {
@@ -219,6 +223,8 @@ export class GeminiProvider implements LLMProvider {
     temperature?: number
     maxTokens?: number
     signal?: AbortSignal
+    priority?: LlmPriority
+    task?: LLMTask
   }): Promise<ChatResult> {
     if (!this.apiKey) throw new Error('GEMINI_API_KEY not configured')
 
@@ -237,45 +243,72 @@ export class GeminiProvider implements LLMProvider {
 
     // A stateful continuation must stay on the model that started it.
     const candidates = previousInteractionId ? chain.slice(0, 1) : chain
-    let earliestReset = Infinity
+    const priority = opts.priority ?? (opts.task ? TASK_PRIORITY[opts.task] : 'core')
+    const task = opts.task ?? 'other'
+    const estTokens = estimateTokens(opts.messages)
+    const tried = new Set<string>()
+    let unavailable: { resetAt: number; reasons: Record<string, string> } | null = null
     let blocked: InputBlockedError | null = null
+    let recitation: string | null = null
     let res: Response | null = null
     let data: InteractionResponse = {}
     let model = candidates[0]!
-    for (const m of candidates) {
-      const until = cooldowns.get(m) ?? 0
-      if (until > Date.now()) {
-        earliestReset = Math.min(earliestReset, until)
-        continue
+    while (!res) {
+      const left = candidates.filter((m) => !tried.has(m))
+      if (!left.length) break
+      // The first model in the chain with budget; waits a few seconds when all are only minute-limited
+      const pick = await this.budget.acquire(left, { priority, task, estTokens, signal: opts.signal })
+      if (pick.model === null) {
+        unavailable = { resetAt: pick.resetAt, reasons: pick.reasons }
+        break
       }
+      const m = pick.model
+      tried.add(m)
       model = m
       const body: Record<string, unknown> = { ...baseBody, model: m }
       if (previousInteractionId) body.previous_interaction_id = previousInteractionId
       // Gemma models don't take a thinking level.
       if (m.startsWith('gemini')) generationConfig.thinking_level = this.thinkingLevel
       else delete generationConfig.thinking_level
+      let r: Response
       try {
-        res = await this.post('interactions', body, opts.signal)
+        r = await this.post('interactions', body, opts.signal)
       } catch (e) {
         if (e instanceof RateLimited) {
+          // Our own accounting was too generous: leave this model alone and take the next one
           const resetAt = Date.now() + e.retryInMs
           cooldowns.set(m, resetAt)
-          earliestReset = Math.min(earliestReset, resetAt)
+          await this.budget.store.cool(m, resetAt, Date.now())
+          await this.budget.store.note(m, 'rateLimited', Date.now())
           continue
         }
         throw e
       }
-      data = (await res.json().catch(() => ({}))) as InteractionResponse
-      // This model refuses the prompt (Gemma does it on news about violence); the next one in the chain may not
-      if (res.status === 400 && BLOCKED_RE.test(data.error?.message ?? '') && !previousInteractionId) {
-        blocked = new InputBlockedError(m, data.error?.message ?? '')
-        res = null
-        continue
+      data = (await r.json().catch(() => ({}))) as InteractionResponse
+      const msg = data.error?.message ?? ''
+      if (r.status === 400 && !previousInteractionId) {
+        // This model refuses the prompt (Gemma does it on news about violence); the next one in the chain may not
+        if (BLOCKED_RE.test(msg)) {
+          blocked = new InputBlockedError(m, msg)
+          await this.budget.store.note(m, 'blocked', Date.now())
+          continue
+        }
+        // Not a quota failure and not the story's fault: try the next model
+        if (RECITATION_RE.test(msg)) {
+          recitation = m
+          await this.budget.store.note(m, 'recitation', Date.now())
+          continue
+        }
       }
-      break
+      res = r
+      if (data.usage) {
+        const actual = data.usage.total_input_tokens ?? 0
+        if (actual) void this.budget.store.settle(m, actual - estTokens, Date.now()).catch(() => {})
+      }
     }
-    if (!res && blocked && !Number.isFinite(earliestReset)) throw blocked
-    if (!res) throw new QuotaExhaustedError(Number.isFinite(earliestReset) ? earliestReset : Date.now() + 3_600_000)
+    if (!res && unavailable) throw new QuotaExhaustedError(unavailable.resetAt, unavailable.reasons)
+    if (!res && blocked) throw blocked
+    if (!res) throw new Error(`Gemini chat failed: every model refused the text (${recitation ?? model}: copyright/recitation)`)
     if (!res.ok || data.error) {
       throw new Error(`Gemini chat failed (${model}, ${res.status}): ${data.error?.message ?? 'unknown error'}`)
     }
