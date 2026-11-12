@@ -27,6 +27,17 @@ export function classifyUploadError(message: string): UploadErrorKind {
   return 'retry'
 }
 
+/** The first extension build that knows youtube.upload: an older one ignores the job without answering, so nothing may be sent to it */
+export const MIN_EXTENSION_VERSION = '0.5.0'
+
+export function versionAtLeast(version: string | null, min: string): boolean {
+  if (!version) return false
+  const a = version.split('.').map((n) => parseInt(n, 10) || 0)
+  const b = min.split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0)
+  return true
+}
+
 export const MAX_ATTEMPTS = 3
 /** a failed attempt waits this long before the next one (the same Studio page may need a moment) */
 export const RETRY_PAUSE_MS = 10 * 60_000
@@ -37,7 +48,7 @@ export const OFFLINE_RECHECK_MS = 60_000
 export interface UploaderDeps {
   cfg: YoutubeConfig
   store: YtStore
-  bridge: { isOnline(): boolean; send(job: BridgeJob, timeoutMs?: number): Promise<unknown> }
+  bridge: { isOnline(): boolean; extensionVersion(): string | null; send(job: BridgeJob, timeoutMs?: number): Promise<unknown> }
   redis: { set(key: string, value: string, mode: 'EX', seconds: number): Promise<unknown> }
   payload: { upsertSocialPost(body: Record<string, unknown> & { idempotencyKey: string; article: string; platform: string; format: string; copy: string; mediaUrls: string[]; status: string }): Promise<unknown> }
   /** the newest article, for videos that are not about one */
@@ -97,6 +108,9 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
   if (st.pausedUntil && st.pausedUntil > now) return { state: 'paused', until: st.pausedUntil, reason: st.pauseReason ?? '' }
   if (st.lastUploadAt && st.lastUploadAt + cfg.minGapMs > now) return { state: 'gap', until: st.lastUploadAt + cfg.minGapMs }
   if (!deps.bridge.isOnline()) return { state: 'offline' }
+  if (!versionAtLeast(deps.bridge.extensionVersion(), MIN_EXTENSION_VERSION)) {
+    return { state: 'paused', until: now + OFFLINE_RECHECK_MS, reason: `the Chrome extension is ${deps.bridge.extensionVersion() ?? 'unknown'}, youtube.upload needs ${MIN_EXTENSION_VERSION}: reload it at chrome://extensions` }
+  }
   const item = await store.peek()
   if (!item) return { state: 'idle' }
 

@@ -1,5 +1,5 @@
 /**
- *   node --import tsx src/youtube/cli.ts backfill [--dry]   queue every posted video still on disk (explainers first, oldest first)
+ *   node --import tsx src/youtube/cli.ts backfill [--dry] [--reconsider]   queue every posted video still on disk (explainers first, oldest first)
  *   node --import tsx src/youtube/cli.ts status             counts, and the uploaded and skipped lists
  *
  * Runs inside the video service container (it has the videos on disk and the same Redis as the uploader).
@@ -11,13 +11,15 @@ import { loadVideoConfig } from '../video/config.js'
 import { backfill } from './producer.js'
 import { YtStore, type YtRedis } from './queue.js'
 
-const { positionals, values } = parseArgs({ allowPositionals: true, options: { dry: { type: 'boolean' } } })
+const { positionals, values } = parseArgs({ allowPositionals: true, options: { dry: { type: 'boolean' }, reconsider: { type: 'boolean' } } })
 const env = loadConfig()
 const cfg = loadVideoConfig()
 const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null })
 const store = new YtStore(redis as unknown as YtRedis)
 try {
   if (positionals[0] === 'backfill') {
+    // --reconsider: skip decisions are taken again under the current guard (not in a dry run, which changes nothing)
+    if (values.reconsider && !values.dry) console.error(`cleared ${await store.clearSkipped()} earlier skip decisions`)
     const report = await backfill(store, cfg.dataDir, {
       siteUrl: cfg.siteUrl,
       dryRun: values.dry,
@@ -27,7 +29,7 @@ try {
   } else if (positionals[0] === 'status') {
     console.log(JSON.stringify({ ...(await store.report()), state: await store.state(), uploaded: await store.doneRecords() }, null, 2))
   } else {
-    console.error('usage: cli.ts backfill [--dry] | status')
+    console.error('usage: cli.ts backfill [--dry] [--reconsider] | status')
     process.exitCode = 2
   }
 } finally {

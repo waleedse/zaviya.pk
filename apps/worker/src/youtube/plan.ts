@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { isHardBlocked, isSensitive } from '../video/explainer/ideas.js'
+import { isHardBlocked } from '../video/explainer/ideas.js'
 
 /** A Short is vertical and at most 3 minutes; anything longer goes up as a normal video */
 export const SHORT_MAX_SEC = 180
@@ -44,22 +44,13 @@ export const orderScore = (item: Pick<YtItem, 'tier' | 'madeAt'>): number => ite
 
 // ---- content guard ---------------------------------------------------------------------------------------------------------
 
-const RELIGION =
-  /\b(islam\w*|muslims?|qur'?an\w*|hadith|sunnah|namaz|salah|prayers?|mosque\w*|masjid|church\w*|temples?|hindu\w*|christian\w*|sikh\w*|jewish|jews|religio\w*|eid|ramazan|ramadan|muharram|ashura|hajj|umrah|fatwa|imam|maulana|mufti|ulema|madrasa\w*|zakat)\b/i
-
-const VIOLENCE = /\b(blasts?|bombs?|bombing\w*|explosions?|shoot\w*|gunmen|gunfire|violen\w*|stabb\w*|clash(?:es)?|killings?|assault\w*|torture\w*|hostages?)\b/i
-
 /**
- * Nothing political, army, religion or violence goes to YouTube. This reuses the explainer pipeline's hard block (blasphemy,
- * sectarian, minors, party and army names) and its sensitive list (violence, courts, elections, ministers, war), and adds religion.
- * It is deliberately strict: a skipped video costs nothing, a wrong one costs the channel.
+ * No stricter than the guards the same videos already passed before going out on Facebook and Instagram (Waleed, 3 Nov: sensitive
+ * news is not held back; 12 Nov: all daily videos go to YouTube). The one hard rule that stays is the pipeline's own: blasphemy,
+ * sectarian, minors, and Pakistani party-political or army names (`isHardBlocked`, the same list the explainer ideas use).
  */
 export function blockedReason(text: string): string | null {
-  if (isHardBlocked(text)) return 'hard block (blasphemy, sectarian, minors, party or army)'
-  if (isSensitive(text)) return 'sensitive (violence, courts, politics, war)'
-  if (VIOLENCE.test(text)) return 'violence'
-  if (RELIGION.test(text)) return 'religion'
-  return null
+  return isHardBlocked(text) ? 'hard block (blasphemy, sectarian, minors, party or army)' : null
 }
 
 /** A price, rate or market figure in an old video would mislead: it has changed since */

@@ -12,6 +12,7 @@ export class BridgeServer {
   private wss: WebSocketServer | null = null
   private socket: WebSocket | null = null
   private authenticated = false
+  private version: string | null = null
   private tabs: Record<string, boolean> = {}
   private pending = new Map<string, Pending>()
   private heal: { decide: (r: HealRequest) => Promise<HealActionMessage>; report: (r: HealReport) => Promise<void> } | null = null
@@ -63,6 +64,11 @@ export class BridgeServer {
     return Boolean(this.authenticated && this.socket)
   }
 
+  /** Version the connected extension reported in its hello (null when none is connected) */
+  extensionVersion(): string | null {
+    return this.authenticated && this.socket ? this.version : null
+  }
+
   isConnected(platform: string): boolean {
     return Boolean(this.authenticated && this.socket && this.tabs[platform])
   }
@@ -82,6 +88,7 @@ export class BridgeServer {
       if (this.token && data.token === this.token) {
         this.authenticated = true
         this.socket = ws
+        this.version = data.version
         ws.send(JSON.stringify({ type: 'hello', ok: true }))
         logger.info({ version: data.version }, 'extension connected')
       } else {

@@ -67,6 +67,13 @@ export class YtStore {
     await this.r.hset(K.skipped, id, JSON.stringify({ key, reason, at: now }))
   }
 
+  /** Forget the skip decisions so a changed guard can look at those videos again; returns how many were cleared */
+  async clearSkipped(): Promise<number> {
+    const all = await this.r.hgetall(K.skipped)
+    for (const id of Object.keys(all)) await this.r.hdel(K.skipped, id)
+    return Object.keys(all).length
+  }
+
   async peek(): Promise<YtItem | null> {
     for (const id of await this.r.zrange(K.order, 0, 4)) {
       const raw = await this.r.hget(K.items, id)
