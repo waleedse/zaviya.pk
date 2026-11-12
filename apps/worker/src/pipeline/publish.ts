@@ -385,7 +385,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
 
   // ZG-22: the 40-a-day cap stays; what goes into it is chosen. Waiting stories wake best-first (trend hit, learned desk weight,
   // freshness), and a story that waited past 12 h on a 0.6 desk with no trend hit leaves the queue as an editor draft (nothing is deleted).
-  const rankSettings = await deps.payload.getSettings().catch(() => ({}) as { categoryWeights?: Record<string, number> })
+  const rankSettings: { categoryWeights?: Record<string, number> } = (await Promise.resolve().then(() => deps.payload.getSettings()).catch(() => null)) ?? {}
   const rankInput = { category: triage?.category, trend: isTrendMarked(cluster.items) || Boolean((triage as { trendGap?: boolean } | undefined)?.trendGap), items: cluster.items }
   const rankOffset = rankOffsetMs(publishRank(rankInput, { weights: rankSettings.categoryWeights }))
   const droppedAsDraft =
