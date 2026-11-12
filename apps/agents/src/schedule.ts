@@ -15,11 +15,11 @@ export interface Slot {
 }
 
 export const SCHEDULE: Record<AgentName, Slot[]> = {
-  // Newsroom oversight: a full pass hourly by day (every 3 hours at night), and a quick check of the
-  // newest articles every 15 minutes so mistakes are fixed soon after publishing
+  // Newsroom oversight (Waleed 13 Nov: Claude usage was too high): a full pass every 6 hours and a quick
+  // check every 3 hours by day (6 at night). Pipeline QA still checks every article before it publishes.
   editor: [
-    { session: 'hourly', every: 60, nightEvery: 180 },
-    { session: 'quick', every: 15, nightEvery: 30 },
+    { session: 'hourly', every: 360 },
+    { session: 'quick', every: 180, nightEvery: 360 },
   ],
   // Growth research once a day: trends, evergreen search demand, ideas for the PM (Linear)
   research: [{ session: 'daily', at: '09:30' }],
