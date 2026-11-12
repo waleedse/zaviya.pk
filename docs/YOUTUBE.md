@@ -23,9 +23,12 @@ video service (videodata volume)            main worker (owns the bridge)       
   link, hashtags (digests reuse the trending-hashtag caption of the `youtube` platform in `packages/video/src/captions.ts`).
   Over 3 minutes the video goes up as a normal video, without `#Shorts`.
 - "Altered or synthetic content" is answered Yes for explainers (AI pictures) and No for digests (real photos), truthfully.
-- Guards: nothing political, army, religion or violence (reuses the explainer hard block and sensitive lists, plus a religion and
-  a violence list), checked when queued and again at upload time. Old videos with a price or rate (more than 3 days old) are
-  skipped because the number has changed since. Every skip is stored with its reason (`yt:skipped`).
+- Guards: no stricter than what the same videos already passed on Facebook and Instagram (sensitive news is not held back). Only the
+  pipeline's hard block stays (blasphemy, sectarian, minors, Pakistani party-political and army names), checked when queued and again
+  at upload time. Old videos with a price or rate (more than 3 days old) are skipped because the number has changed since. Every skip
+  is stored with its reason (`yt:skipped`); `backfill --reconsider` clears the skip decisions and looks again under the current rules.
+- Extension version: the worker sends `youtube.upload` only to an extension that reported 0.5.0 or newer in its hello (older ones ignore
+  the job without answering); otherwise the queue waits and nothing is lost.
 - Pacing: at least `YOUTUBE_MIN_GAP_MIN` (5) minutes between uploads, no daily cap, no quiet hours.
   "Daily upload limit reached" in Studio (new channels, about 10-15 uploads in 24 h) puts the queue to sleep for
   `YOUTUBE_LIMIT_PAUSE_MIN` (240) minutes, then it tries again by itself.

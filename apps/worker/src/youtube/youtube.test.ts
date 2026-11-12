@@ -7,7 +7,7 @@ import { loadYoutubeConfig } from './config.js'
 import { blockedReason, itemFromDir, itemId, orderScore, outdatedReason, probeFromTimeline, ytDescription, ytTitle, type YtItem } from './plan.js'
 import { backfill, enqueueLive } from './producer.js'
 import { YtStore, type YtRedis } from './queue.js'
-import { classifyUploadError, uploadNext, MAX_ATTEMPTS, type UploaderDeps } from './uploader.js'
+import { classifyUploadError, uploadNext, versionAtLeast, MAX_ATTEMPTS, type UploaderDeps } from './uploader.js'
 import { youtubeFileResolver } from '../video/media-hub.js'
 
 /** A Redis with just the commands the queue uses */
@@ -77,19 +77,15 @@ describe('wording', () => {
 })
 
 describe('content guard', () => {
-  it.each([
-    ['Imran Khan rally in Lahore', 'hard block'],
-    ['Army chief meets minister', 'hard block'],
-    ['Three killed in blast near market', 'sensitive'],
-    ['Eid shopping rush in Lahore', 'religion'],
-    ['Cabinet approves new budget', 'sensitive'],
-  ])('blocks %s', (text) => {
-    expect(blockedReason(text)).not.toBeNull()
+  it.each([['Imran Khan rally in Lahore'], ['Army chief meets minister'], ['Sectarian clash in Parachinar']])('blocks %s (hard block)', (text) => {
+    expect(blockedReason(text)).toMatch(/hard block/)
   })
-  it('lets ordinary explainers through', () => {
-    expect(blockedReason('How load shedding works in Pakistan')).toBeNull()
-    expect(blockedReason('Petrol price in Pakistan today')).toBeNull()
-  })
+  it.each([['Three killed in blast near market'], ['Eid shopping rush in Lahore'], ['Cabinet approves new budget'], ['How load shedding works in Pakistan']])(
+    'is no stricter than Facebook and Instagram: %s passes',
+    (text) => {
+      expect(blockedReason(text)).toBeNull()
+    },
+  )
   it('calls an old price video outdated, an evergreen one not', () => {
     expect(outdatedReason('Petrol price today', NOW - 5 * DAY, NOW)).not.toBeNull()
     expect(outdatedReason('Petrol price today', NOW - DAY, NOW)).toBeNull()
@@ -129,12 +125,12 @@ describe('itemFromDir', () => {
     expect(res.item.description).not.toContain('#Shorts')
   })
 
-  it('skips political, army and violent content and an outdated price video', async () => {
+  it('skips party and army content and an outdated price video, but not sensitive news', async () => {
     const pol = await itemFromDir(writeEdition(root, '2026-11-08-a', digestFiles('PTI leader arrested')), opts, NOW)
     const viol = await itemFromDir(writeEdition(root, '2026-11-08-b', explainerFiles('Why blasts happen')), opts, NOW)
     const price = await itemFromDir(writeEdition(root, '2026-11-01-c', digestFiles('Petrol price rises by Rs 5'), 11 * DAY), opts, NOW)
     expect(pol).toHaveProperty('skip')
-    expect(viol).toHaveProperty('skip')
+    expect(viol).toHaveProperty('item')
     expect(price).toEqual({ skip: 'a price or rate that has changed since' })
   })
 
@@ -204,6 +200,7 @@ describe('uploadNext', () => {
   let posts: Record<string, unknown>[]
   let notes: string[]
   let online: boolean
+  let extVersion: string
 
   const item = (key: string, tier: 0 | 1 | 2 = 1): YtItem => ({
     id: itemId(key),
@@ -227,6 +224,7 @@ describe('uploadNext', () => {
     store,
     bridge: {
       isOnline: () => online,
+      extensionVersion: () => extVersion,
       send: async (job) => {
         sent.push(job)
         return answer()
@@ -247,6 +245,7 @@ describe('uploadNext', () => {
     posts = []
     notes = []
     online = true
+    extVersion = '0.5.0'
     answer = async () => ({ videoId: 'abcdefghijk', url: 'https://www.youtube.com/watch?v=abcdefghijk', visibility: 'public' })
   })
 
@@ -299,6 +298,24 @@ describe('uploadNext', () => {
     online = false
     expect((await uploadNext(deps())).state).toBe('offline')
     expect(sent).toHaveLength(0)
+  })
+
+  it('sends nothing to an extension older than 0.5.0 (it would ignore the job and time out)', async () => {
+    await store.enqueue(item('a'))
+    extVersion = '0.4.0'
+    const r = await uploadNext(deps())
+    expect(r.state).toBe('paused')
+    expect(sent).toHaveLength(0)
+    expect((await store.peek())?.attempts).toBe(0)
+    extVersion = '0.10.1'
+    expect((await uploadNext(deps())).state).toBe('uploaded')
+  })
+
+  it('compares versions numerically', () => {
+    expect(versionAtLeast('0.5.0', '0.5.0')).toBe(true)
+    expect(versionAtLeast('0.10.0', '0.5.0')).toBe(true)
+    expect(versionAtLeast('0.4.9', '0.5.0')).toBe(false)
+    expect(versionAtLeast(null, '0.5.0')).toBe(false)
   })
 
   it('an old extension pauses the queue instead of burning attempts', async () => {
