@@ -10,9 +10,10 @@ import type { PayloadClient } from '../payload-client.js'
 import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
+import { publishRank, rankOffsetMs, staleLowDeskStory } from './triage-order.js'
 import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
-import { isTrendGapCluster } from '../ingest/trend-gap-mark.js'
+import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 import { CARD_VERSION } from './card-version.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 import { ensureHeroMedia } from './hero-photo.js'
@@ -380,7 +381,18 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   // Editor gate: normal stories wait as drafts (workflow in_review); the editor agent publishes the
   // best one each run. Breaking stories and live updates still go out at once.
   // A story the editor approved as a pitch was chosen before it was written: it does not wait twice.
-  const gated = Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !editorApproved(triage)
+  const gatedByRule = Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting && !editorApproved(triage)
+
+  // ZG-22: the 40-a-day cap stays; what goes into it is chosen. Waiting stories wake best-first (trend hit, learned desk weight,
+  // freshness), and a story that waited past 12 h on a 0.6 desk with no trend hit leaves the queue as an editor draft (nothing is deleted).
+  const rankSettings: { categoryWeights?: Record<string, number> } = (await Promise.resolve().then(() => deps.payload.getSettings()).catch(() => null)) ?? {}
+  const rankInput = { category: triage?.category, trend: isTrendMarked(cluster.items) || Boolean((triage as { trendGap?: boolean } | undefined)?.trendGap), items: cluster.items }
+  const rankOffset = rankOffsetMs(publishRank(rankInput, { weights: rankSettings.categoryWeights }))
+  const droppedAsDraft =
+    !gatedByRule && Boolean(deps.gate) && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting &&
+    staleLowDeskStory(rankInput, { weights: rankSettings.categoryWeights })
+  if (droppedAsDraft) logger.info({ clusterId: data.clusterId, category: triage?.category }, 'publish queue: older than 12 h on a 0.6 desk, no trend hit: kept as a draft for the editor')
+  const gated = gatedByRule || droppedAsDraft
 
   // Pacing is enforced here, at the last step: triage runs in parallel and cannot see the
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
@@ -402,7 +414,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
     if (data.articleId) {
       const capWait = await dailyCapReached(deps.payload, Date.now(), overdueCategory).catch(() => false)
       if (capWait) {
-        await deps.publishQueue.add('publish', data, { delay: 5 * 60_000 + Math.floor(Math.random() * 90_000), priority: 5 })
+        await deps.publishQueue.add('publish', data, { delay: 5 * 60_000 + Math.floor(Math.random() * 90_000) + rankOffset, priority: 5 })
         logger.info({ clusterId: data.clusterId, articleId: data.articleId }, 'approved story waits: the daily cap is reached')
         return null
       }
@@ -411,7 +423,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   if (!gated && deps.publishQueue && !data.articleId && data.priority !== 'breaking' && !triage?.isUpdateOfExisting) {
     const wait = await pacingWaitMs(deps.payload, Date.now(), overdueCategory).catch(() => 0)
     if (wait > 0) {
-      await deps.publishQueue.add('publish', data, { delay: wait, priority: 5 })
+      await deps.publishQueue.add('publish', data, { delay: wait + rankOffset, priority: 5 })
       logger.info({ clusterId: data.clusterId, waitMin: Math.round(wait / 60_000) }, 'publish paced: waiting for the next slot')
       return null
     }

@@ -80,3 +80,39 @@ export const BACKOFF_MIN_MS = 10 * 60_000
 export function backoffMs(): number {
   return BACKOFF_MIN_MS + Math.floor(Math.random() * 5 * 60_000)
 }
+
+/** The window after a publish slot opens in which waiting stories wake up, best first (shorter than the 10 min publish gap). */
+export const RANK_WINDOW_MS = 8 * 60_000
+/** A queued story on a low-weight desk (0.6 or less) with no trend hit is dropped from the publish queue (kept as a draft) after this age. */
+export const LOW_DESK_QUEUE_MAX_AGE_MS = 12 * 3_600_000
+
+/**
+ * 0 (best) to just under 1 (worst) for a story waiting for a publish slot: trend hit first, then the learned desk weight
+ * (education-jobs 1.5 before pakistan 0.77 before world/ai/cricket 0.6), then freshness (newest source first).
+ */
+export function publishRank(
+  s: { category?: string | null; trend: boolean; items: { publishedAt?: string }[] },
+  o: { weights?: Record<string, number> | null; now?: number } = {},
+): number {
+  const now = o.now ?? Date.now()
+  const w = deskWeight(s.category ?? 'pakistan', o.weights)
+  const tier = s.trend ? 0 : w >= 1 ? 1 : w > LOW_DESK_WEIGHT ? 2 : 3
+  const newest = newestMs(s.items)
+  const ageH = newest ? Math.max(0, (now - newest) / 3_600_000) : 48
+  return tier / 4 + Math.min(0.99, ageH / 48) * 0.24
+}
+
+/** Delay to add on top of the pacing wait so waiting stories wake best-first instead of in a random order. */
+export function rankOffsetMs(rank: number): number {
+  return Math.round(rank * RANK_WINDOW_MS)
+}
+
+/** Queued story on a 0.6 desk, no trend hit, whose newest source is older than 12 h. */
+export function staleLowDeskStory(
+  s: { category?: string | null; trend: boolean; items: { publishedAt?: string }[] },
+  o: { weights?: Record<string, number> | null; now?: number } = {},
+): boolean {
+  if (s.trend || deskWeight(s.category ?? 'pakistan', o.weights) > LOW_DESK_WEIGHT) return false
+  const newest = newestMs(s.items)
+  return newest > 0 && (o.now ?? Date.now()) - newest > LOW_DESK_QUEUE_MAX_AGE_MS
+}
