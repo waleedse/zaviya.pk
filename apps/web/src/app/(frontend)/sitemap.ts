@@ -52,6 +52,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   entries.push({ url: `${siteUrl}/chicken-price-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/fuel-relief-9771-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/atl-filer-status-check-pakistan`, changeFrequency: 'monthly', priority: 0.8 })
+  entries.push({ url: `${siteUrl}/bisp-8171-pakistan`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/loan-emi-calculator-pakistan`, changeFrequency: 'weekly', priority: 0.9 })
   entries.push({ url: `${siteUrl}/sbp-policy-rate`, changeFrequency: 'daily', priority: 0.9 })
   entries.push({ url: `${siteUrl}/income-tax-return-deadline-pakistan`, changeFrequency: 'daily', priority: 0.9 })
