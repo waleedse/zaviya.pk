@@ -293,6 +293,17 @@ describe('uploadNext', () => {
     expect((await uploadNext(deps())).state).toBe('uploaded')
   })
 
+  it('waits the gap after a failed attempt too, so a failure never cascades into the next video', async () => {
+    await store.enqueue(item('a'))
+    await store.enqueue(item('b'))
+    answer = async () => {
+      throw new Error('post_unsure_no_link: clicked publish')
+    }
+    expect((await uploadNext(deps())).state).toBe('failed')
+    expect((await uploadNext(deps())).state).toBe('gap')
+    expect(sent).toHaveLength(1)
+  })
+
   it('waits while the extension is offline', async () => {
     await store.enqueue(item('a'))
     online = false
