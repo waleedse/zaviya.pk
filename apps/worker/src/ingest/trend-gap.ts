@@ -113,6 +113,32 @@ export async function loadTopics(redis: Pick<Redis, 'get'>, now = Date.now(), mi
 const STOP = new Set(['vs', 'v', 'versus', 'the', 'a', 'an', 'and', 'of', 'in', 'on', 'for', 'to', 'at', 'by', 'is', 'are', 'today', 'latest', 'news', 'live', 'update', 'updates', 'new'])
 const ALIAS: Record<string, string> = { pak: 'pakistan', ban: 'bangladesh', ind: 'india', aus: 'australia', eng: 'england', afg: 'afghanistan', nz: 'newzealand', wi: 'westindies', sl: 'srilanka', zim: 'zimbabwe', uae: 'uae', saf: 'southafrica' }
 
+/** Cricket team shorthand as Google Trends writes it: "pakw" is Pakistan women, "pak" Pakistan, "u19" the under-19 side. */
+const TEAM_NAME: Record<string, string> = { pak: 'Pakistan', ban: 'Bangladesh', ind: 'India', aus: 'Australia', eng: 'England', afg: 'Afghanistan', nz: 'New Zealand', wi: 'West Indies', sl: 'Sri Lanka', zim: 'Zimbabwe', saf: 'South Africa', uae: 'UAE' }
+const TEAM_SHORT = /^(pak|ban|ind|aus|eng|afg|nz|wi|sl|zim|saf|uae)(w)?$/
+
+/** "banw vs pakw" -> "Bangladesh women vs Pakistan women", "pak u19 v ban u19" -> "Pakistan U19 vs Bangladesh U19". */
+export function expandCricketShorthand(term: string): string {
+  return term
+    .trim()
+    .split(/\s+/)
+    .map((w) => {
+      const lower = w.toLowerCase().replace(/[.,]+$/g, '')
+      if (lower === 'v' || lower === 'vs' || lower === 'versus') return 'vs'
+      const t = TEAM_SHORT.exec(lower)
+      if (t) return `${TEAM_NAME[t[1]!]}${t[2] ? ' women' : ''}`
+      const u = /^u-?(\d\d)$/.exec(lower)
+      return u ? `U${u[1]}` : w
+    })
+    .join(' ')
+}
+
+/** The two sides of a "X vs Y" topic the other way round ("vs" both orders); null when there are not exactly two sides. */
+export function swapSides(expanded: string): string | null {
+  const sides = expanded.split(/\s+vs\s+/)
+  return sides.length === 2 && sides[0] && sides[1] ? `${sides[1]} vs ${sides[0]}` : null
+}
+
 function stem(w: string): string {
   if (w.length > 4 && w.endsWith('ies')) return `${w.slice(0, -3)}y`
   if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1)
@@ -126,6 +152,12 @@ export function termTokens(text: string): string[] {
   for (const raw of cleaned.split(' ')) {
     const w = raw.replace(/^\.+|\.+$/g, '')
     if (!w || STOP.has(w)) continue
+    const short = TEAM_SHORT.exec(w)
+    if (short?.[2]) {
+      // pakw -> pakistan + women, so "Pakistan Women beat Bangladesh Women" covers "banw vs pakw"
+      for (const x of [ALIAS[short[1]!] ?? short[1]!, 'women']) if (!out.includes(x)) out.push(x)
+      continue
+    }
     const t = ALIAS[w] ?? stem(w)
     if (t.length < 2 && !/\d/.test(t)) continue
     if (!out.includes(t)) out.push(t)
@@ -259,7 +291,7 @@ export async function parseNewsSearch(xml: string): Promise<NewsHit[]> {
 
 /** Official domains worth a targeted search for a topic (cricket boards, FBR, provincial education departments). */
 export function officialDomainsFor(term: string): string[] {
-  const t = term.toLowerCase()
+  const t = expandCricketShorthand(term).toLowerCase()
   const out: string[] = []
   const pakVs = /\b(pak|pakistan)\b.*\b(vs|v|versus)\b|\b(vs|v|versus)\b.*\b(pak|pakistan)\b/.test(t)
   if (pakVs || /\b(cricket|u-?19|u-?16|asia cup|psl|t20|odi|wickets?|icc|pcb)\b/.test(t)) out.push('pcb.com.pk', 'asiancricket.org', 'icc-cricket.com')
@@ -280,12 +312,18 @@ export interface SearchSpec {
 export function searchUrls(term: string): SearchSpec[] {
   const q = (query: string, lang: 'en' | 'ur') =>
     `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:1d`)}&hl=${lang}-PK&gl=PK&ceid=PK:${lang}`
+  // Trends writes "banw vs pakw"; newsrooms write "Bangladesh women vs Pakistan women" (and either side first)
+  const expanded = expandCricketShorthand(term)
+  const swapped = swapSides(expanded)
   const specs: SearchSpec[] = [
     { url: q(term, 'en'), lang: 'en', official: false },
     { url: q(term, 'ur'), lang: 'ur', official: false },
   ]
+  if (expanded !== term) specs.push({ url: q(expanded, 'en'), lang: 'en', official: false })
+  if (swapped) specs.push({ url: q(swapped, 'en'), lang: 'en', official: false })
   const domains = officialDomainsFor(term)
-  if (domains.length) specs.push({ url: q(`${term} (${domains.map((d) => `site:${d}`).join(' OR ')})`, 'en'), lang: 'en', official: true })
+  // the PCB site and the other cricket bodies, searched with the spelled-out names
+  if (domains.length) specs.push({ url: q(`${expanded} (${domains.map((d) => `site:${d}`).join(' OR ')})`, 'en'), lang: 'en', official: true })
   return specs
 }
 

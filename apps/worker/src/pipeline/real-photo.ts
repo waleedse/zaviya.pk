@@ -122,7 +122,7 @@ const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|d
 
 const FREE_FILE = /\/wikipedia\/commons\/[^?]+\.(jpe?g|png)(\?|$)/i
 
-const EXT_FIELDS = 'Artist|LicenseShortName|NonFree'
+const EXT_FIELDS = 'Artist|LicenseShortName|NonFree|DateTimeOriginal|DateTime|ImageDescription'
 const INFO = `prop=imageinfo&iiprop=url|size|mime|extmetadata&iiextmetadatafilter=${EXT_FIELDS}&iiurlwidth=2000`
 
 async function query(fetchFn: typeof fetch, params: string): Promise<WikiPage[]> {
@@ -163,9 +163,32 @@ interface Candidate {
   file: string
 }
 
+/** Childhood and family-archive files: wrong for a news card about a living adult ("with his father", "as a child", "young"). */
+const NOT_AN_ADULT_PORTRAIT = /\b(as an? (child|boy|girl|baby|young)|childhood|with (his|her|their) (father|mother|son|daughter|family|parents|wife|husband|brother|sister|children|kids?)|young|youth|baby|infant|family (photo|portrait|archive)|sepia|archive photo|passport)\b/i
+
+/** The year a file was taken: the Commons date field, else a year in the file name. */
+export function photoYear(file: string, info: { extmetadata?: Record<string, { value?: string } | undefined> } | undefined): number | null {
+  const raw = `${info?.extmetadata?.DateTimeOriginal?.value ?? ''} ${info?.extmetadata?.DateTime?.value ?? ''}`.replace(/<[^>]+>/g, ' ')
+  const m = raw.match(/\b(1[89]\d\d|20\d\d)\b/) ?? file.match(/(?:^|[^0-9])(19\d\d|20\d\d)(?:[^0-9]|$)/)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * A photo of a living person on a news card must show the adult as they are now: never a childhood or family-archive
+ * file, never one taken before 1990. `recent` (first choice) also wants 2015 or later when the date is known.
+ */
+export function personPhotoOk(file: string, info: ImageInfo, mode: 'recent' | 'adult'): boolean {
+  const text = `${file.replace(/[_.]/g, ' ')} ${(info.extmetadata?.ImageDescription?.value ?? '').replace(/<[^>]+>/g, ' ')}`
+  if (NOT_AN_ADULT_PORTRAIT.test(text)) return false
+  const y = photoYear(file, info)
+  if (y !== null && y < 1990) return false
+  return mode === 'adult' || y === null || y >= 2015
+}
+
 /** The file passes every check: free licence on Commons, a real photo, big enough, right shape */
-export function acceptable(file: string, info: ImageInfo | undefined, o: Required<PhotoOpts>, strictName = false): info is ImageInfo {
+export function acceptable(file: string, info: ImageInfo | undefined, o: Required<PhotoOpts>, strictName = false, person?: 'recent' | 'adult'): info is ImageInfo {
   if (!info) return false
+  if (person && !personPhotoOk(file, info, person)) return false
   const short = info.extmetadata?.LicenseShortName?.value ?? ''
   const nonFree = (info.extmetadata?.NonFree?.value ?? '').toLowerCase() === 'true'
   return (
@@ -233,7 +256,7 @@ export function titleHoldsName(title: string | undefined, name: string): boolean
 }
 
 /** The article's lead image if it is a free Commons file of the right shape; else the best Commons file named after the subject. */
-async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<PhotoOpts>): Promise<Candidate | null> {
+async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<PhotoOpts>, person?: 'recent' | 'adult'): Promise<Candidate | null> {
   // A bare "High Court" could be any of five: no photo rather than a guess
   if (PK_ALIAS[subject.trim().toLowerCase()] === '') return null
   const search = searchTerm(subject)
@@ -245,12 +268,12 @@ async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<
   const lead = pages.find((p) => p.title?.toLowerCase() === s && bigEnough(p)) ?? pages.find((p) => titleHoldsName(p.title, search) && bigEnough(p))
   if (lead?.pageimage) {
     const info = await fileInfo(lead.pageimage, fetchFn)
-    if (acceptable(lead.pageimage, info, o)) return { url: info.thumburl ?? info.url, info, file: lead.pageimage }
+    if (acceptable(lead.pageimage, info, o, false, person)) return { url: info.thumburl ?? info.url, info, file: lead.pageimage }
   }
   if (!isSpecific(search)) return null
   const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${search} filetype:bitmap`)}&${INFO}`))
     .map((p) => ({ title: (p.title ?? '').replace(/^File:/, ''), info: p.imageinfo?.[0], rank: p.index ?? 9 }))
-    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, search) && acceptable(f.title, f.info, o, true))
+    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, search) && acceptable(f.title, f.info, o, true, person))
   // Landscape first (they crop least), then search order
   files.sort((a, b) => Number(b.info!.width >= b.info!.height * 1.3) - Number(a.info!.width >= a.info!.height * 1.3) || a.rank - b.rank)
   const best = files[0]
@@ -302,11 +325,22 @@ export function worshipSiteMismatch(subject: string, file: string): boolean {
 }
 
 /** Try each subject in turn; the first free-licence photo that downloads wins. */
-export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof fetch = fetch, opts: PhotoOpts = SOCIAL): Promise<RealPhoto | null> {
+export async function findPhotoForSubjects(subjects: string[], fetchFn: typeof fetch = fetch, opts: PhotoOpts = SOCIAL, people?: Set<string>): Promise<RealPhoto | null> {
   const o = { ...SOCIAL, ...opts }
+  // Living people: first a photo from 2015 or later, then any adult photo (never childhood, family archive or pre-1990).
+  // Other subjects are only tried in the first pass.
+  const passes: ('recent' | 'adult' | undefined)[] = people?.size ? ['recent', 'adult'] : [undefined]
+  for (const pass of passes) {
+    const found = await tryPass(subjects.filter((s) => pass !== 'adult' || people?.has(s)), fetchFn, o, people, pass)
+    if (found) return found
+  }
+  return null
+}
+
+async function tryPass(subjects: string[], fetchFn: typeof fetch, o: Required<PhotoOpts>, people: Set<string> | undefined, pass: 'recent' | 'adult' | undefined): Promise<RealPhoto | null> {
   for (const subject of subjects) {
     try {
-      const hit = await candidateFor(subject, fetchFn, o)
+      const hit = await candidateFor(subject, fetchFn, o, people?.has(subject) ? pass : undefined)
       if (!hit) continue
       if (!localEnough(subject, hit.file)) {
         logger.info({ subject, file: hit.file }, 'real photo skipped: common topic, photo not from Pakistan')
@@ -374,10 +408,10 @@ export async function findRealPhoto(title: string, tags: string[], fetchFn: type
   if (!subjects.length) return null
   const people = await livingPeople(subjects, fetchFn)
   const ordered = peopleFirst(subjects, people)
-  const hit = await findPhotoForSubjects(ordered, fetchFn, SOCIAL)
+  const hit = await findPhotoForSubjects(ordered, fetchFn, SOCIAL, people)
   if (hit) return hit
   const named = ordered.filter((s) => people.has(s))
-  return named.length ? findPhotoForSubjects(named, fetchFn, PERSON_FALLBACK) : null
+  return named.length ? findPhotoForSubjects(named, fetchFn, PERSON_FALLBACK, people) : null
 }
 
 /**
@@ -388,5 +422,5 @@ export async function findHeroPhoto(input: { title: string; dek?: string; brief?
   const subjects = heroSubjects(input)
   const named = subjectsFor(input.title, input.tags, 4)
   const people = named.length ? await livingPeople(named, fetchFn) : new Set<string>()
-  return findPhotoForSubjects(peopleFirst(subjects, people), fetchFn, HERO)
+  return findPhotoForSubjects(peopleFirst(subjects, people), fetchFn, HERO, people)
 }
