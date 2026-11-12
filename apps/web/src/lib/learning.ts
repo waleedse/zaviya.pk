@@ -45,6 +45,16 @@ export async function pacingStats(payload: Payload): Promise<{ lastPublishedAt: 
 }
 
 /** Category multiplier from reader interest: sqrt(category avg views / overall avg), kept within 0.85–1.2. */
+/**
+ * Learned triage weight for a desk from its Pakistani pageviews per article vs the site average (14 days).
+ * Range 0.6-1.5 since 12 Nov: on 0.85-1.2 a desk with 1% of the jobs desk's readers (world: 0.01 vs 1.12 views
+ * per article) still used a full share of the 40-a-day cap, and Google left those pages "discovered, not indexed".
+ */
+export function categoryWeight(avg: number, overall: number): number {
+  if (!overall) return 1
+  return Math.round(Math.min(1.5, Math.max(0.6, Math.sqrt(avg / overall))) * 100) / 100
+}
+
 export async function computeCategoryWeights(payload: Payload): Promise<Record<string, number>> {
   const rows = await q<{ slug: string; articles: string; views: string }>(
     payload,
@@ -56,7 +66,7 @@ export async function computeCategoryWeights(payload: Payload): Promise<Record<s
         WHERE a._status = 'published' AND a.published_at > now() - interval '14 days'
       )
       SELECT arts.slug, count(DISTINCT arts.id) AS articles, count(p.id) AS views
-      FROM arts LEFT JOIN zaviya_pageviews p ON p.path = arts.path AND p.ts > now() - interval '14 days'
+      FROM arts LEFT JOIN zaviya_pageviews p ON p.path = arts.path AND p.ts > now() - interval '14 days' AND p.country = 'PK'
       GROUP BY arts.slug`,
   )
   const per = rows.map((r) => ({ slug: r.slug, n: Number(r.articles), avg: Number(r.views) / Math.max(1, Number(r.articles)) }))
@@ -68,7 +78,7 @@ export async function computeCategoryWeights(payload: Payload): Promise<Record<s
   if (!overall) return weights
   for (const r of per) {
     if (r.n < 3) continue // not enough evidence yet
-    weights[r.slug] = Math.round(Math.min(1.2, Math.max(0.85, Math.sqrt(r.avg / overall))) * 100) / 100
+    weights[r.slug] = categoryWeight(r.avg, overall)
   }
   return weights
 }
