@@ -50,20 +50,15 @@ export function isVerbatim(quote: string, source: string): boolean {
 // ---- safety ---------------------------------------------------------------------------------------------------------
 
 /**
- * No insults, attacks on people, the army, religion, incitement or party-political attacks. A deliberately blunt filter:
+ * No insults, personal attacks, incitement or spam. Army, religion and party topics are allowed (Waleed, 13 Nov: no sensitive holds).
+ * A deliberately blunt filter:
  * a quote that mentions any of these is skipped, never softened.
  */
 const UNSAFE: { why: string; re: RegExp }[] = [
   { why: 'insult', re: /\b(idiot|stupid|moron|fool|clown|puppet|traitor|corrupt|thief|thieves|liar|liars|fraud|crook|coward|scum|dog|dogs|pig|shameless|disgrace|criminal|terrorist|loser|dumb|ugly|hate)\b/i },
   { why: 'insult', re: /(چور|غدار|بے شرم|بیشرم|گدھا|کتا|کتے|جھوٹا|بزدل|منافق|ڈاکو|کرپٹ|بدمعاش|احمق|نفرت)/ },
-  { why: 'army', re: /\b(army|armed forces|military|ispr|isi|generals?|corps commander|field marshal|establishment|martial law|cantonment)\b/i },
-  { why: 'army', re: /(فوج|فوجی|آرمی|عسکری|اسٹیبلشمنٹ|جرنیل|جنرل|آئی ایس آئی|مارشل لا)/ },
-  { why: 'religion', re: /\b(islam\w*|muslims?|quran|koran|allah|prophet|blasphem\w*|sectarian|shia|sunni|ahmadi\w*|kafir|jihad\w*|hindu\w*|christian\w*|church|mosque|temple|fatwa|haram|halal|religio\w*|god)\b/i },
-  { why: 'religion', re: /(اسلام|مسلم|قرآن|قران|اللہ|رسول|نبی|توہین|فرقہ|شیعہ|سنی|احمدی|کافر|جہاد|ہندو|مسیحی|مسجد|مندر|گرجا|فتویٰ|حرام|حلال|مذہب|خدا)/ },
   { why: 'incitement', re: /\b(kill\w*|murder\w*|shoot\w*|hang|behead\w*|burn\w*|bomb\w*|blood|revenge|riots?|uprising|rise up|take to the streets|long march|lynch\w*|destroy them|wipe out|nuke|nuclear strike)\b/i },
   { why: 'incitement', re: /(قتل|مار ڈال|پھانسی|جلا|بم |خون|بغاوت|دھرنا|لانگ مارچ|انتقام|فساد)/ },
-  { why: 'party-political', re: /\b(pti|pml-?n|pml-?q|ppp|tlp|mqm|jui-?f?|anp|bjp|congress party|democrats?|republicans?|maga|labour|tories|conservatives|opposition|regime|rigged|rigging|election fraud|vote theft|imran khan|nawaz sharif|zardari|bilawal)\b/i },
-  { why: 'party-political', re: /(تحریک انصاف|پی ٹی آئی|مسلم لیگ|پیپلز پارٹی|ایم کیو ایم|جے یو آئی|اپوزیشن|دھاندلی|عمران خان|نواز شریف|زرداری|بلاول)/ },
   { why: 'attack', re: /\b(blame[sd]?|accus\w+|shame on|resign now|must resign|step down|failed|failure of|should be jailed|jail him|arrest him)\b/i },
   { why: 'spam', re: /\b(giveaway|retweet|follow me|subscribe|link in bio|use code|discount code|airdrop|crypto|bitcoin|token|nft)\b/i },
 ]

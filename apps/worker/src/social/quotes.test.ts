@@ -45,10 +45,7 @@ describe('direct quotes in articles', () => {
 describe('safety filter', () => {
   it.each([
     ['You are a stupid clown and everyone knows it', 'insult'],
-    ['The army must stay out of politics for good', 'army'],
-    ['This is an attack on Islam and its followers', 'religion'],
     ['We should take to the streets and burn it down', 'incitement'],
-    ['PTI workers were treated unfairly by the courts', 'party-political'],
     ['The finance minister has failed the country', 'attack'],
   ])('skips %s', (text, why) => {
     expect(unsafeReason(text)).toBe(why)
@@ -56,9 +53,13 @@ describe('safety filter', () => {
   it('lets a plain statement through', () => {
     expect(unsafeReason('AI will change how every business in the country works over the next decade.')).toBeNull()
   })
-  it('skips Urdu insults and army mentions', () => {
+  it('skips Urdu insults', () => {
     expect(unsafeReason('یہ لوگ چور ہیں')).toBe('insult')
-    expect(unsafeReason('فوج کا کردار')).toBe('army')
+  })
+  it('allows army, religion and party topics (no sensitive holds)', () => {
+    expect(unsafeReason('فوج کا کردار')).toBeNull()
+    expect(unsafeReason('The army must stay out of politics for good')).toBeNull()
+    expect(unsafeReason('PTI workers were treated unfairly by the courts')).toBeNull()
   })
 })
 
