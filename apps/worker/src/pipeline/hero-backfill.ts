@@ -200,6 +200,8 @@ export async function backfillRealPhotos(
     mediaBase?: string
     cdnBase?: string
     card?: typeof uploadBrandCard
+    /** Only these problems (the sweep passes ['missing']) */
+    only?: HeroProblem[]
   } = {},
 ): Promise<HeroFixResult> {
   const days = opts.days ?? 7
@@ -239,8 +241,8 @@ export async function backfillRealPhotos(
   const todo: { a: RecentArticle; problem: HeroProblem; reason?: string }[] = []
   for (const a of sorted) {
     const p = await heroProblem(a.heroImage, fetchImage, `${a.title ?? ''} ${a.dek ?? ''}`)
-    if (p.problem) todo.push({ a, problem: p.problem, reason: p.reason })
-    else {
+    if (p.problem && (!opts.only || opts.only.includes(p.problem))) todo.push({ a, problem: p.problem, reason: p.reason })
+    else if (!p.problem) {
       out.unchanged++
       out.items.push({ id: String(a.id), title: a.title ?? '', views: views.get(String(a.id)) ?? 0, status: 'unchanged' })
     }
@@ -291,4 +293,23 @@ export async function backfillRealPhotos(
   }
   logger.info({ scanned: out.scanned, candidates: out.candidates, commons: out.replacedCommons, openverse: out.replacedOpenverse, card: out.brandedCard, unchanged: out.unchanged, failed: out.failed }, 'hero fix backfill: done')
   return out
+}
+
+let sweeping = false
+
+/**
+ * Safety net for the publish guard: an article the editor released straight through Payload (not through the worker's
+ * publish step) can go live with no hero. Every few minutes, stories of the last 2 days with no hero get one
+ * (Commons, Openverse, else the branded card).
+ */
+export async function sweepMissingHeroes(payload: PayloadClient): Promise<HeroFixResult | null> {
+  if (sweeping) return null
+  sweeping = true
+  try {
+    const res = await backfillRealPhotos(payload, { days: 2, only: ['missing'], pauseMs: 500 })
+    if (res.candidates) logger.warn({ fixed: res.replacedCommons + res.replacedOpenverse + res.brandedCard, failed: res.failed }, 'hero sweep: published stories had no hero')
+    return res
+  } finally {
+    sweeping = false
+  }
 }

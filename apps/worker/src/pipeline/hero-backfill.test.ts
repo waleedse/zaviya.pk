@@ -112,3 +112,23 @@ describe('backfillRealPhotos (AI, missing and document heroes)', () => {
     expect(t.calls.some((c) => c.method === 'PATCH')).toBe(false)
   })
 })
+
+describe('hero sweep (missing heroes only)', () => {
+  it('touches only published stories with no hero and gives them a branded card when no photo exists', async () => {
+    const calls: { method: string; path: string; body?: unknown }[] = []
+    const payload = {
+      request: vi.fn(async (method: string, path: string, body?: unknown) => {
+        calls.push({ method, path, body })
+        if (path.startsWith('/api/articles?')) {
+          return { docs: [{ id: 1, title: 'Has AI hero', heroImage: { id: 10, isAiGenerated: true } }, { id: 2, title: 'Released by the editor', heroImage: null }, { id: 3, title: 'Fine', heroImage: { id: 12, license: 'wikimedia', credit: 'Photo: a / CC0' } }] }
+        }
+        return { docs: [] }
+      }),
+      uploadMedia: vi.fn(async () => ({ id: '99' })),
+    }
+    const card = vi.fn(async () => ({ id: '77' }))
+    const res = await backfillRealPhotos(payload as unknown as PayloadClient, { only: ['missing'], find: async () => null, card: card as never, pauseMs: 0 })
+    expect(res).toMatchObject({ candidates: 1, brandedCard: 1, failed: 0 })
+    expect(calls.filter((c) => c.method === 'PATCH')).toEqual([{ method: 'PATCH', path: '/api/articles/2?locale=en', body: { heroImage: 77 } }])
+  })
+})

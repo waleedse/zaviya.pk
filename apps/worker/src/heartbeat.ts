@@ -6,6 +6,7 @@ import { geminiModelStatus } from '@zaviya/llm'
 import { logger } from './logger.js'
 import { finishGated, gateFallback } from './pipeline/publish.js'
 import { decidePitch, pitchFallback } from './pipeline/pitch.js'
+import { sweepMissingHeroes } from './pipeline/hero-backfill.js'
 
 async function readJson<T>(runtime: WorkerRuntime, key: string): Promise<T | null> {
   try {
@@ -127,6 +128,8 @@ export function startHeartbeat(runtime: WorkerRuntime): ReturnType<typeof setInt
         (e) => logger.warn({ err: e }, 'live expiry failed'),
       )
     }
+    // Every ~5 minutes: a published story without a hero (released by the editor straight through Payload) gets one
+    if (ticks % 15 === 3) void sweepMissingHeroes(runtime.payload).catch((e) => logger.warn({ err: e }, 'hero sweep failed'))
     // Every ~5 minutes: if the editor gate holds stories but nothing went out for a while, publish one
     if (runtime.env.EDITOR_GATE && ++beats % 15 === 0) {
       void gateFallback({ payload: runtime.payload, socialQueue: runtime.queues.social, redis: runtime.redis, mediaQueue: runtime.queues.media }, runtime.env.EDITOR_GATE_FALLBACK_MIN).catch((e) =>
