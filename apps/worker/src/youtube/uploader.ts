@@ -31,8 +31,8 @@ export function classifyUploadError(message: string): UploadErrorKind {
   return 'retry'
 }
 
-/** The first extension build that knows youtube.upload: an older one ignores the job without answering, so nothing may be sent to it */
-export const MIN_EXTENSION_VERSION = '0.5.0'
+/** The first extension build that knows youtube.upload and opens Studio's upload dialog the 13 Nov way (0.5.0 uploaded into nothing and failed with next_button_not_found): an older one must not be sent the job */
+export const MIN_EXTENSION_VERSION = '0.5.1'
 
 export function versionAtLeast(version: string | null, min: string): boolean {
   if (!version) return false
