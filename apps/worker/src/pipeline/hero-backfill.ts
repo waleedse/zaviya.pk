@@ -7,7 +7,7 @@ import { generateHeroViaExtension, geminiAccounts, AI_MEDIA, absoluteMediaUrl } 
 import { fluxPrompt, generateHeroViaWorkersAI } from './flux.js'
 import { findHeroImage, uploadHeroPhoto, uploadBrandCard, heroKindOf, type HeroInput } from './hero-photo.js'
 import type { RealPhoto } from './real-photo.js'
-import { documentNameReason, documentPixelReason } from './photo-qa.js'
+import { combatReason, documentNameReason, documentPixelReason } from './photo-qa.js'
 
 /**
  * Stories that went out without a hero image (or with only the branded text card) get one
@@ -139,7 +139,7 @@ interface RecentArticle {
   tags?: ({ name?: string } | number | string)[]
 }
 
-export type HeroProblem = 'missing' | 'ai' | 'document' | 'card'
+export type HeroProblem = 'missing' | 'ai' | 'document' | 'combat' | 'card'
 
 export interface HeroFixResult {
   scanned: number
@@ -167,13 +167,15 @@ function decodeURIComponentSafe(s: string | undefined): string {
 }
 
 /** The article's current hero and what is wrong with it, or null when it is a fine real photo. Documents are found by name, then by pixels. */
-export async function heroProblem(hero: RecentArticle['heroImage'], fetchImage?: FetchImage): Promise<{ problem: HeroProblem | null; reason?: string }> {
+export async function heroProblem(hero: RecentArticle['heroImage'], fetchImage?: FetchImage, text = ''): Promise<{ problem: HeroProblem | null; reason?: string }> {
   if (!hero || typeof hero !== 'object') return { problem: 'missing' }
   if (hero.isAiGenerated === true || hero.license === 'ai-generated') return { problem: 'ai' }
   // The branded text card (our own design) is not a photo; it is upgraded when a real photo turns up, never flagged as a document
   if (hero.license === 'own' || hero.credit === 'Zaviya') return { problem: 'card' }
   const byName = documentNameReason(hero.filename, hero.alt, decodeURIComponentSafe(hero.credit))
   if (byName) return { problem: 'document', reason: byName }
+  const combat = combatReason(text, hero.filename, hero.alt, decodeURIComponentSafe(hero.credit))
+  if (combat) return { problem: 'combat', reason: combat }
   const img = fetchImage ? await fetchImage(hero).catch(() => null) : null
   const byPixels = img ? documentPixelReason(img.bytes, img.mime) : null
   return byPixels ? { problem: 'document', reason: byPixels } : { problem: null }
@@ -236,7 +238,7 @@ export async function backfillRealPhotos(
   const sorted = [...res.docs].sort((a, b) => (views.get(String(b.id)) ?? 0) - (views.get(String(a.id)) ?? 0))
   const todo: { a: RecentArticle; problem: HeroProblem; reason?: string }[] = []
   for (const a of sorted) {
-    const p = await heroProblem(a.heroImage, fetchImage)
+    const p = await heroProblem(a.heroImage, fetchImage, `${a.title ?? ''} ${a.dek ?? ''}`)
     if (p.problem) todo.push({ a, problem: p.problem, reason: p.reason })
     else {
       out.unchanged++

@@ -30,7 +30,7 @@ export function heroKindOf(photo: RealPhoto): 'commons' | 'openverse' {
 export async function findHeroImage(input: HeroInput, finders: HeroFinders = {}): Promise<RealPhoto | null> {
   const ctx = { title: input.title }
   const accept = (p: RealPhoto) => {
-    const v = heroPhotoQa(p)
+    const v = heroPhotoQa(p, `${input.title} ${input.dek ?? ''}`)
     if (!v.ok) logger.warn({ ...ctx, subject: p.meta.subject, file: p.meta.file, provider: p.meta.provider ?? 'commons', reason: v.reason }, 'hero rejected')
     return v.ok
   }
