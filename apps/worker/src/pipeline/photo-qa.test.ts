@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firstPassingPhoto, photoQa } from './photo-qa.js'
+import { firstPassingPhoto, photoQa, wildlifeReason } from './photo-qa.js'
 import type { RealPhoto } from './real-photo.js'
 
 const photo = (over: Partial<RealPhoto['meta']> = {}, bytes = 90_000): RealPhoto => ({
@@ -36,5 +36,19 @@ describe('social photo QA gate', () => {
     expect(photoQa(photo({ subject: 'Islamabad', file: 'Faisal_Mosque,_Islamabad_III.jpg' }), 'Islamabad police jobs').ok).toBe(false)
     expect(photoQa(photo({ subject: 'Faisal Mosque', file: 'Faisal_Mosque,_Islamabad_III.jpg' }), 'Faisal Mosque lit up').ok).toBe(true)
     expect(photoQa(photo({ subject: 'Nawaz Sharif', file: 'Nawaz_Sharif_2013.jpg' }), 'Nawaz Sharif says').ok).toBe(true)
+  })
+})
+
+describe('wildlife photos', () => {
+  it('rejects a bird photo for a place on a news story', () => {
+    expect(wildlifeReason('Iran claims destruction of US radar in Bahrain', 'Greater flamingos (Phoenicopterus roseus) Bahrain.jpg')).toMatch(/wildlife/)
+    expect(wildlifeReason('Digital skills program launched in Punjab', 'White-throated Kingfisher in Ludhiana district, Punjab 03.jpg')).toMatch(/wildlife/)
+  })
+  it('allows it when the story is about nature', () => {
+    expect(wildlifeReason('Migratory birds return to Punjab wetlands', 'White-throated Kingfisher in Punjab.jpg')).toBeNull()
+  })
+  it('allows ordinary place photos', () => {
+    expect(wildlifeReason('Rain in Lahore', 'Badshahi Mosque, Lahore.jpg')).toBeNull()
+    expect(wildlifeReason('Cricket in Karachi', 'National Stadium Karachi (2019).jpg')).toBeNull()
   })
 })
