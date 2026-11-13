@@ -204,9 +204,10 @@ export function buildCaptions(timeline: Timeline, stories: StoryInput[], opts: C
     const prefix = timeline.topic === 'ai-tech' ? 'AI & Tech This Week' : timeline.topic === 'money' ? 'Pakistan Money Today' : 'Pakistan News Today'
     const suffix = N > 1 ? ` & ${N - 1} more #Shorts` : ' #Shorts'
     const lead = list[0]?.headline ?? ''
-    const room = 100 - `${prefix}: `.length - suffix.length
-    const leadShort = lead.length <= room ? lead : shortenHeadline(lead, Math.max(20, room), true)
-    const title = `${prefix}: ${leadShort}${suffix}`.slice(0, 100)
+    // the whole lead headline, never cut mid-sentence ("...think secrets were & 7 more"): drop the prefix, then the
+    // "& N more", before shortening the headline itself
+    const fits = [`${prefix}: ${lead}${suffix}`, `${lead}${suffix}`, `${lead} #Shorts`, lead].find((t) => t.length <= 100)
+    const title = fits ?? `${shortenHeadline(lead, 92, true)} #Shorts`.slice(0, 100)
     const chapters: string[] = []
     if (timeline.format === 'roundup60') {
       chapters.push('0:00 Intro')
