@@ -48,3 +48,16 @@ describe('speechSentences', () => {
     expect(speechSentences('ہاں۔ یہ ایک لمبا جملہ ہے۔')).toEqual(['ہاں۔ یہ ایک لمبا جملہ ہے۔'])
   })
 })
+
+describe('English names keep their English sound', () => {
+  it('splits glued names and reads beta as بی ٹا, not the Urdu word for son', () => {
+    const r = toSpeechText('WABetaInfo کے مطابق WhatsApp beta میں نیا فیچر آیا۔')
+    expect(r.unresolved).toEqual([])
+    expect(r.text).toContain('ڈبلیو اے بی ٹا انفو')
+    expect(r.text).toContain('واٹس ایپ بی ٹا')
+  })
+  it('matches plain English words in any case but keeps acronyms exact', () => {
+    expect(toSpeechText('Beta update').text).toBe('بی ٹا اپ ڈیٹ')
+    expect(toSpeechText('IMF').text).toBe('آئی ایم ایف')
+  })
+})

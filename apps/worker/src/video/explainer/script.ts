@@ -56,7 +56,7 @@ export function scriptIssues(script: ExplainerScript, allowedText: string, everg
     const n = i + 1
     if (GREETING.test(b.text)) issues.push(`beat ${n}: no greeting, start with the hook`)
     const speech = toSpeechText(b.text)
-    if (speech.unresolved.length) issues.push(`beat ${n}: write these English words in Urdu letters: ${speech.unresolved.join(', ')}`)
+    if (speech.unresolved.length) issues.push(`beat ${n}: the voice has no pronunciation for ${speech.unresolved.join(', ')}; write each in Urdu letters by its English sound, split into syllables with spaces (beta -> بی ٹا, update -> اپ ڈیٹ), never as a look-alike Urdu word`)
     words += speech.text.split(/\s+/).filter(Boolean).length
     const sentences = b.text.split(/(?<=[۔؟])\s*/).filter(Boolean)
     if (sentences.length > 2) issues.push(`beat ${n}: at most two sentences`)
@@ -82,7 +82,7 @@ Never make a video about government or public administration: ministers, cabinet
 
 Structure: 8 to 11 beats, a story and not a list. Beat 1 is the hook: a surprising fact or a question in at most 14 words. Then build it up: what it is, how it works step by step, one or two details that make people say "wow", why it matters or what is next, and a misunderstanding cleared up. The last beat says what it means for the viewer and ends by pointing to zaviya.pk.
 
-Language: simple spoken Urdu in Urdu script, the way a friendly TV presenter talks. Short sentences, each ending with ۔ or ؟. In total 200 to 280 words, at most two sentences per beat. Never start with a greeting (no السلام علیکم, no ناظرین). Use no English letters anywhere: write English or foreign names in Urdu letters (پی ایچ پی, واٹس ایپ, اسپیس ایکس). Write figures as digits (they are read aloud as Urdu words), for example 5 ہزار; use a figure only if it is in the sources. With no sources, use no figures except small counts like "تین باتیں".
+Language: simple spoken Urdu in Urdu script, the way a friendly TV presenter talks. Short sentences, each ending with ۔ or ؟. In total 200 to 280 words, at most two sentences per beat. Never start with a greeting (no السلام علیکم, no ناظرین). Write names of English brands, apps, companies, products and tech words in English letters exactly as spelled (WhatsApp, WABetaInfo, beta, iPhone, Nvidia, IMF): a pronunciation list reads them with their English sound. Never write such words in Urdu letters, because the voice then reads them as Urdu words (وا بیٹا is heard as the Urdu word for son, not WhatsApp beta). Everything else in Urdu script. Write figures as digits (they are read aloud as Urdu words), for example 5 ہزار; use a figure only if it is in the sources. With no sources, use no figures except small counts like "تین باتیں".
 
 Facts: use only facts that are in the SOURCES. A topic without sources may use only widely known, stable general facts. Never state prices, dates, laws, phone numbers or statistics you cannot trace to the sources; when unsure leave it out. Attribute every claim that comes from a company or a report to its source in the sentence itself (کمپنی کے مطابق, رپورٹ کے مطابق) and never state an unconfirmed claim as established fact; no accusations against named people or organisations, no sensational wording, no medical promises, no fear-mongering about money.
 

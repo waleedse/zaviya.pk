@@ -79,6 +79,21 @@ export const TERMS: Record<string, string> = {
   Apple: 'ایپل', Samsung: 'سام سنگ', internet: 'انٹرنیٹ', Internet: 'انٹرنیٹ', online: 'آن لائن', Online: 'آن لائن',
   WiFi: 'وائی فائی', 'Wi-Fi': 'وائی فائی', app: 'ایپ', App: 'ایپ', link: 'لنک', Link: 'لنک', password: 'پاس ورڈ', Password: 'پاس ورڈ',
   email: 'ای میل', Email: 'ای میل', website: 'ویب سائٹ', Website: 'ویب سائٹ', 'zaviya.pk': 'زاویہ ڈاٹ پی کے',
+  // English words spelled by English sound, never by an Urdu word that looks the same (beta is بی ٹا, not بیٹا "son")
+  beta: 'بی ٹا', info: 'انفو', update: 'اپ ڈیٹ', updates: 'اپ ڈیٹس', version: 'ورژن', feature: 'فیچر', features: 'فیچرز',
+  Android: 'اینڈرائیڈ', iPhone: 'آئی فون', iOS: 'آئی او ایس', iPad: 'آئی پیڈ', Gemini: 'جیمنائی', Meta: 'میٹا', Twitter: 'ٹوئٹر',
+  TikTok: 'ٹک ٹاک', Netflix: 'نیٹ فلکس', Amazon: 'ایمیزون', Nvidia: 'این ویڈیا', NVIDIA: 'این ویڈیا', Bitcoin: 'بٹ کوائن',
+  crypto: 'کرپٹو', smartphone: 'اسمارٹ فون', laptop: 'لیپ ٹاپ', chip: 'چپ', chips: 'چپس', Windows: 'ونڈوز', Chrome: 'کروم',
+  Gmail: 'جی میل', Telegram: 'ٹیلی گرام', Snapchat: 'اسنیپ چیٹ', Threads: 'تھریڈز', Grok: 'گروک', Claude: 'کلاڈ',
+  Anthropic: 'اینتھروپک', Huawei: 'ہواوے', Xiaomi: 'شاؤمی', Infinix: 'انفینکس', Tecno: 'ٹیکنو', Vivo: 'ویوو', Oppo: 'اوپو',
+  Realme: 'ریئل می', Pixel: 'پکسل', Galaxy: 'گلیکسی', Pro: 'پرو', Max: 'میکس', Ultra: 'الٹرا', Plus: 'پلس', Mini: 'منی',
+  test: 'ٹیسٹ', status: 'اسٹیٹس', channel: 'چینل', group: 'گروپ', video: 'ویڈیو', call: 'کال', chat: 'چیٹ', message: 'میسج',
+  messages: 'میسجز', account: 'اکاؤنٹ', users: 'یوزرز', user: 'یوزر', server: 'سرور', cloud: 'کلاؤڈ', model: 'ماڈل', bot: 'بوٹ',
+}
+
+/** Split glued English names (WABetaInfo -> WA Beta Info) so each part can be looked up. */
+export function splitCamel(s: string): string {
+  return s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
 }
 
 const LETTERS: Record<string, string> = {
@@ -139,10 +154,18 @@ export function toSpeechText(input: string): SpeechText {
   })
 
   // known terms (longest first), then acronyms, then report what is left
+  // whole known names first (WhatsApp, ChatGPT), then glued names split into parts (WABetaInfo -> WA Beta Info)
   const terms = Object.keys(TERMS).sort((a, b) => b.length - a.length)
-  for (const k of terms) {
-    t = t.replace(new RegExp(`(?<![A-Za-z])${k.replace(/[-.]/g, '\\$&')}(?![A-Za-z])`, 'g'), ` ${TERMS[k]} `)
+  const applyTerms = () => {
+    for (const k of terms) {
+      // acronyms and brand spellings match exactly; plain words (beta, Beta, BETA) in any case
+      const flags = /^[a-z]+$/.test(k) ? 'gi' : 'g'
+      t = t.replace(new RegExp(`(?<![A-Za-z])${k.replace(/[-.]/g, '\\$&')}(?![A-Za-z])`, flags), ` ${TERMS[k]} `)
+    }
   }
+  applyTerms()
+  t = splitCamel(t)
+  applyTerms()
   t = t.replace(/(?<![A-Za-z])[A-Z]{2,6}(?![A-Za-z])/g, (m) => ` ${spellAcronym(m)} `)
   t = t.replace(/[A-Za-z][A-Za-z'’-]*/g, (m) => {
     unresolved.push(m)
