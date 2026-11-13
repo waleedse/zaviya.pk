@@ -81,12 +81,12 @@ export function matchTrend(trend: string, story: { title: string; tags: string[]
   const term = trend.trim()
   if (!term) return null
   const haystack = `${story.title} ${story.tags.join(' ')}`.toLowerCase()
-  const termWords = wordsOf(term)
+  const termWords = [...new Set(wordsOf(term))]
   let words = ''
   if (haystack.includes(term.toLowerCase()) && term.split(/\s+/).length <= 3) words = term
   else {
     const hay = new Set(wordsOf(haystack).map(stemWord))
-    const hit = termWords.filter((w) => hay.has(stemWord(w)))
+    const hit = [...new Set(termWords.filter((w) => hay.has(stemWord(w))).map(stemWord))].map((st) => termWords.find((w) => stemWord(w) === st)!)
     const enough = termWords.length === 1 ? hit.length === 1 && hit[0]!.length >= 4 : hit.length >= 2
     if (enough) words = hit.slice(0, 3).join(' ')
   }
@@ -111,7 +111,7 @@ export function toHashtag(raw: string): string | null {
  * A trending-topic tag first (when the story matches a Google Trends PK or X trend, at most two), then specific topics people search
  * (from the story's tags, ones named in the headline first), then the category tags, the brand always last. Three in all, never a party tag.
  */
-export function pickHashtags(opts: { tags: string[]; category: string; title: string; trends?: string[]; cap?: number }): string[] {
+export function pickHashtags(opts: { tags: string[]; category: string; title: string; trends?: string[]; cap?: number; avoid?: Set<string> }): string[] {
   const cap = opts.cap ?? IG_HASHTAG_CAP
   const title = opts.title.toLowerCase()
   const out: string[] = []
@@ -126,8 +126,16 @@ export function pickHashtags(opts: { tags: string[]; category: string; title: st
     add(trendHashtag(t, { title: opts.title, tags: opts.tags }))
     if (out.length > before) trendTags++
   }
+  // story tags only when the headline names them (a tag like "Platts" or a wrong "NCCIA" that the headline never says is noise),
+  // and a tag used on the last few posts only when nothing fresh is left (the same tags on every World post looked like spam)
+  const avoid = opts.avoid ?? new Set<string>()
+  const named = (t: string) => {
+    const ws = wordsOf(t)
+    return title.includes(t.toLowerCase()) || (ws.length > 0 && ws.every((w) => title.includes(w)))
+  }
   const ranked = opts.tags
-    .map((t) => ({ h: toHashtag(t), score: (title.includes(t.toLowerCase()) ? 100 : 0) - t.length }))
+    .filter(named)
+    .map((t) => ({ h: toHashtag(t), score: (avoid.has(toHashtag(t)?.toLowerCase() ?? '') ? -50 : 0) - t.length }))
     .filter((x): x is { h: string; score: number } => !!x.h)
     .sort((a, b) => b.score - a.score)
   for (const r of ranked.slice(0, 2)) add(r.h)
@@ -152,6 +160,10 @@ export function trendKeyword(story: { tags: string[]; title: string }, trends: s
   return null
 }
 
+/** Hashtags of the last posts (oldest first): story tags used on them go last so each post carries fresh ones. */
+const RECENT_X_TAGS = 12
+const recentXTags = new Set<string>()
+
 /**
  * Final copy per platform: the writer's description, no stray tags, a controlled set of hashtags (three at most), and the
  * matching trending keyword as plain words too (people search words, not only tags).
@@ -161,7 +173,7 @@ export function finalizeCopy(
   story: { tags: string[]; category: string; title: string; trends?: string[] },
 ): { facebook: string; instagram: string; x: string } {
   const trends = story.trends ?? currentTrends()
-  const tags = pickHashtags({ ...story, trends })
+  const tags = pickHashtags({ ...story, trends, avoid: recentXTags })
   const fb = tags.slice(0, 2)
   const xTags = tags.slice(0, 2)
   const fbText = stripHashtags(copy.facebook)
@@ -170,10 +182,13 @@ export function finalizeCopy(
   const said = (t: string) => t
   const kwFb = trendKeyword(story, trends, said(fbText))
   const kwIg = trendKeyword(story, trends, said(igText))
-  const kwX = trendKeyword(story, trends, said(x))
   const kwLine = (k: string | null) => (k ? `\n\nTrending: ${k}` : '')
-  // X: 258 characters leave room for the 23-character link; add the words only when they fit with the tags
-  if (kwX && `${x} ${kwX}`.length + 1 + xTags.join(' ').length <= 258) x = `${x} (${kwX})`
+  // X: no "(trend words)" tail any more, it read as spam ("(women women)"); the trend rides in the hashtag
+  for (const t of xTags) {
+    recentXTags.delete(t.toLowerCase())
+    recentXTags.add(t.toLowerCase())
+  }
+  while (recentXTags.size > RECENT_X_TAGS) recentXTags.delete(recentXTags.values().next().value!)
   return {
     facebook: `${fbText}${kwLine(kwFb)}\n\n${fb.join(' ')}`,
     instagram: `${igText}${kwLine(kwIg)}\n\n.\n${tags.join(' ')}`,

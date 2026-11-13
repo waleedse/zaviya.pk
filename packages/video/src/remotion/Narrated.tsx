@@ -39,10 +39,12 @@ const BeatLayer: React.FC<{ beat: NarratedBeat; seqFrom: number; accent: string;
 
   if (layout === 'full') {
     // a vertical photograph filling the screen, drifting slowly, with the words on a dark fade at the bottom
-    const fd = { scale: 1.08 + 0.14 * p, x: beat.drift % 2 === 0 ? -2 + 4 * p : 2 - 4 * p, y: beat.drift < 2 ? 1.5 - 3 * p : -1.5 + 3 * p }
+    const fd = { scale: 1 + 0.06 * p, x: beat.drift % 2 === 0 ? -2 + 4 * p : 2 - 4 * p, y: beat.drift < 2 ? 1.5 - 3 * p : -1.5 + 3 * p }
     return (
       <AbsoluteFill style={{ opacity: fadeIn, background: '#05080f' }}>
-        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${fd.x}%, ${fd.y}%) scale(${fd.scale})`, filter: 'saturate(1.08) contrast(1.04)' }} />
+        {/* the whole photo, never cropped: a wide photo sits in the middle over a blurred copy of itself */}
+        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(38px) brightness(0.45) saturate(1.2)', transform: 'scale(1.25)' }} />
+        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', transform: `translate(${fd.x / 2}%, ${fd.y / 2}%) scale(${fd.scale})`, filter: 'saturate(1.08) contrast(1.04)' }} />
         <AbsoluteFill style={{ background: 'linear-gradient(180deg, rgba(3,6,12,0.62) 0%, rgba(3,6,12,0) 20%, rgba(3,6,12,0) 42%, rgba(3,6,12,0.72) 66%, rgba(3,6,12,0.95) 100%)' }} />
         {beat.credit ? (
           <div style={{ position: 'absolute', right: SAFE.right, top: 150, padding: '6px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', color: 'rgba(255,255,255,0.85)', fontFamily: FONT.mono, fontSize: 22, letterSpacing: 1 }}>{beat.credit}</div>
@@ -78,7 +80,8 @@ const BeatLayer: React.FC<{ beat: NarratedBeat; seqFrom: number; accent: string;
     <AbsoluteFill style={{ opacity: fadeIn }}>
       <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(38px) brightness(0.42) saturate(1.2)', transform: 'scale(1.25)' }} />
       <div style={{ position: 'absolute', left: 48, top: 330, width: 984, height: 1010, borderRadius: 36, overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.55)', background: '#000' }}>
-        <Img src={src(beat.image)} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${d.x}%, ${d.y}%) scale(${d.scale})` }} />
+        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(30px) brightness(0.5)', transform: 'scale(1.2)' }} />
+        <Img src={src(beat.image)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${1 + (d.scale - 1) / 2})` }} />
         {beat.credit ? (
           <div style={{ position: 'absolute', left: 20, bottom: 20, padding: '8px 16px', borderRadius: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', fontFamily: FONT.mono, fontSize: 24, letterSpacing: 1 }}>
             {beat.credit}

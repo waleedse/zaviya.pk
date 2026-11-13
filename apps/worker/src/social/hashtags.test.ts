@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { currentTrends, finalizeCopy, hydrateTrends, isPartyTag, pickHashtags, rememberTrends, stripHashtags, toHashtag, trendHashtag } from './hashtags.js'
+import { currentTrends, finalizeCopy, hydrateTrends, isPartyTag, matchTrend, pickHashtags, rememberTrends, stripHashtags, toHashtag, trendHashtag } from './hashtags.js'
 
 describe('hashtags', () => {
   it('camel-cases entities and drops generic or non-latin ones', () => {
@@ -95,7 +95,8 @@ describe('trending keyword in the post text', () => {
     expect(out.instagram).toContain('Trending: Iran strike')
     expect(out.facebook).toContain('#IranStrike')
     expect(out.instagram.match(/#\w+/g)!.length).toBeLessThanOrEqual(3)
-    expect(out.x).toContain('(Iran strike)')
+    expect(out.x).not.toContain('(Iran strike)')
+    expect(out.x).toContain('#IranStrike')
   })
   it('does not repeat a trend the text already says, and never uses party or army terms', () => {
     const said = finalizeCopy({ facebook: 'Iran strike fears grow.', instagram: 'i', x: 'x' }, { tags: [], category: 'world', title: 'Iran strike fears', trends: ['Iran strike'] })
@@ -105,5 +106,21 @@ describe('trending keyword in the post text', () => {
     expect(party.facebook).not.toMatch(/#PTI/i)
     const army = finalizeCopy({ facebook: 'f', instagram: 'i', x: 'x' }, { tags: [], category: 'pakistan', title: 'Pakistan army chief visits Quetta', trends: ['army chief visit'] })
     expect(army.facebook).not.toContain('Trending:')
+  })
+})
+
+describe('hashtag quality (14 Nov)', () => {
+  it('never doubles a trend word ("women women")', () => {
+    const m = matchTrend('pakistan women vs bangladesh women', { title: 'Pakistan women beat Bangladesh in Ajman', tags: [] })
+    expect(m?.words.split(' ').filter((w) => w === 'women').length ?? 0).toBeLessThanOrEqual(1)
+  })
+  it('skips story tags the headline never names', () => {
+    const tags = pickHashtags({ tags: ['Platts', 'Petrol Price'], category: 'business', title: 'Petrol price cut by Rs3 from November 13', trends: [] })
+    expect(tags).not.toContain('#Platts')
+    expect(tags).toContain('#PetrolPrice')
+  })
+  it('puts a recently used tag after a fresh one', () => {
+    const tags = pickHashtags({ tags: ['Iran', 'Bahrain'], category: 'world', title: 'Iran targets US radar in Bahrain', trends: [], avoid: new Set(['#iran']) })
+    expect(tags[0]).toBe('#Bahrain')
   })
 })

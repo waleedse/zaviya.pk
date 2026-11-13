@@ -147,8 +147,9 @@ describe('buildCaptions', () => {
   it('youtube: title <= 100, 3 hashtags, chapters for roundup60', () => {
     const yt = caps.youtube
     expect(yt.title!.length).toBeLessThanOrEqual(100)
-    expect(yt.title).toMatch(/^Pakistan News Today: /)
-    expect(yt.title).toContain('& 11 more #Shorts')
+    // a long lead headline stays whole: the prefix and "& N more" give way first
+    expect(yt.title).toMatch(/^Story 0 headline/)
+    expect(yt.title).toMatch(/#Shorts$/)
     expect(yt.hashtags.length).toBeLessThanOrEqual(3)
     expect(yt.text).toContain('0:00 Intro')
     expect(yt.text).toMatch(/\n0:0\d 1\. /)
