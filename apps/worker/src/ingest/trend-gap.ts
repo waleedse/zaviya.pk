@@ -27,7 +27,9 @@ export { TREND_GAP_MARK }
 
 export const TREND_GAP_MIN_VOLUME = 2000
 /** At most this many trend-gap stories are started a day (PKT). They count against the daily cap but may use the extra slots. */
-export const TREND_GAP_DAILY_MAX = 6
+export const TREND_GAP_DAILY_MAX = 8
+/** 13 Nov: a 10K+ trend may still start a story after the cap is reached, up to twice the cap ("saud shakeel" 20K+ was skipped). */
+export const BIG_TREND_VOLUME = 10_000
 /** Topics searched per run: keeps the number of requests to Google News small and polite. */
 export const TREND_GAP_MAX_PER_RUN = 5
 export const TREND_GAP_MAX_ITEMS = 4
@@ -556,7 +558,8 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
       await done('skipped-entertainment', 'gossip or foreign celebrity without a Pakistan angle')
       continue
     }
-    if (startedToday >= dailyMax) {
+    const big = topic.volume >= BIG_TREND_VOLUME
+    if (startedToday >= (big ? dailyMax * 2 : dailyMax)) {
       await done('skipped-daily-limit', `${startedToday} trend-gap stories already started today (limit ${dailyMax})`)
       continue
     }

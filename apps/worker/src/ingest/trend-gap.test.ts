@@ -333,20 +333,32 @@ describe('runTrendGap', () => {
     expect(run.gaps.map((g) => g.outcome)).toEqual(['ingested'])
   })
 
-  it('starts at most 6 trend-gap stories a day', async () => {
-    const trends = Array.from({ length: 8 }, (_, i) => ({ query: `topic${i} update match`, traffic: 9000 - i }))
+  it('starts at most 8 trend-gap stories a day', async () => {
+    const trends = Array.from({ length: 10 }, (_, i) => ({ query: `topic${i} update match`, traffic: 9000 - i }))
     const news = (term: string) => [hit(`${term} headline report`, 'Dawn', 'www.dawn.com'), hit(`${term} reported by Geo`, 'Geo News', 'www.geo.tv')]
     const s = setup({ trends, news })
-    // 5 searches a run: the first run starts 5, the second starts 1 and stops at the limit
+    // 5 searches a run: the first run starts 5, the second starts 3 and stops at the limit
     const r1 = await runTrendGap(s.deps as never)
     expect(r1.gaps.filter((g) => g.outcome === 'ingested')).toHaveLength(5)
     const r2 = await runTrendGap(s.deps as never)
-    expect(r2.gaps.filter((g) => g.outcome === 'ingested')).toHaveLength(1)
+    expect(r2.gaps.filter((g) => g.outcome === 'ingested')).toHaveLength(3)
     expect(r2.gaps.filter((g) => g.outcome === 'skipped-daily-limit')).toHaveLength(2)
-    expect(s.stored).toHaveLength(6)
+    expect(s.stored).toHaveLength(8)
     const dayKey = [...s.redis.kv.keys()].find((k) => k.startsWith('zaviya:trendgap:day:'))!
     expect(dayKey).toContain('2026-11-12')
-    expect(s.redis.kv.get(dayKey)).toBe('6')
+    expect(s.redis.kv.get(dayKey)).toBe('8')
+  })
+
+  it('lets a 10K+ trend through after the daily cap, up to twice the cap', async () => {
+    const trends = [
+      { query: 'saud shakeel century test', traffic: 20_000 },
+      { query: 'babar azam fifty test', traffic: 12_000 },
+      { query: 'small topic update match', traffic: 5_000 },
+    ]
+    const news = (term: string) => [hit(`${term} headline report`, 'Dawn', 'www.dawn.com'), hit(`${term} reported by Geo`, 'Geo News', 'www.geo.tv')]
+    const s = setup({ trends, news })
+    const run = await runTrendGap({ ...(s.deps as object), dailyMax: 1 } as never)
+    expect(run.gaps.map((g) => g.outcome)).toEqual(['ingested', 'ingested', 'skipped-daily-limit'])
   })
 
   it('runs nothing when our own articles cannot be read', async () => {
