@@ -52,6 +52,19 @@ export function combatReason(text: string, ...names: (string | undefined | null)
   return null
 }
 
+const WILDLIFE_WORDS = /\b(flamingos?|kingfishers?|birds?|eagles?|falcons?|parrots?|owls?|herons?|egrets?|storks?|ducks?|geese|goose|pigeons?|sparrows?|crows?|peacocks?|butterfl(y|ies)|moths?|insects?|beetles?|spiders?|snakes?|lizards?|turtles?|tortoises?|frogs?|fish|fishes|dolphins?|whales?|deer|camels?|goats?|sheep|cows?|buffalo(es)?|horses?|donkeys?|monkeys?|leopards?|tigers?|lions?|bears?|foxes|fox|wolf|wolves|jackals?|cats?|dogs?|flowers?|orchids?|wildlife|fauna|flora)\b/i
+// a Latin species name in brackets, e.g. "(Phoenicopterus roseus)"
+const BINOMIAL = /\(([A-Z][a-z]+ [a-z]{3,})\)/
+const ANIMAL_STORY = /\b(wildlife|animals?|birds?|species|zoo|forest|conservation|poaching|livestock|cattle|fish(eries|ing)?|dengue|mosquito\w*|rabies|bird flu|hunting|biodiversity|nature)\b/i
+
+/** A wildlife or plant photo (a flamingo for "Bahrain", a kingfisher for "Punjab") unless the story is about nature. */
+export function wildlifeReason(text: string, ...names: (string | undefined | null)[]): string | null {
+  const name = names.filter(Boolean).join(' ').replace(/[_-]+/g, ' ')
+  const m = name.match(BINOMIAL) ?? name.match(WILDLIFE_WORDS)
+  if (!m || ANIMAL_STORY.test(text)) return null
+  return `wildlife photo ("${m[0]}") on a story that is not about nature`
+}
+
 export type PhotoVerdict = { ok: true } | { ok: false; reason: string }
 
 export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string): PhotoVerdict {
@@ -69,7 +82,7 @@ export function photoQa(photo: Pick<RealPhoto, 'meta' | 'bytes'>, text: string):
     const aspect = m.width / Math.max(1, m.height)
     if (aspect < QA_MIN_ASPECT || aspect > QA_MAX_ASPECT) return { ok: false, reason: `odd shape (${m.width}x${m.height})` }
   }
-  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? documentPixelReason(photo.bytes, (photo as { mime?: string }).mime)
+  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? wildlifeReason(text, m.file) ?? documentPixelReason(photo.bytes, (photo as { mime?: string }).mime)
   if (doc) return { ok: false, reason: doc }
   return { ok: true }
 }
@@ -86,7 +99,7 @@ export function heroPhotoQa(photo: Pick<RealPhoto, 'meta' | 'bytes' | 'mime'>, t
   if (photo.bytes.length < 20_000) return { ok: false, reason: `file too small (${photo.bytes.length} bytes)` }
   if (m.width !== undefined && m.height !== undefined && m.width < 600) return { ok: false, reason: `too narrow (${m.width}px)` }
   if (m.file && m.provider !== 'openverse' && worshipSiteMismatch(m.subject, m.file)) return { ok: false, reason: `worship site photo "${m.file}" for subject "${m.subject}"` }
-  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? documentPixelReason(photo.bytes, photo.mime)
+  const doc = documentNameReason(m.file, m.subject) ?? combatReason(text, m.file) ?? wildlifeReason(text, m.file) ?? documentPixelReason(photo.bytes, photo.mime)
   if (doc) return { ok: false, reason: doc }
   return { ok: true }
 }
