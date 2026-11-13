@@ -55,9 +55,23 @@ export function isDisabled(el: HTMLElement): boolean {
   return el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true' || el.classList.contains('disabled')
 }
 
+const DIALOGS = 'ytcp-uploads-dialog, tp-yt-paper-dialog, ytcp-dialog, [role="dialog"]'
+
+/**
+ * The open dialog: the first one that shows text. 13 Nov: Studio keeps hidden, empty dialogs in the page, and the upload
+ * dialog's host element can have no box of its own (its paper-dialog child has it), so neither "first match" nor a size
+ * check finds it. innerText is empty for anything not rendered, so it tells the open one apart.
+ */
+export function openDialog(re?: RegExp): HTMLElement | null {
+  for (const d of Array.from(document.querySelectorAll<HTMLElement>(DIALOGS))) {
+    const t = norm(d.innerText)
+    if (t && (!re || re.test(t))) return d
+  }
+  return null
+}
+
 export function dialogText(): string {
-  const d = document.querySelector<HTMLElement>('ytcp-uploads-dialog, tp-yt-paper-dialog[opened], ytcp-dialog')
-  return norm(d?.innerText ?? document.body?.innerText).slice(0, 1500)
+  return norm(openDialog()?.innerText ?? document.body?.innerText).slice(0, 1500)
 }
 
 const LIMIT_RE = /daily upload limit|upload limit (has been )?reached|reached (your|the) (daily )?upload limit|upload limit/i
@@ -143,9 +157,18 @@ export async function uploadToStudio(input: UploadInput, log: (s: string) => voi
   //   (2) Create > Upload videos;
   //   (3) the "Upload videos" button on the empty Content page.
   const findInput = () => {
-    const dialog = pick(['ytcp-uploads-dialog'])
+    const dialog = openDialog(/upload videos|select files|drag and drop/i)
     if (!dialog) return null
-    return dialog.querySelector<HTMLInputElement>('input[type="file"]') ?? document.querySelector<HTMLInputElement>('ytcp-uploads-file-picker input[type="file"]')
+    const inDialog = dialog.querySelector<HTMLInputElement>('input[type="file"]')
+    if (inDialog) return inDialog
+    // the picker can sit next to the dialog's paper box: take the input nearest the visible "Select files" button
+    let el: HTMLElement | null = byText(/^select files?$/i)
+    while (el) {
+      const input = el.querySelector<HTMLInputElement>('input[type="file"]')
+      if (input) return input
+      el = el.parentElement
+    }
+    return null
   }
   const waitInput = (ms: number, detail = '') =>
     waitFor(() => {
