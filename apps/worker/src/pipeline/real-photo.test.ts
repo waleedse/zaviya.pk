@@ -215,3 +215,15 @@ describe('file names that hold a longer name', () => {
     expect(partOfLongerName('Shehbaz_Sharif_2023.jpg', 'Shehbaz Sharif')).toBe(false)
   })
 })
+
+describe('namedIn short forms (14 Nov)', () => {
+  it('counts a headline abbreviation as naming the entity', async () => {
+    const { namedIn } = await import('./real-photo.js')
+    expect(namedIn('Faisal Karim Kundi commends military after 35 killed in KP', 'Khyber Pakhtunkhwa')).toBe(true)
+    expect(namedIn('KP government debt servicing costs reach Rs50.5 billion', 'Khyber Pakhtunkhwa')).toBe(true)
+    expect(namedIn('SBP keeps policy rate unchanged', 'State Bank of Pakistan')).toBe(true)
+    expect(namedIn('Bilal Azhar Kayani calls for faster digital payment adoption', 'State Bank of Pakistan')).toBe(false)
+    expect(namedIn('Kpk-style reform? Not quite', 'Pakistan Cricket Board')).toBe(false)
+    expect(namedIn('Upkeep costs rise', 'Khyber Pakhtunkhwa')).toBe(false)
+  })
+})
