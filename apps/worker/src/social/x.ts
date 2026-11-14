@@ -17,7 +17,7 @@ export async function postX(
     mediaUrls?: string[]
   },
   deps: { env: WorkerEnv; payload: PayloadClient; bridge?: BridgeServer },
-): Promise<void> {
+): Promise<'posted' | 'failed' | 'paused' | 'no-route'> {
   const format = input.url ? 'link' : 'text'
   const key = socialIdempotencyKey(input.articleId, 'x', format)
   const text = withLink(limitHashtags(input.copy.x, 2), input.url, 'x')
@@ -59,7 +59,7 @@ export async function postX(
         error: data.detail,
         postedAt: res.ok ? new Date().toISOString() : undefined,
       })
-      return
+      return res.ok ? 'posted' : 'failed'
     } catch (e) {
       logger.warn({ err: e }, 'X API post failed')
     }
@@ -67,7 +67,7 @@ export async function postX(
 
   if (xPostingBlocked()) {
     logger.info({ articleId: input.articleId }, 'X posting paused: X reported its daily post limit, resumes at 00:00 PKT')
-    return
+    return 'paused'
   }
 
   if (deps.bridge?.isConnected('x')) {
@@ -90,7 +90,7 @@ export async function postX(
         error: healed ? `healed: ${healed}` : undefined,
         postedAt: new Date().toISOString(),
       })
-      return
+      return 'posted'
     } catch (e) {
       logger.warn({ err: e }, 'X bridge post failed')
       if (isXDailyLimit(e instanceof Error ? e.message : String(e))) {
@@ -110,8 +110,12 @@ export async function postX(
           error: (e instanceof Error ? e.message : String(e)).slice(0, 900),
         })
         .catch((e2) => logger.warn({ err: e2 }, 'could not record the failed X post'))
+      return 'failed'
     }
   }
 
-  logger.debug('X posting skipped — not configured')
+  // No API keys and the Chrome extension is offline (Mac asleep, Chrome closed): the caller retries later instead of
+  // dropping the post (14 Nov: a night offline silently lost every X post of the morning)
+  logger.info({ articleId: input.articleId }, 'X post waiting: the Chrome extension is offline')
+  return 'no-route'
 }

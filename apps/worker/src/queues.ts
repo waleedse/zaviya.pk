@@ -27,6 +27,9 @@ import { Redis } from 'ioredis'
 import { postFacebook } from './social/facebook.js'
 import { postInstagram } from './social/instagram.js'
 import { postX } from './social/x.js'
+
+/** How long an X post waits before trying again when the Chrome extension is offline */
+const X_OFFLINE_RETRY_MS = 15 * 60_000
 import { processQuoteJob, QUOTE_JOB, runQuoteRound, type QuoteJobData } from './social/quote-post.js'
 import { runSocialMetrics } from './social/metrics.js'
 import { redisKv, runCommentReplies } from './social/comments.js'
@@ -442,10 +445,15 @@ export async function createWorkerRuntime(
             { env, payload, settingsDailyCap: cap },
           )
         } else {
-          await postX(
+          const r = await postX(
             { articleId: d.articleId, copy: d.copy, priority: d.priority, mediaUrls: d.mediaUrls, url: d.url },
             { env, payload, bridge },
           )
+          // extension offline: try again in 15 min; decideSlot drops it once it has waited too long (MAX_WAIT_MS)
+          if (r === 'no-route') {
+            await job.moveToDelayed(Date.now() + X_OFFLINE_RETRY_MS + Math.floor(Math.random() * 60_000), token)
+            throw new DelayedError()
+          }
         }
       },
       { connection, concurrency: 1, lockDuration: LONG_LOCK_MS, stalledInterval: LONG_LOCK_MS },
