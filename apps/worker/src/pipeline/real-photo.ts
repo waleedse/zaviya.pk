@@ -61,10 +61,43 @@ const wordRe = (w: string) => new RegExp(`(^|[^a-z])${w.replace(/[^a-z]/g, '')}(
 /** Lower-case and drop accents, so a "Kraków" or "Erdoğan" tag matches a "Krakow" or "Erdogan" headline. */
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
+/**
+ * Short forms Pakistani headlines use for an entity ("35 killed in KP" names Khyber Pakhtunkhwa). Without them a
+ * Khyber Pakhtunkhwa photo was rejected as "not named in the text" and the card went out with no photo (14 Nov).
+ */
+const ABBREVIATIONS: Record<string, string[]> = {
+  'khyber pakhtunkhwa': ['kp', 'kpk'],
+  'gilgit-baltistan': ['gb'],
+  'gilgit baltistan': ['gb'],
+  'azad kashmir': ['ajk'],
+  'azad jammu and kashmir': ['ajk'],
+  'state bank of pakistan': ['sbp'],
+  'federal board of revenue': ['fbr'],
+  'national accountability bureau': ['nab'],
+  'election commission of pakistan': ['ecp'],
+  'islamabad high court': ['ihc'],
+  'lahore high court': ['lhc'],
+  'sindh high court': ['shc'],
+  'peshawar high court': ['phc'],
+  'pakistan cricket board': ['pcb'],
+  'pakistan telecommunication authority': ['pta'],
+  'pakistan international airlines': ['pia'],
+  'international monetary fund': ['imf'],
+  'higher education commission': ['hec'],
+  'national database and registration authority': ['nadra'],
+  'oil and gas regulatory authority': ['ogra'],
+  'national electric power regulatory authority': ['nepra'],
+  'federal investigation agency': ['fia'],
+  'karachi electric': ['k-electric'],
+  'united arab emirates': ['uae'],
+  'saudi arabia': ['ksa'],
+}
+
 export function namedIn(title: string, tag: string): boolean {
   const t = fold(title)
   const full = fold(tag.trim())
   if (full.length >= 3 && t.includes(full)) return true
+  if ((ABBREVIATIONS[full] ?? []).some((a) => new RegExp(`(^|[^a-z0-9-])${a.replace(/-/g, '\\-')}([^a-z0-9-]|$)`).test(t))) return true
   const words = full.split(/\s+/)
   if (words.length < 2 || words.length > 3) return false
   const first = words[0] ?? ''
