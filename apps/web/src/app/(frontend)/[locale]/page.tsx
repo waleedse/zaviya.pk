@@ -249,7 +249,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden />
               </Link>
             </div>
-            <PictureStory article={cricket[0]!} locale={locale} size="lg" />
+            {/* Wrapped: PictureStory is h-full, and inside this stretched grid cell it took the whole box, pushing the
+                other cricket rows out over the next section (Waleed, 15 Nov) */}
+            <div>
+              <PictureStory article={cricket[0]!} locale={locale} size="lg" />
+            </div>
             <div className="divide-y divide-ink-line">
               {cricket.slice(1).map((a) => (
                 <ThumbStory key={a.id} article={a} locale={locale} tone="dark" />
