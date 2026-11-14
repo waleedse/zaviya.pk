@@ -222,6 +222,7 @@ describe('namedIn short forms (14 Nov)', () => {
     expect(namedIn('Faisal Karim Kundi commends military after 35 killed in KP', 'Khyber Pakhtunkhwa')).toBe(true)
     expect(namedIn('KP government debt servicing costs reach Rs50.5 billion', 'Khyber Pakhtunkhwa')).toBe(true)
     expect(namedIn('SBP keeps policy rate unchanged', 'State Bank of Pakistan')).toBe(true)
+    expect(namedIn('Illegal gold mining in Kohat funds terror, K-P governor says', 'Khyber Pakhtunkhwa')).toBe(true)
     expect(namedIn('Bilal Azhar Kayani calls for faster digital payment adoption', 'State Bank of Pakistan')).toBe(false)
     expect(namedIn('Kpk-style reform? Not quite', 'Pakistan Cricket Board')).toBe(false)
     expect(namedIn('Upkeep costs rise', 'Khyber Pakhtunkhwa')).toBe(false)

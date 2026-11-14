@@ -66,7 +66,7 @@ const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').t
  * Khyber Pakhtunkhwa photo was rejected as "not named in the text" and the card went out with no photo (14 Nov).
  */
 const ABBREVIATIONS: Record<string, string[]> = {
-  'khyber pakhtunkhwa': ['kp', 'kpk'],
+  'khyber pakhtunkhwa': ['kp', 'kpk', 'k-p'],
   'gilgit-baltistan': ['gb'],
   'gilgit baltistan': ['gb'],
   'azad kashmir': ['ajk'],
