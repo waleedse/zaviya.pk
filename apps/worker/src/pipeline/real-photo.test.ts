@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptable, isCommonTopic, localEnough, partOfLongerName, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
+import { acceptable, byPhotographer, isCommonTopic, localEnough, partOfLongerName, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
 
 describe('real photo subjects', () => {
@@ -226,5 +226,13 @@ describe('namedIn short forms (14 Nov)', () => {
     expect(namedIn('Bilal Azhar Kayani calls for faster digital payment adoption', 'State Bank of Pakistan')).toBe(false)
     expect(namedIn('Kpk-style reform? Not quite', 'Pakistan Cricket Board')).toBe(false)
     expect(namedIn('Upkeep costs rise', 'Khyber Pakhtunkhwa')).toBe(false)
+  })
+})
+
+describe('byPhotographer (15 Nov)', () => {
+  it('a file by the person named is not a photo of them', () => {
+    expect(byPhotographer('<a href="//flickr.com/x">Kamran Qureshi</a> from London, United Kingdom', 'Kamran Qureshi')).toBe(true)
+    expect(byPhotographer('Prime Minister\'s Office', 'Shehbaz Sharif')).toBe(false)
+    expect(byPhotographer(undefined, 'Kamran Qureshi')).toBe(false)
   })
 })
