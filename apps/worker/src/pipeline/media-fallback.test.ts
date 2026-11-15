@@ -9,7 +9,7 @@ vi.mock('./post-card.js', () => ({ renderPostCard: vi.fn(async () => null) }))
 vi.mock('./real-photo.js', async (orig) => ({ ...(await orig<typeof import('./real-photo.js')>()), findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
 vi.mock('./reference.js', () => ({ describeReferenceScene: vi.fn(async () => null) }))
 vi.mock('./openverse.js', async (orig) => ({ ...(await orig<typeof import('./openverse.js')>()), findOpenversePhoto: vi.fn(async () => null) }))
-vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b }))
+vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b, geminiPrompt: (b: string) => b }))
 vi.mock('./zimage.js', () => ({ generateViaZImage: vi.fn(async () => null) }))
 
 import { heroMaxTries, processMediaJob } from './media.js'
@@ -151,7 +151,7 @@ describe('real photo first, AI only as a last resort', () => {
     const d = deps()
     const bridge = { isOnline: () => true, send: vi.fn(async () => ({ base64: Buffer.alloc(200, 1).toString('base64'), mimeType: 'image/png', width: 1, height: 1 })) }
     await processMediaJob({ clusterId: '1', write, qaScore: 1, priority: 'normal' }, { ...d, env, bridge } as never)
-    expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI illustration)' }))
+    expect(d.payload.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI-generated image)' }))
     expect(vi.mocked(socialCard.renderSocialCardSet).mock.calls[0]![0]).toMatchObject({ photo: null })
   })
 })

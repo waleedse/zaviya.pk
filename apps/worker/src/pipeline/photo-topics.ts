@@ -25,6 +25,9 @@ export const TOPICS: Topic[] = [
   { name: 'psx', when: /\b(psx|kse-?100|pakistan stock exchange|karachi stock exchange)\b/i, subjects: ['Pakistan Stock Exchange', 'Karachi Stock Exchange', 'Stock Exchange Building Karachi'] },
   { name: 'sbp', when: /\b(sbp|state bank of pakistan|policy rate|monetary policy committee)\b/i, unless: /\b(fed|federal reserve|ecb|bank of england)\b/i, subjects: ['State Bank of Pakistan'] },
   { name: 'pakistan-cricket', when: /\b(pcb|pakistan cricket|pakistan super league|psl|pakistan (test|odi|t20)|babar azam|shaheen afridi)\b/i, subjects: ['Gaddafi Stadium', 'National Stadium, Karachi'] },
+  // 15 Nov: "World Test Championship format" had no free photo (logos only), so the lead went out as a text card. Lord's, home of
+  // Test cricket, is a real place photo that fits any WTC or ICC Test story; Pakistan's own matches keep the Pakistani grounds above.
+  { name: 'test-cricket', when: /\b(world test championship|wtc (final|cycle|table|points)|icc (board|meeting|chief executives)|test cricket)\b/i, subjects: ["Lord's", 'The Oval'] },
   { name: 'openai', when: /\b(chatgpt|openai|gpt-?\d)\b/i, subjects: ['OpenAI', 'Sam Altman'] },
   { name: 'parliament-pk', when: /\b(national assembly|parliament|senate|joint session)\b/i, requires: PAKISTAN, subjects: ['Parliament House, Islamabad'] },
   { name: 'supreme-court-pk', when: /\b(supreme court|chief justice)\b/i, requires: PAKISTAN, subjects: ['Supreme Court of Pakistan'] },

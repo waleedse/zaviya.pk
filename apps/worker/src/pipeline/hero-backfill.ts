@@ -4,7 +4,7 @@ import type { PayloadClient } from '../payload-client.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { logger } from '../logger.js'
 import { generateHeroViaExtension, geminiAccounts, AI_MEDIA, absoluteMediaUrl } from './media.js'
-import { fluxPrompt, generateHeroViaWorkersAI } from './flux.js'
+import { geminiPrompt, generateHeroViaWorkersAI } from './flux.js'
 import { findHeroImage, uploadHeroPhoto, uploadBrandCard, heroKindOf, type HeroInput } from './hero-photo.js'
 import type { RealPhoto } from './real-photo.js'
 import { combatReason, documentNameReason, documentPixelReason } from './photo-qa.js'
@@ -97,7 +97,7 @@ export async function processHeroBackfill(
     ? ((await generateHeroViaWorkersAI(brief, {
         ...fluxCreds(deps.env),
         clusterId,
-      })) ?? (await generateHeroViaExtension(fluxPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0])))
+      })) ?? (await generateHeroViaExtension(geminiPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0])))
     : null
   if (!blob) {
     const tries = (data.tries ?? 0) + 1

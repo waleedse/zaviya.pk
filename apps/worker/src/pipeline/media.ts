@@ -12,7 +12,7 @@ import { firstPassingPhoto } from './photo-qa.js'
 import { generateViaZImage } from './zimage.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
-import { generateHeroViaWorkersAI, fluxPrompt } from './flux.js'
+import { generateHeroViaWorkersAI, fluxPrompt, geminiPrompt } from './flux.js'
 import { editorApproved } from './pitch.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
@@ -95,7 +95,7 @@ export function deferImage(o: { gate: boolean; articleId?: string; priority: Pri
 }
 
 /** Labelling of AI illustrations (last resort only) */
-export const AI_MEDIA = { license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI illustration)' } as const
+export const AI_MEDIA = { license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI-generated image)' } as const
 
 const MEDIA_FILE_PREFIX = '/api/media/file/'
 
@@ -270,7 +270,7 @@ export async function processMediaJob(
   //    The prompt forbids real people, events, elections, disasters and specific buildings (fluxPrompt). Breaking news cannot wait for Gemini.
   const flux = async () => generateHeroViaWorkersAI(brief, { ...fluxCreds(deps.env), clusterId: data.clusterId })
   const gemini = async () => {
-    const prompt = fluxPrompt(brief)
+    const prompt = geminiPrompt(brief)
     for (const account of geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)) {
       const b = await generateHeroViaExtension(prompt, deps.bridge, data.clusterId, account, GEMINI_ACCOUNT_TIMEOUT_MS)
       if (b) {
