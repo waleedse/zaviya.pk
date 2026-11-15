@@ -187,6 +187,9 @@ describe('classifyUploadError', () => {
     ['file_input_not_found', 'ui'],
     ['next_button_not_found: url=/x tab=hidden', 'ui'],
     ['upload_not_finished: Uploading 40%', 'retry'],
+    ['video_download_failed: HTTP 401', 'gone'],
+    ['video_download_failed: HTTP 404', 'gone'],
+    ['video_download_failed: HTTP 502', 'retry'],
   ])('%s -> %s', (msg, kind) => {
     expect(classifyUploadError(msg)).toBe(kind)
   })
