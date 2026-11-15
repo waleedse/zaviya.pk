@@ -17,36 +17,57 @@ export const RETAIL_STORES = [
 export type RetailStoreSlug = (typeof RETAIL_STORES)[number]['slug']
 export const RETAIL_STORE_SLUGS = RETAIL_STORES.map((s) => s.slug) as [RetailStoreSlug, ...RetailStoreSlug[]]
 
+/** Store-offer categories ("shop by category" on /prices, /prices/shop/<slug>), each with its Urdu name */
 export const OFFER_GROUPS = [
-  { slug: 'mobiles', name: 'Mobile phones' },
-  { slug: 'tablets', name: 'Tablets' },
-  { slug: 'laptops', name: 'Laptops' },
-  { slug: 'smartwatches', name: 'Smart watches' },
-  { slug: 'audio', name: 'Earbuds & headphones' },
-  { slug: 'speakers', name: 'Speakers' },
-  { slug: 'tvs', name: 'TVs' },
-  { slug: 'accessories', name: 'Chargers & accessories' },
-  { slug: 'home-appliances', name: 'Home appliances' },
-  { slug: 'other', name: 'Other' },
+  { slug: 'mobiles', name: 'Mobile phones', ur: 'موبائل فون' },
+  { slug: 'laptops', name: 'Laptops', ur: 'لیپ ٹاپ' },
+  { slug: 'tablets', name: 'Tablets', ur: 'ٹیبلٹ' },
+  { slug: 'computer', name: 'Computer accessories', ur: 'کمپیوٹر کا سامان' },
+  { slug: 'smartwatches', name: 'Smart watches', ur: 'سمارٹ واچ' },
+  { slug: 'audio', name: 'Earbuds & headphones', ur: 'ایئربڈز' },
+  { slug: 'speakers', name: 'Speakers', ur: 'اسپیکر' },
+  { slug: 'tvs', name: 'TVs', ur: 'ٹی وی' },
+  { slug: 'cameras', name: 'Cameras & lenses', ur: 'کیمرے' },
+  { slug: 'gaming', name: 'Gaming', ur: 'گیمنگ' },
+  { slug: 'accessories', name: 'Phone accessories', ur: 'موبائل ایکسیسریز' },
+  { slug: 'home-appliances', name: 'Home appliances', ur: 'گھریلو مشینیں' },
+  { slug: 'kitchen', name: 'Kitchen & home', ur: 'کچن اور گھر' },
+  { slug: 'beauty', name: 'Beauty & perfume', ur: 'خوشبو اور میک اپ' },
+  { slug: 'health', name: 'Health & fitness', ur: 'صحت اور فٹنس' },
+  { slug: 'toys', name: 'Toys & kids', ur: 'کھلونے' },
+  { slug: 'grocery', name: 'Food & grocery', ur: 'کھانے پینے کی چیزیں' },
+  { slug: 'other', name: 'Everything else', ur: 'دیگر' },
 ] as const
 export type OfferGroupSlug = (typeof OFFER_GROUPS)[number]['slug']
 export const OFFER_GROUP_SLUGS = OFFER_GROUPS.map((g) => g.slug) as [OfferGroupSlug, ...OfferGroupSlug[]]
+export const offerGroupInfo = (slug: string) => OFFER_GROUPS.find((g) => g.slug === slug)
 
 const PHONE_WORDS = /\b(iphone|galaxy [amsz]\d|galaxy (note|fold|flip)|redmi|poco|infinix|tecno|vivo|oppo|realme|honor|itel|nokia|pixel|xiaomi \d|oneplus|sparx|zte|motorola|moto [eg]\d)/i
+const STORAGE = /\b\d{1,2}\s?\+?\s?\d{0,4}\s?gb\b|\b\d{2,4}\s?gb\b/i
 
-/** Our group from the store's product type and title. Order matters: "Redmi Pad" is a tablet, "Redmi Watch" a watch. */
+/** Our group from the store's product type and title. Order matters: "Redmi Pad" is a tablet, "PS5 controller" is gaming. */
 export function offerGroup(title: string, productType = ''): OfferGroupSlug {
   const t = `${productType} ${title}`
+  const type = productType.trim()
+  if (!/contact lens/i.test(t) && /\b(camera|dslr|mirrorless|lens|gimbal|gopro|insta360|instax|tripod|drone|dji)\b/i.test(t)) return 'cameras'
+  if (/\b(ps[345]|playstation|xbox|nintendo|switch 2|gaming\b[^|]{0,20}\b(chair|console|desk)|game ?pad|joystick|controller)\b/i.test(t)) return 'gaming'
+  if (/\b(writing|drawing|graphics?|soap|cleaning|detergent|cleaner)\b[^|]*\btablets?\b|\btablets?\b[^|]*\b(writing|drawing|soap|kids)\b/i.test(t)) return /soap|cleaning|detergent|cleaner/i.test(t) ? 'kitchen' : 'toys'
+  if (classifyAppliance(title, productType)) return 'home-appliances'
   if (/\b(cover|case|screen protector|tempered|glass protector|back skin)\b/i.test(t)) return 'accessories'
   if (/\b(power ?bank|charger|charging|cable|adapter|usb[- ]?c to|lightning|car mount|holder|stand)\b/i.test(t)) return 'accessories'
   if (/\b(laptop|notebook|macbook|chromebook)\b/i.test(t)) return 'laptops'
-  if (/\b(tablet|ipad|galaxy tab|redmi pad|xiaomi pad|\bpad \d)/i.test(t)) return 'tablets'
+  if (/\b(ipad|galaxy tab|redmi pad|xiaomi pad|honor pad|lenovo tab|matepad|tablet)\b/i.test(t)) return 'tablets'
   if (/\b(smart ?watch|smart ?band|\bwatch\b|\bband \d|fitness tracker)/i.test(t)) return 'smartwatches'
-  if (/\b(ear ?buds|earphones?|headphones?|headset|airpods|\bbuds\b|tws|neckband)\b/i.test(t)) return 'audio'
+  if (/\b(ear ?buds|earphones?|headphones?|headset|handsfree|hands free|microphone|airpods|\bbuds\b|tws|neckband)\b/i.test(t)) return 'audio'
   if (/\b(speaker|soundbar|sound bar)\b/i.test(t)) return 'speakers'
   if (/\b(led tv|smart tv|android tv|google tv|qled|oled tv|\btv\b|television)\b/i.test(t)) return 'tvs'
-  if (/^(phone|phones|mobile|mobiles|smartphones?)$/i.test(productType.trim()) || (PHONE_WORDS.test(title) && /\b\d{1,2}\s?\+?\s?\d{0,4}\s?gb\b|\b\d{2,4}\s?gb\b/i.test(title))) return 'mobiles'
-  if (classifyAppliance(title, productType)) return 'home-appliances'
+  if (/\b(mouse|keyboard|monitor|printer|toner|ssd|hdd|hard drive|usb flash|flash drive|router|webcam|graphics card|gpu|motherboard|processor|ram ddr|ddr[345]|ups)\b/i.test(t)) return 'computer'
+  if ((/\b(mobile|smart ?phones?|phones?)\b/i.test(type) && !/access/i.test(type)) || (PHONE_WORDS.test(title) && (STORAGE.test(title) || /\b(dual sim|single sim|official warranty|pta approved)\b/i.test(title)))) return 'mobiles'
+  if (/\b(perfume|edp|edt|eau de|attar|fragrance|body mist|makeup|lipstick|mascara|foundation|nail|hair|keratin|shampoo|conditioner|serum|spf\d*|sunblock|cream|lotion|moisturi[sz]er|face ?wash|skin ?care|hard wax|inspired by|vitamin c|trimmer|shaver|straightener|epilator)\b/i.test(t)) return 'beauty'
+  if (/\b(test kit|medicine|bp monitor|blood pressure|thermometer|oximeter|glucometer|massager|massage gun|stethoscope|test strips|glucose|resistance band|yoga|dumbbell|treadmill|exercise|fitness|knee|posture|arch support)\b/i.test(t)) return 'health'
+  if (/\b(toys?|kids|baby|toddler|doll|lego|puzzle|board game|rc car|play ?house|walkie talkie|prank)\b/i.test(t)) return 'toys'
+  if (/\b(almonds?|nuts|chilgoza|pista|cashew|dry ?fruits?|dates|honey|tea|coffee beans|rice|ghee|cooking oil|chocolate|spices|masala)\b/i.test(t)) return 'grocery'
+  if (/\b(bottle|jug|lunch ?box|cookware|pan|pot|kitchen|organi[sz]er|basket|rack|duster|mug|flask|storage|container|dinner set|cutlery|mop|broom|laundry|chopper|lint remover|clips|bedsheet|cushion|curtain|towel|prayer (mat|rug))\b/i.test(t)) return 'kitchen'
   return 'other'
 }
 
