@@ -14,11 +14,13 @@ export interface ModelLimits {
   tpm: number
 }
 
-export const FLASH_LIMITS: ModelLimits = { rpm: 10, rpd: 250, tpm: 250_000 }
-export const LITE_LIMITS: ModelLimits = { rpm: 15, rpd: 1000, tpm: 250_000 }
+// 15 Nov: Google cut each flash model off for the day after about 20 calls (14-21) and each flash-lite after about
+// 450-480, so these are the real free-tier daily limits, not the published 250 / 1000
+export const FLASH_LIMITS: ModelLimits = { rpm: 10, rpd: 20, tpm: 250_000 }
+export const LITE_LIMITS: ModelLimits = { rpm: 15, rpd: 450, tpm: 250_000 }
 // 12 Nov: gemma answered 429 at 15 rpm / 15k tpm (84 in a day), so stay under both
 export const GEMMA_LIMITS: ModelLimits = { rpm: 10, rpd: 1500, tpm: 10_000 }
-export const PREVIEW_LIMITS: ModelLimits = { rpm: 5, rpd: 100, tpm: 250_000 }
+export const PREVIEW_LIMITS: ModelLimits = { rpm: 5, rpd: 20, tpm: 250_000 }
 /** A model nobody listed: stay well under any free tier. */
 export const UNKNOWN_LIMITS: ModelLimits = { rpm: 5, rpd: 100, tpm: 100_000 }
 
