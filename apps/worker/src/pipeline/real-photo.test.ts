@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptable, byPhotographer, isCommonTopic, localEnough, partOfLongerName, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
+import { acceptable, byPhotographer, GRAPHIC, isCommonTopic, localEnough, partOfLongerName, findHeroPhoto, findRealPhoto, heroSubjects, licenceOk, livingPeople, peopleFirst, plainAuthor, subjectsFor } from './real-photo.js'
 import { topicSubjects } from './photo-topics.js'
 
 describe('real photo subjects', () => {
@@ -248,5 +248,16 @@ describe('test-cricket topic and Gemini prompt (15 Nov)', async () => {
     expect(p).toMatch(/realistic/i)
     expect(p).toMatch(/no real, named or recognisable people/i)
     expect(p).toMatch(/no text/i)
+  })
+})
+
+describe('graphic symbols (15 Nov)', () => {
+  const info = { url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/x.png', descriptionurl: 'https://commons.wikimedia.org/wiki/File:x.png', mime: 'image/png', width: 2000, height: 1200, extmetadata: { LicenseShortName: { value: 'CC0' } } } as never
+  const o = { minWidth: 900, minAspect: 0.7 }
+  it('rejects an insignia or crest even as a non-strict Wikipedia lead image', () => {
+    expect(acceptable('Pakistan Army Insignia.png', info, o)).toBe(false)
+    expect(acceptable('Crest of the Pakistan Army.png', info, o)).toBe(false)
+    expect(GRAPHIC.test('River Swat, KPK.jpg')).toBe(false)
+    expect(GRAPHIC.test('Sealdah station.jpg')).toBe(false)
   })
 })
