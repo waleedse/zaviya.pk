@@ -156,6 +156,8 @@ const NOT_A_PHOTO = / vs\.? | v | and | with | meets |logo|flag|map|seal|chart|d
 const FREE_FILE = /\/wikipedia\/commons\/[^?]+\.(jpe?g|png)(\?|$)/i
 
 const EXT_FIELDS = 'Artist|LicenseShortName|NonFree|DateTimeOriginal|DateTime|ImageDescription'
+/** Symbols, never photos: checked even on a Wikipedia lead image (an org page such as "Pakistan Army" leads with its insignia, which came out pixelated on a card, 15 Nov) */
+export const GRAPHIC = /logo|emblem|insignia|crest|coat[ _]of[ _]arms|\bseal\b|\bflag\b|badge|roundel|symbol|\bicon\b|wordmark/i
 const INFO = `prop=imageinfo&iiprop=url|size|mime|extmetadata&iiextmetadatafilter=${EXT_FIELDS}&iiurlwidth=2000`
 
 async function query(fetchFn: typeof fetch, params: string): Promise<WikiPage[]> {
@@ -232,6 +234,7 @@ export function acceptable(file: string, info: ImageInfo | undefined, o: Require
     /^image\/(jpeg|png)$/.test(info.mime ?? 'image/jpeg') &&
     info.width >= o.minWidth &&
     info.width >= info.height * o.minAspect &&
+    !GRAPHIC.test(file) &&
     !(strictName && NOT_A_PHOTO.test(file))
   )
 }
