@@ -164,7 +164,17 @@ async function fetchAlternateHref(articleId: string, locale: Locale, categorySlu
   }
 }
 
+/**
+ * A generated share card (`<slug>-card.png`, the headline baked into the picture) is not a photo. In a tile it is
+ * cropped and the tile prints the headline over it again (15 Nov: the World Test Championship lead read twice, cut
+ * at both edges), so tiles show the desk-colour panel instead.
+ */
+export function isTextCard(url: string | undefined): boolean {
+  return Boolean(url && /-card(-\d+)?\.(png|jpe?g|webp)(\?.*)?$/i.test(url))
+}
+
 function mapArticleCard(doc: Article, locale: Locale, category: CategoryRef): ArticleCard {
+  const image = mapMedia(doc.heroImage as Media | number | null, locale)
   const slug = String(doc.slug ?? '')
   return {
     id: String(doc.id),
@@ -174,7 +184,7 @@ function mapArticleCard(doc: Article, locale: Locale, category: CategoryRef): Ar
     title: String(doc.title ?? ''),
     dek: doc.dek ?? undefined,
     category,
-    image: mapMedia(doc.heroImage as Media | number | null, locale),
+    image: image && !isTextCard(image.url) ? image : undefined,
     author: mapAuthor(doc.author as Author | number | null, locale),
     publishedAt: doc.publishedAt ?? doc.createdAt,
     updatedAt: doc.updatedAt,
