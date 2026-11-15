@@ -42,6 +42,7 @@ import { decideSlot, pktDayStart } from './social/caps.js'
 import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import { runPhonePrices } from './phones/refresh.js'
 import { runAppliancePrices } from './appliances/collect.js'
+import { RETAIL_TICK_MS, runRetailTick } from './appliances/retail.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
 import { sendReviewCard } from './telegram/bot.js'
@@ -472,6 +473,8 @@ export async function createWorkerRuntime(
         if (job.name === 'phone-prices') return runPhonePrices((m, p, b, o) => payload.request(m, p, b, o))
         // Home appliance prices (zaviya.pk/prices): brand stores, once a day
         if (job.name === 'appliance-prices') return runAppliancePrices((m, p, b, o) => payload.request(m, p, b, o))
+        // Store offers: one page of one retail store feed per tick, all day (appliances/retail.ts)
+        if (job.name === 'store-offers') return runRetailTick({ request: (m, p, b, o) => payload.request(m, p, b, o), kv: redis })
         const rates = await fetchRatePoints(env, redis)
         await postRatePoints(payload, rates)
         return { points: rates.points.length, tables: rates.snapshots.map((x) => x.key) }
@@ -610,6 +613,12 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.data.removeJobScheduler('appliance-prices').catch(() => {})
   } else {
     await runtime.queues.data.upsertJobScheduler('appliance-prices', { every: 24 * 60 * 60 * 1000 }, { name: 'appliance-prices', data: {} })
+  }
+  // Store offers (15 Nov 2026): rolling crawl of retail store feeds, one page every 5 minutes. STORE_OFFERS=0 turns it off.
+  if (process.env.STORE_OFFERS === '0') {
+    await runtime.queues.data.removeJobScheduler('store-offers').catch(() => {})
+  } else {
+    await runtime.queues.data.upsertJobScheduler('store-offers', { every: RETAIL_TICK_MS }, { name: 'store-offers', data: {} })
   }
   // ZAV-109 phase 2: confirmation mails and the 07:30 PKT briefing. Scheduled only with NEWSLETTER_SEND=true and the news@ password set.
   if (runtime.env.NEWSLETTER_SEND && runtime.env.NEWS_MAIL_PASSWORD) {

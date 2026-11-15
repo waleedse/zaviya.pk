@@ -1,3 +1,5 @@
+import { recentOfferChanges } from '@/lib/offers/queries'
+import { OfferChangesGrid } from '@/components/offers/StoreOffers'
 import { notFound } from 'next/navigation'
 import { ApplianceHubView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
@@ -31,5 +33,11 @@ export default async function PricesHub({ params }: { params: Promise<{ locale: 
   const popular = trendingItems(all, 10)
   const fallback = [...all].filter((a) => a.pricePkr).sort((a, b) => b.popularity - a.popularity).slice(0, 10)
   const basketUpdated = pbs.map((a) => a.priceUpdatedAt).filter(Boolean).sort().at(-1)
-  return <ApplianceHubView summaries={categorySummaries(all)} movers={topMovers(all, 5)} baskets={cityBaskets(pbs)} basketUpdated={basketUpdated} trending={popular.length >= 4 ? popular : fallback} faqs={hubFaqs(all.length)} phones={phoneSummary} />
+  const storeChanges = await recentOfferChanges(12)
+  return (
+    <>
+      <ApplianceHubView summaries={categorySummaries(all)} movers={topMovers(all, 5)} baskets={cityBaskets(pbs)} basketUpdated={basketUpdated} trending={popular.length >= 4 ? popular : fallback} faqs={hubFaqs(all.length)} phones={phoneSummary} />
+      <OfferChangesGrid offers={storeChanges} />
+    </>
+  )
 }

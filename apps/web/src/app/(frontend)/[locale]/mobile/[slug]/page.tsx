@@ -1,3 +1,4 @@
+import { offersFor } from '@/lib/offers/queries'
 import { notFound } from 'next/navigation'
 import { PhonePageView, pairLabel } from '@/components/phones/PhoneViews'
 import { getPhoneBySlug, getPhones } from '@/lib/phones/queries'
@@ -44,5 +45,6 @@ export default async function MobilePage({ params }: Params) {
       return a && b ? { key: p.key, label: pairLabel(a, b) } : null
     })
     .filter((p): p is { key: string; label: string } => p !== null)
-  return <PhonePageView phone={phone} related={related} pairs={pairs} brandPhones={all.filter((p) => p.brand.slug === phone.brand.slug).length} />
+  const offers = await offersFor('phone', phone.slug)
+  return <PhonePageView phone={phone} related={related} pairs={pairs} brandPhones={all.filter((p) => p.brand.slug === phone.brand.slug).length} offers={offers} />
 }

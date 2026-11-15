@@ -31,6 +31,8 @@ interface Resp {
   categories: Hit[]
   pages: { href: string; name: string }[]
   closest: Hit[]
+  /** Store listings (store offers): h is our page or the store's product page */
+  offers?: { n: string; h: string; s: string; p: number | null; i: string | null }[]
 }
 type Row = { key: string; href: string; title: string; sub: string; price?: string; cat?: boolean }
 
@@ -46,6 +48,7 @@ const COPY = {
     didYou: 'Showing close matches',
     category: 'category',
     models: 'items',
+    inStores: 'In Pakistani stores',
     from: 'from',
     news: 'Search news for',
     clear: 'Clear',
@@ -59,6 +62,7 @@ const COPY = {
     didYou: 'ملتے جلتے نتائج',
     category: 'زمرہ',
     models: 'اشیا',
+    inStores: 'پاکستانی اسٹورز میں',
     from: 'سے',
     news: 'خبروں میں تلاش کریں',
     clear: 'صاف کریں',
@@ -162,7 +166,8 @@ export function PriceSearch({
         ...resp.pages.map((x) => ({ key: `p${x.href}`, href: x.href, title: x.name, sub: '', cat: true })),
       ]
     : []
-  const none = !!resp && rows.length === 0 && q.trim().length >= 2
+  const offers = resp?.offers ?? []
+  const none = !!resp && rows.length === 0 && offers.length === 0 && q.trim().length >= 2
   const showList = (inline || open) && q.trim().length >= 2 && !!resp
 
   const go = (href: string) => {
@@ -217,6 +222,31 @@ export function PriceSearch({
           {r.price ? <span className="shrink-0 font-display font-bold tabular-nums">{r.price}</span> : <ArrowRight className="h-4 w-4 shrink-0 text-fg-subtle rtl:rotate-180" aria-hidden />}
         </Link>
       ))}
+      {offers.length ? (
+        <div className="mt-1 border-t border-border pt-2" data-testid="search-offers">
+          <p className="px-3 pb-1 text-xs font-semibold text-fg-subtle">{c.inStores}</p>
+          {offers.map((o) => (
+            <a
+              key={o.h}
+              href={o.h}
+              {...(o.h.startsWith('/') ? {} : { target: '_blank', rel: 'noopener nofollow' })}
+              onClick={() => {
+                setOpen(false)
+                onNavigate?.()
+              }}
+              className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {o.i ? <img src={o.i} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-10 w-10 shrink-0 rounded-lg bg-white object-contain" /> : null}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{o.n}</span>
+                <span className="block truncate text-xs text-fg-muted">{o.s}</span>
+              </span>
+              {o.p ? <span className="shrink-0 font-display font-bold tabular-nums">{rs(o.p)}</span> : null}
+            </a>
+          ))}
+        </div>
+      ) : null}
       {none ? (
         <div className="px-3 py-3">
           <p className="font-semibold">

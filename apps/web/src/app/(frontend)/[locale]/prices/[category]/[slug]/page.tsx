@@ -1,3 +1,4 @@
+import { offersFor } from '@/lib/offers/queries'
 import { notFound } from 'next/navigation'
 import { ApplianceListView, AppliancePageView } from '@/components/appliances/ApplianceViews'
 import { getAppliances } from '@/lib/appliances/queries'
@@ -93,5 +94,6 @@ export default async function ApplianceOrBrandPage({ params }: Params) {
   }
   const a = all.find((x) => x.slug === slug && x.category.slug === category)
   if (!a) notFound()
-  return <AppliancePageView a={a} similar={similarAppliances(a, all, 6)} faqs={productFaqs(a)} />
+  const offers = await offersFor('appliance', a.slug)
+  return <AppliancePageView a={a} similar={similarAppliances(a, all, 6)} faqs={productFaqs(a)} offers={offers} />
 }
