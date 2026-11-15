@@ -13,7 +13,7 @@ import { generateViaZImage } from './zimage.js'
 import { generateViaComfy } from './comfy.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
-import { generateHeroViaWorkersAI, fluxPrompt, geminiPrompt } from './flux.js'
+import { generateHeroViaWorkersAI, fluxPrompt, geminiPrompt, zimagePrompt } from './flux.js'
 import { editorApproved } from './pitch.js'
 
 export type { SocialCardRenderInput } from './social-card.js'
@@ -285,7 +285,7 @@ export async function processMediaJob(
   }
   const zimage = async () => generateViaZImage(fluxPrompt(brief), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
   // Z-Image on our own M3 (free); null when COMFY_URL is unset or the Mac is offline
-  const m3 = async () => generateViaComfy(geminiPrompt(brief), { url: deps.env.COMFY_URL, clusterId: data.clusterId })
+  const m3 = async () => generateViaComfy(zimagePrompt(brief), { url: deps.env.COMFY_URL, clusterId: data.clusterId })
   const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
   const aiAllowed = Boolean(deps.env.AI_HERO_IMAGES)
   const blob: Blob | null = realHero
