@@ -9,7 +9,7 @@ vi.mock('./post-card.js', () => ({ renderPostCard: vi.fn(async () => null) }))
 vi.mock('./real-photo.js', async (orig) => ({ ...(await orig<typeof import('./real-photo.js')>()), findRealPhoto: vi.fn(async () => null), findHeroPhoto: vi.fn(async () => null) }))
 vi.mock('./reference.js', () => ({ describeReferenceScene: vi.fn(async () => null) }))
 vi.mock('./openverse.js', async (orig) => ({ ...(await orig<typeof import('./openverse.js')>()), findOpenversePhoto: vi.fn(async () => null) }))
-vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b, geminiPrompt: (b: string) => b }))
+vi.mock('./flux.js', () => ({ generateHeroViaWorkersAI: vi.fn(async () => null), fluxPrompt: (b: string) => b, geminiPrompt: (b: string) => b, zimagePrompt: (b: string) => b }))
 vi.mock('./zimage.js', () => ({ generateViaZImage: vi.fn(async () => null) }))
 
 import { heroMaxTries, processMediaJob } from './media.js'
