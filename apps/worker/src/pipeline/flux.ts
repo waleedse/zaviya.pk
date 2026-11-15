@@ -23,6 +23,20 @@ export function fluxPrompt(brief: string, _scene?: string | null): string {
   ].join(' ')
 }
 
+/**
+ * Gemini heroes look like real photographs (Waleed, 15 Nov: "gemini say realistic images"), but of a generic scene only: never a
+ * real person, a real event or a disaster, so no reader can take it for a news photo of what happened. The site labels them "AI image".
+ */
+export function geminiPrompt(brief: string): string {
+  return [
+    `Theme: ${brief.trim()}.`,
+    'A realistic, high-quality editorial photograph of a generic scene or object that suggests the theme (for example an empty cricket ground with stumps at golden hour for cricket, banknotes and a calculator for the economy, an empty classroom for education, a fuel nozzle for petrol prices). Natural light, shallow depth of field, 16:9 landscape composition, like a stock photo for a news website.',
+    'No real, named or recognisable people and no faces; any person only small, from behind or out of focus. Do not show the actual event, a real building or landmark, elections, protests, disasters, accidents, wars, violence, crimes, weapons, injured people or children.',
+    'No national flags, uniforms or emblems, and never place the scene in Pakistan unless the theme names Pakistan.',
+    'Absolutely no text or writing of any script, no numbers, banners, signs, screens with text, logos or watermarks.',
+  ].join(' ')
+}
+
 interface Opts {
   accountId?: string
   token?: string

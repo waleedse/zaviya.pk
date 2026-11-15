@@ -36,7 +36,13 @@ export function CardImage({
           sizes={sizes}
           className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
-      ) : (
+      ) : null}
+      {img?.isAiGenerated ? (
+        <span className="absolute end-2 top-2 z-10 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          {locale === 'ur' ? 'اے آئی تصویر' : 'AI image'}
+        </span>
+      ) : null}
+      {img ? null : (
         <div
           className="absolute inset-0"
           style={{ background: `linear-gradient(135deg, ${color} 0%, color-mix(in oklab, ${color} 55%, #0c0f14) 100%)` }}

@@ -236,3 +236,17 @@ describe('byPhotographer (15 Nov)', () => {
     expect(byPhotographer(undefined, 'Kamran Qureshi')).toBe(false)
   })
 })
+
+describe('test-cricket topic and Gemini prompt (15 Nov)', async () => {
+  const { topicSubjects } = await import('./photo-topics.js')
+  const { geminiPrompt } = await import('./flux.js')
+  it('a World Test Championship story falls back to Lord\'s', () => {
+    expect(topicSubjects('World Test Championship format: nine teams likely until 2031')).toContain("Lord's")
+  })
+  it('the Gemini prompt is realistic but forbids real people, events and text', () => {
+    const p = geminiPrompt('WTC format')
+    expect(p).toMatch(/realistic/i)
+    expect(p).toMatch(/no real, named or recognisable people/i)
+    expect(p).toMatch(/no text/i)
+  })
+})
