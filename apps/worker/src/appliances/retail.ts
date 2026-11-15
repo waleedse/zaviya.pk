@@ -14,6 +14,11 @@ import { modelFrom } from './collect.js'
 export const RETAIL_PAGE_SIZE = 250
 export const RETAIL_TICK_MS = 5 * 60_000
 const CURSOR_KEY = 'zaviya:retail:cursor'
+/**
+ * Ask for the store's Pakistan market. Our server is in Europe: without it Shopify answers for the French market,
+ * where these stores do not sell, and every product reads "available: false" (15 Nov 2026: 4,438 of 4,440 out of stock).
+ */
+export const PK_MARKET = 'country=PK'
 
 interface ShopifyProduct {
   title?: string
@@ -87,7 +92,7 @@ export async function runRetailTick(deps: { request: Request; kv: Kv; fetchText?
   } catch {}
   if (!(cursor.store >= 0 && cursor.store < RETAIL_STORES.length)) cursor = { store: 0, page: 1 }
   const store = RETAIL_STORES[cursor.store]!
-  const body = await (deps.fetchText ?? politeFetchText)(`${store.base}/products.json?limit=${RETAIL_PAGE_SIZE}&page=${cursor.page}`)
+  const body = await (deps.fetchText ?? politeFetchText)(`${store.base}/products.json?limit=${RETAIL_PAGE_SIZE}&page=${cursor.page}&${PK_MARKET}`)
   let products: ShopifyProduct[] = []
   try {
     products = body ? ((JSON.parse(body) as { products?: ShopifyProduct[] }).products ?? []) : []

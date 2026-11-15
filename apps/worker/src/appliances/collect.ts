@@ -135,7 +135,7 @@ export function parseShopifyProducts(products: ShopifyProduct[], brand: (typeof 
 export async function fetchShopify(ctx: AdapterCtx, store: (typeof SHOPIFY_STORES)[number]): Promise<ApplianceImportInput[]> {
   const products: ShopifyProduct[] = []
   for (let page = 1; page <= SHOPIFY_MAX_PAGES; page++) {
-    const body = await ctx.fetchText(`${store.base}/products.json?limit=250&page=${page}`)
+    const body = await ctx.fetchText(`${store.base}/products.json?limit=250&page=${page}&country=PK`)
     if (!body) {
       if (page === 1) throw new Error(`${store.brand} product feed unavailable`)
       break

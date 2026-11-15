@@ -271,6 +271,8 @@ export function ApplianceHubView({
   faqs,
   phones,
   basketUpdated,
+  shop,
+  deals,
 }: {
   summaries: CategorySummary[]
   movers: { up: Mover[]; down: Mover[]; windowDays: number }
@@ -279,12 +281,16 @@ export function ApplianceHubView({
   faqs: FAQ[]
   phones: PhonesSummary
   basketUpdated?: string
+  /** "Shop by category" tiles, right under the search */
+  shop?: React.ReactNode
+  /** Store deals and price drops, after the price movers */
+  deals?: React.ReactNode
 }) {
   const count = (g: PriceGroupSlug) => summaries.filter((s) => s.category.group === g).reduce((n, s) => n + s.count, 0)
   const groups = PRICE_GROUPS.filter((g) => count(g.slug) > 0)
   const total = summaries.reduce((n, s) => n + s.count, 0)
   const groupSection = (g: (typeof PRICE_GROUPS)[number]) => (
-    <section key={g.slug} aria-labelledby={`g-${g.slug}`}>
+    <section key={g.slug} id={g.slug} aria-labelledby={`g-${g.slug}`} className="scroll-mt-24">
       <h2 id={`g-${g.slug}`} className="font-display text-xl font-bold">
         {g.name} <span className="text-fg-subtle" lang="ur">({g.ur})</span>
       </h2>
@@ -314,6 +320,7 @@ export function ApplianceHubView({
       </section>
       <div className="container-wide mt-8 space-y-10">
         <CategoryChips summaries={summaries} />
+        {shop}
 
         {hasMovers ? (
           <section aria-labelledby="movers">
@@ -339,6 +346,8 @@ export function ApplianceHubView({
             </div>
           </section>
         ) : null}
+
+        {deals}
 
         {lo && hi ? (
           <section aria-labelledby="basket" className="card-surface p-4 md:p-6">

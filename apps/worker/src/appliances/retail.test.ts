@@ -52,14 +52,20 @@ describe('store offers', () => {
   it('one tick reads one page, posts it and saves the cursor', async () => {
     const kv = new Map<string, string>()
     const posted: unknown[] = []
+    const urls: string[] = []
     const out = await runRetailTick({
       kv: { get: async (k) => kv.get(k) ?? null, set: async (k, v) => kv.set(k, v) },
       request: async <T,>(_m: string, _p: string, b?: unknown) => {
         posted.push(b)
         return { matched: 1, changed: 0 } as T
       },
-      fetchText: async () => JSON.stringify({ products: [{ title: 'Redmi Note 14 6GB 128GB', handle: 'rn14', vendor: 'Xiaomi', variants: [{ price: '45999' }] }] }),
+      fetchText: async (url: string) => {
+        urls.push(url)
+        return JSON.stringify({ products: [{ title: 'Redmi Note 14 6GB 128GB', handle: 'rn14', vendor: 'Xiaomi', variants: [{ price: '45999' }] }] })
+      },
     })
+    // the Pakistan market: from a European server Shopify otherwise marks everything unavailable
+    expect(urls[0]).toMatch(/[?&]country=PK\b/)
     expect(out.offers).toBe(1)
     expect(posted).toHaveLength(1)
     expect(JSON.parse(kv.get('zaviya:retail:cursor')!)).toEqual({ store: 1, page: 1 })
