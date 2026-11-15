@@ -355,6 +355,8 @@ function nameCore(name: string): string {
   return (core.length ? core : words.filter((w) => w !== 'the')).join(' ')
 }
 
+const HOST_ALIAS: Record<string, string> = { 'cricinfo.com': 'espncricinfo.com' }
+
 export interface OutletMatch {
   source: Pick<PipelineSource, 'id' | 'name' | 'trustTier'>
   official: boolean
@@ -366,7 +368,10 @@ export interface OutletMatch {
  */
 export function matchOutlet(hit: NewsHit, sources: PipelineSource[], lang: 'en' | 'ur', official?: Pick<PipelineSource, 'id' | 'name' | 'trustTier'> | null): OutletMatch | null {
   const credible = sources.filter((s) => s.type === 'rss' && s.trustTier <= 2 && !/google|trends|discovery/i.test(s.name))
-  const host = hit.outletHost ? baseHost(hit.outletHost) : ''
+  const raw = hit.outletHost ? baseHost(hit.outletHost) : ''
+  // Google News names some outlets by an older domain (15 Nov: "Cricinfo" at cricinfo.com, our feed is espncricinfo.com, so the
+  // 20K "ind vs nz" search found no credible coverage)
+  const host = HOST_ALIAS[raw] ?? raw
   const byHost = host ? credible.filter((s) => { try { return baseHost(new URL(s.url).hostname) === host } catch { return false } }) : []
   const core = nameCore(hit.outlet)
   const byName = core ? credible.filter((s) => nameCore(s.name) === core) : []
