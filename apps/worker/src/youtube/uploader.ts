@@ -13,7 +13,7 @@ import type { YoutubeConfig } from './config.js'
 import { blockedReason, type YtItem } from './plan.js'
 import { fileKey, type YtStore } from './queue.js'
 
-export type UploadErrorKind = 'limit' | 'human' | 'outdated' | 'offline' | 'unsure' | 'ui' | 'retry'
+export type UploadErrorKind = 'limit' | 'human' | 'outdated' | 'offline' | 'unsure' | 'ui' | 'gone' | 'retry'
 
 /** Studio's upload dialog did not open or work: the same thing will fail again on the next video, so retrying every few minutes is pointless */
 const UI_ERROR = /^(file_input_not_found|details_not_shown|next_button_not_found|next_button_disabled|create_button_not_found|upload_menu_not_found|kids_radio_not_found|visibility_step_not_found|textbox_not_found|textbox_not_filled|content_script_unreachable)/
@@ -28,6 +28,8 @@ export function classifyUploadError(message: string): UploadErrorKind {
   // publish may or may not have happened: never repeat, a person looks at the channel
   if (/^(post_unsure|bridge job timeout)/.test(m)) return 'unsure'
   if (UI_ERROR.test(m)) return 'ui'
+  // the hub no longer has the file (old videos are pruned from disk; 15 Nov: 31 Oct digests retried for hours on HTTP 401): retrying cannot help
+  if (/^video_download_failed: HTTP (401|403|404|410)\b/.test(m)) return 'gone'
   return 'retry'
 }
 
@@ -181,6 +183,11 @@ export async function uploadNext(deps: UploaderDeps): Promise<TickResult> {
       }
       if (kind === 'outdated') return pause(OUTDATED_PAUSE_MS, 'the Chrome extension has no youtube.upload yet: reload it at chrome://extensions')
       if (kind === 'offline') return pause(OFFLINE_RECHECK_MS, 'extension offline')
+      if (kind === 'gone') {
+        await store.fail(item, error, deps.now())
+        await record(deps, item, 'failed', { error })
+        return { state: 'failed', id: item.id, error }
+      }
       if (kind === 'unsure') {
         await store.fail(item, error, deps.now())
         await record(deps, item, 'failed', { error })
