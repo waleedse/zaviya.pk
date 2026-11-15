@@ -88,6 +88,7 @@ export interface Config {
     'phone-brands': PhoneBrand;
     phones: Phone;
     appliances: Appliance;
+    'store-offers': StoreOffer;
     'price-demand': PriceDemand;
     'result-boards': ResultBoard;
     'result-exams': ResultExam;
@@ -121,6 +122,7 @@ export interface Config {
     'phone-brands': PhoneBrandsSelect<false> | PhoneBrandsSelect<true>;
     phones: PhonesSelect<false> | PhonesSelect<true>;
     appliances: AppliancesSelect<false> | AppliancesSelect<true>;
+    'store-offers': StoreOffersSelect<false> | StoreOffersSelect<true>;
     'price-demand': PriceDemandSelect<false> | PriceDemandSelect<true>;
     'result-boards': ResultBoardsSelect<false> | ResultBoardsSelect<true>;
     'result-exams': ResultExamsSelect<false> | ResultExamsSelect<true>;
@@ -933,6 +935,40 @@ export interface Appliance {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "store-offers".
+ */
+export interface StoreOffer {
+  id: number;
+  slug: string;
+  store: string;
+  title: string;
+  brand?: string | null;
+  group: string;
+  url: string;
+  imageUrl?: string | null;
+  pricePkr?: number | null;
+  listPricePkr?: number | null;
+  /**
+   * Price before the last change
+   */
+  prevPricePkr?: number | null;
+  priceChangedAt?: string | null;
+  inStock?: boolean | null;
+  model?: string | null;
+  /**
+   * phone or appliance
+   */
+  matchKind?: string | null;
+  matchSlug?: string | null;
+  /**
+   * Last time the store feed listed it
+   */
+  seenAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "price-demand".
  */
 export interface PriceDemand {
@@ -1246,6 +1282,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'appliances';
         value: number | Appliance;
+      } | null)
+    | ({
+        relationTo: 'store-offers';
+        value: number | StoreOffer;
       } | null)
     | ({
         relationTo: 'price-demand';
@@ -1885,6 +1925,30 @@ export interface AppliancesSelect<T extends boolean = true> {
         sourceUrl?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "store-offers_select".
+ */
+export interface StoreOffersSelect<T extends boolean = true> {
+  slug?: T;
+  store?: T;
+  title?: T;
+  brand?: T;
+  group?: T;
+  url?: T;
+  imageUrl?: T;
+  pricePkr?: T;
+  listPricePkr?: T;
+  prevPricePkr?: T;
+  priceChangedAt?: T;
+  inStock?: T;
+  model?: T;
+  matchKind?: T;
+  matchSlug?: T;
+  seenAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

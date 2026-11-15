@@ -93,3 +93,36 @@ seo agent, daily
 - **History**: stored rows are price changes (plus one row per PBS weekly release). Between rows the price carries forward and the last point is the last check (`priceUpdatedAt`), so every chart grows daily without a row per item per day (`lib/appliances/series.ts`). Less than a week of history and no change: "Tracking since <date>" instead of a chart.
 - **PBS backfill**: `runPbsBackfill` (worker, runs after the daily `appliance-prices`) reads the weekly SPI releases pbs.gov.pk still lists in its post sitemap (16 weeks, 30 Oct 2025 to 5 Nov 2026; PBS keeps no others online), asks `GET /api/pipeline/appliances/history-days` which weeks are already stored, and posts the rest to `POST /api/pipeline/appliances/history` (`source_url` = the release page). Idempotent; never changes the current price. Manual run: `tsx src/appliances/cli.ts backfill`.
 - **Charts**: Recharts (`components/appliances/PriceCharts.tsx`): step line with min/max, range buttons, per-city bars. Hub: today's movers (`lib/appliances/movers.ts`), grocery basket by city, popular items, categories.
+
+## Store offers (15 Nov 2026)
+
+Waleed asked for every product price in Pakistan, with "where to buy" links to each store. So the rule above now has a second tier:
+
+- **Retail stores that publish their own public product feed** (Shopify `/products.json`) are read too. They are listed in `RETAIL_STORES` (`packages/shared/src/offers.ts`): Telemart, Mi Store Pakistan and Friends Home. Highfy is Shopify too, but it sells beauty products, so it is not added yet.
+- **Still never read:** price-comparison sites (PriceOye, Qeemat, WhatMobile, PriceMeter) and any site that blocks `ZaviyaBot/1.0` or disallows the feed in robots.txt.
+- **Images:** the product image is the store's own listing image, shown next to a link to that store's product page, the way shopping search shows it. We do not take images from Google Images, because those images are not free to reuse.
+
+How it runs:
+
+```
+worker job "store-offers" (BullMQ data queue, every 5 min, STORE_OFFERS=0 turns it off)
+  apps/worker/src/appliances/retail.ts   reads ONE page (250 listings) of ONE store per tick; Redis cursor zaviya:retail:cursor
+    -> POST /api/pipeline/offers/import    upsert by store+handle into store_offers
+         keeps the previous price when it changes (prev_price_pkr, price_changed_at)
+         links the listing to our phone page (matchPhone: every word of the phone name, no extra model word such as "Ultra")
+         or to our appliance page (same model code)
+```
+
+Pages:
+- Phone pages (`/mobile/<slug>`) and item pages (`/prices/<category>/<item>`) show "Where to buy" with every matched store, cheapest in-stock first.
+- `/prices` shows "Store prices that changed this week".
+- The price search (`/api/prices/search`) also returns store listings ("In Pakistani stores").
+
+**Adding a store:** add one line to `RETAIL_STORES`. First check that `/products.json` returns JSON for our bot and that robots.txt allows it.
+
+Next (phase 2):
+- A full phone catalogue: every brand's official site, past and upcoming models, with full specs.
+- Product pages for store listings that match no page of ours.
+- Category pages for laptops, tablets, watches, audio and TVs.
+- Price history per offer.
+- More stores, including WooCommerce stores through the Store API.

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { closestCategories, searchPrices } from '@/lib/appliances/search'
 import { getSearchIndex, logMissedSearch } from '@/lib/appliances/searchIndex'
+import { searchOffers } from '@/lib/offers/search'
 
 /**
  * Price search for the box on /prices, the home page and the header. Not a page: /api/ is disallowed in robots.txt and
@@ -14,7 +15,8 @@ export async function GET(request: Request) {
   const q = (new URL(request.url).searchParams.get('q') ?? '').slice(0, 80)
   const index = await getSearchIndex()
   const r = searchPrices(index, q, 8)
-  const empty = r.total === 0 && r.categories.length === 0 && r.pages.length === 0
+  const offers = await searchOffers(q, 8)
+  const empty = r.total === 0 && r.categories.length === 0 && r.pages.length === 0 && offers.length === 0
   return NextResponse.json(
     {
       q,
@@ -23,6 +25,7 @@ export async function GET(request: Request) {
       items: r.items.map((i) => ({ n: i.name, h: i.href, b: i.brand, c: i.category, p: i.price, u: i.unit ?? null, k: i.kind })),
       categories: r.categories.map((c) => ({ n: c.name, h: c.href, count: c.count, min: c.minPrice })),
       pages: r.pages,
+      offers,
       closest: empty && q.trim().length >= 2 ? closestCategories(index, q, 4).map((c) => ({ n: c.name, h: c.href, count: c.count, min: c.minPrice })) : [],
     },
     { headers: { 'cache-control': 'public, s-maxage=60, stale-while-revalidate=300' } },

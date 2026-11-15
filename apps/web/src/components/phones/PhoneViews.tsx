@@ -1,3 +1,5 @@
+import { StoreOffersTable } from '@/components/offers/StoreOffers'
+import type { OfferView } from '@/lib/offers/queries'
 import Link from 'next/link'
 import { Smartphone } from 'lucide-react'
 import { PRICE_BANDS, formatPkr, type FAQ } from '@zaviya/shared'
@@ -46,7 +48,7 @@ export function SourcingNote() {
 
 // ---------- phone page ----------
 
-export function PhonePageView({ phone, related, pairs, brandPhones }: { phone: PhoneView; related: PhoneView[]; pairs: { key: string; label: string }[]; brandPhones?: number }) {
+export function PhonePageView({ phone, related, pairs, brandPhones, offers = [] }: { phone: PhoneView; related: PhoneView[]; pairs: { key: string; label: string }[]; brandPhones?: number; offers?: OfferView[] }) {
   const url = absoluteUrl(phoneHref(phone.slug))
   const faqs = phoneFaqs(phone)
   const rows = specRows(phone)
@@ -93,6 +95,7 @@ export function PhonePageView({ phone, related, pairs, brandPhones }: { phone: P
         </aside>
 
         <div className="min-w-0 space-y-8">
+          <StoreOffersTable offers={offers} name={full} />
           <section aria-labelledby="variants">
             <h2 id="variants" className="font-display text-xl font-bold">
               {full} price by RAM and storage

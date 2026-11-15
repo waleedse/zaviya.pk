@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { StoreOffersTable } from '@/components/offers/StoreOffers'
+import type { OfferView } from '@/lib/offers/queries'
 import { ArrowRight, ExternalLink, Plug } from 'lucide-react'
 import { PRICE_GROUPS, formatPkr, type FAQ, type PriceGroupSlug } from '@zaviya/shared'
 import { FAQAccordion } from '@/components/article/FAQAccordion'
@@ -580,7 +582,7 @@ function CityPricesTable({ a }: { a: ApplianceView }) {
   )
 }
 
-export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; similar: ApplianceView[]; faqs: FAQ[] }) {
+export function AppliancePageView({ a, similar, faqs, offers = [] }: { a: ApplianceView; similar: ApplianceView[]; faqs: FAQ[]; offers?: OfferView[] }) {
   const full = fullName(a)
   const grocery = a.brand.kind === 'source'
   const maker = a.brand.kind === 'maker'
@@ -671,6 +673,7 @@ export function AppliancePageView({ a, similar, faqs }: { a: ApplianceView; simi
         </div>
       </section>
       <div className="container-wide mt-6 max-w-[960px] space-y-6">
+        <StoreOffersTable offers={offers} name={full} />
         <PriceTrendSection a={a} />
         {a.cityPrices.length ? <CityPricesTable a={a} /> : null}
         {a.specs.length ? (
