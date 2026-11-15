@@ -261,6 +261,16 @@ export function partOfLongerName(fileTitle: string, subject: string): boolean {
 }
 
 /**
+ * Is the subject the photographer rather than the person in the photo? Flickr uploads often carry the uploader's name in
+ * the file title (15 Nov: "Kamran Qureshi" the ex-SHO got a photo by the Flickr user "Kamran Qureshi from London").
+ */
+export function byPhotographer(artistHtml: string | undefined, subject: string): boolean {
+  const a = fold(plainAuthor(artistHtml))
+  const s = fold(subject.trim())
+  return s.length >= 3 && a.includes(s)
+}
+
+/**
  * Names that mean a different thing outside Pakistan: a bare "Supreme Court" finds the US building. They are searched with
  * the Pakistani name, while the photo keeps the headline's own subject (the QA checks that the headline names it).
  */
@@ -306,7 +316,7 @@ async function candidateFor(subject: string, fetchFn: typeof fetch, o: Required<
   if (!isSpecific(search)) return null
   const files = (await query(fetchFn, `generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(`${search} filetype:bitmap`)}&${INFO}`))
     .map((p) => ({ title: (p.title ?? '').replace(/^File:/, ''), info: p.imageinfo?.[0], rank: p.index ?? 9 }))
-    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, search) && acceptable(f.title, f.info, o, true, person))
+    .filter((f) => f.title.toLowerCase().includes(s) && !partOfLongerName(f.title, search) && !byPhotographer(f.info?.extmetadata?.Artist?.value, search) && acceptable(f.title, f.info, o, true, person))
   // Landscape first (they crop least), then search order
   files.sort((a, b) => Number(b.info!.width >= b.info!.height * 1.3) - Number(a.info!.width >= a.info!.height * 1.3) || a.rank - b.rank)
   const best = files[0]
