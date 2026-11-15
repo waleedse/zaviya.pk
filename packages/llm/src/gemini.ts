@@ -1,5 +1,5 @@
 import type { ChatResult, LLMProvider, LlmPriority, LLMTask, Msg, ToolCall, ToolDef } from './types.js'
-import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_WRITER_CHAIN, TASK_PRIORITY, WRITER_MODEL_RESERVE_FOR_OTHERS } from './types.js'
+import { DEFAULT_GEMINI_EMBED_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_WRITER_FLASH, TASK_PRIORITY, WRITER_MODEL_RESERVE_FOR_OTHERS } from './types.js'
 import { GeminiBudget, estimateTokens } from './budget.js'
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
@@ -66,7 +66,8 @@ class RateLimited extends Error {
   }
 }
 
-const WRITER_MODELS = new Set(GEMINI_WRITER_CHAIN.split(','))
+// Only the flash models are held back for writing; the lite models stay shared with triage and QA
+const WRITER_MODELS = new Set(GEMINI_WRITER_FLASH.split(','))
 
 /** Models the API itself rate-limited, as seen by this process (the shared view lives in the budget store). */
 const cooldowns = new Map<string, number>()

@@ -81,8 +81,13 @@ export const TASK_PRIORITY: Record<LLMTask, LlmPriority> = {
   seo: 'low',
 }
 
-/** Writing models: best first. Each model has its own free-tier quota, so the chain rotates when one runs out. */
-export const GEMINI_WRITER_CHAIN = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview'
+/** The flash writing models: best first. Each has its own free-tier quota (about 20 calls a day, 15 Nov). */
+export const GEMINI_WRITER_FLASH = 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview'
+/**
+ * Writing chain: the flash models first, then (Waleed, 16 Nov: "use the lower Gemini models") the flash-lite models
+ * and gemma, so writing keeps going once the flash models' small daily quota is spent instead of waiting until reset.
+ */
+export const GEMINI_WRITER_CHAIN = `${GEMINI_WRITER_FLASH},gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemma-4-26b-a4b-it`
 /** Cheap models for scoring, keyword research and QA. */
 export const GEMINI_LITE_CHAIN = 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest,gemma-4-26b-a4b-it'
 
