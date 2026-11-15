@@ -42,3 +42,16 @@ describe('M3 Z-Image (ComfyUI)', () => {
     expect(wf['7'].inputs).toMatchObject({ width: 1280, height: 720 })
   })
 })
+
+describe('zimagePrompt', async () => {
+  const { zimagePrompt } = await import('./flux.js')
+  it('keeps only the scene: no "without ..." or "No ..." clauses (Z-Image draws whatever is named)', () => {
+    expect(zimagePrompt('A fuel nozzle at a petrol station at dusk, without real people, flags, logos or any text.')).toBe(
+      'A realistic photograph: A fuel nozzle at a petrol station at dusk. Natural light, shallow depth of field, wide 16:9 shot, high detail.',
+    )
+    expect(zimagePrompt('An empty exam hall with rows of desks. No faces, no text.')).toBe(
+      'A realistic photograph: An empty exam hall with rows of desks. Natural light, shallow depth of field, wide 16:9 shot, high detail.',
+    )
+    expect(zimagePrompt('Cricket stumps on a pitch at sunset')).toContain('Cricket stumps on a pitch at sunset.')
+  })
+})

@@ -37,6 +37,21 @@ export function geminiPrompt(brief: string): string {
   ].join(' ')
 }
 
+/**
+ * Z-Image on the M3 has no negative prompt: whatever a prompt names, it draws (16 Nov: "no flags, no text" gave flags and
+ * Chinese lettering; a list of examples gave all of them in one frame). So the prompt is only the writer's scene
+ * (imageBrief), with its "without faces, flags, logos or text" clauses cut off, plus photo style words.
+ */
+export function zimagePrompt(brief: string): string {
+  const scene = brief
+    .replace(/[,;]?\s*\b(without|with no|avoiding)\b[^.;]*/gi, '')
+    .replace(/(^|[.;]\s*)(no|avoid|do not|don't)\b[^.;]*[.;]?/gi, '$1')
+    .replace(/\s+([.,;])/g, '$1')
+    .replace(/[\s.,;]+$/, '')
+    .trim()
+  return `A realistic photograph: ${scene || brief.trim()}. Natural light, shallow depth of field, wide 16:9 shot, high detail.`
+}
+
 interface Opts {
   accountId?: string
   token?: string
