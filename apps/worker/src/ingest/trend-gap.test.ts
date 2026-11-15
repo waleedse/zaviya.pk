@@ -410,3 +410,12 @@ describe('cap behaviour of a trend-gap story', () => {
     expect(await dailyCapReached(at(46), now, true)).toBe(true)
   })
 })
+
+describe('cricinfo host alias (15 Nov)', async () => {
+  const { matchOutlet } = await import('./trend-gap.js')
+  it('a Google News hit from cricinfo.com counts as our ESPNcricinfo source', () => {
+    const src = { id: '1', key: 'espncricinfo', name: 'ESPNcricinfo', url: 'https://www.espncricinfo.com/rss/content/story/feeds/0.xml', type: 'rss', trustTier: 2, language: 'en' } as never
+    const m = matchOutlet({ outlet: 'Cricinfo', outletHost: 'www.cricinfo.com' } as never, [src], 'en')
+    expect(m?.source.name).toBe('ESPNcricinfo')
+  })
+})
