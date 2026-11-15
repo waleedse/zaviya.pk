@@ -10,6 +10,7 @@ import { findRealPhoto } from './real-photo.js'
 import { findHeroImage, heroMediaMeta } from './hero-photo.js'
 import { firstPassingPhoto } from './photo-qa.js'
 import { generateViaZImage } from './zimage.js'
+import { generateViaComfy } from './comfy.js'
 import { GeminiImageResultSchema } from '@zaviya/shared'
 import type { BridgeServer } from '../bridge/server.js'
 import { generateHeroViaWorkersAI, fluxPrompt, geminiPrompt } from './flux.js'
@@ -283,17 +284,21 @@ export async function processMediaJob(
     return null
   }
   const zimage = async () => generateViaZImage(fluxPrompt(brief), { key: deps.env.FAL_KEY, clusterId: data.clusterId })
+  // Z-Image on our own M3 (free); null when COMFY_URL is unset or the Mac is offline
+  const m3 = async () => generateViaComfy(geminiPrompt(brief), { url: deps.env.COMFY_URL, clusterId: data.clusterId })
   const fluxFirst = data.priority === 'breaking' || deps.env.IMAGE_SOURCE === 'flux'
   const aiAllowed = Boolean(deps.env.AI_HERO_IMAGES)
   const blob: Blob | null = realHero
     ? new Blob([new Uint8Array(realHero.bytes)], { type: realHero.mime })
     : !aiAllowed
       ? null
+      : deps.env.IMAGE_SOURCE === 'comfy' && deps.env.COMFY_URL
+      ? ((await m3()) ?? (await gemini()) ?? (await flux()))
       : deps.env.IMAGE_SOURCE === 'zimage' && deps.env.FAL_KEY
       ? ((await zimage()) ?? (await flux()) ?? (await gemini()))
       : fluxFirst
-        ? ((await flux()) ?? (await gemini()))
-        : ((await gemini()) ?? (await flux()))
+        ? ((await flux()) ?? (await gemini()) ?? (await m3()))
+        : ((await gemini()) ?? (await m3()) ?? (await flux()))
   // No illustration yet: hold the story and retry. A story is never dropped for a missing image (ZAV-299): after the
   // last try it goes out with the branded Zaviya card as its hero, and a backfill job swaps in the Gemini image later.
   // Source-site photos are never reused (copyright), so there is no og:image step.

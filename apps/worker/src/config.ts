@@ -83,8 +83,10 @@ const envSchema = z.object({
   /** Never publish with only the branded text card: wait for a real Gemini illustration (default on) */
   REQUIRE_HERO_IMAGE: z.preprocess((v) => (typeof v === 'boolean' ? v : v === undefined || v === '' ? true : v === 'true' || v === '1'), z.boolean()).default(true),
   /** How often to retry the image before giving up (retries are 15 min apart) */
-  /** Hero images: `flux` = Cloudflare Workers AI first, Gemini (extension) as backup; `extension` = Gemini first; `zimage` = Z-Image Turbo (fal.ai) first, then FLUX, then Gemini */
-  IMAGE_SOURCE: z.enum(['flux', 'extension', 'zimage']).catch('flux').default('flux'),
+  /** Hero images: `flux` = Cloudflare Workers AI first, Gemini (extension) as backup; `extension` = Gemini first; `zimage` = Z-Image Turbo (fal.ai) first, then FLUX, then Gemini; `comfy` = Z-Image on our M3 first, then Gemini, then FLUX */
+  IMAGE_SOURCE: z.enum(['flux', 'extension', 'zimage', 'comfy']).catch('flux').default('flux'),
+  /** ComfyUI (Z-Image Turbo) on our M3 Mac, reached through its SSH tunnel. IMAGE_SOURCE=comfy puts it first; otherwise it backs up Gemini before FLUX */
+  COMFY_URL: optionalStr,
   /** fal.ai key for Z-Image Turbo (IMAGE_SOURCE=zimage): fast, about half a cent a picture */
   FAL_KEY: optionalStr,
   /** The video service's media hub: the explainer pictures are claimed from it (needs MEDIA_AGENT_TOKEN, the same token the Mac agent uses) */
