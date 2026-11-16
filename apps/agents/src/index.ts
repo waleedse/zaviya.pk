@@ -192,7 +192,9 @@ async function runAgent(agent: AgentName, session: string) {
     `Session: ${session}. Time: ${new Date().toISOString()} (Pakistan is UTC+5).`,
     `Site: ${SITE_URL}. Payload API: ${PAYLOAD_URL}/api through "node ops/bin/payload.mjs <METHOD> /api/... [json]" (it adds the key; never put $PAYLOAD_API_KEY in a command, the shell refuses it).`,
     `Your journal: ${journal}. Shared notes: ${path.join(DATA, 'shared')}.`,
-    session === 'quick'
+    session === 'cycle'
+      ? 'CYCLE RUN (under 10 minutes): do "The 30-minute cycle" from your role exactly: 1) check every article published since your last journal line (headline and search term, facts, context, the picture itself, tags, its social posts) and fix, re-image or unpublish; 2) read Google Trends PK past 4 hours and autocomplete for the big terms; 3) decide the pitches and the gate, with the headline search term in each approval note. Do not do the full-pass tasks (front page, sourcing plan, missed-story audit). Append one short journal line: what you checked, changed, re-imaged and approved.'
+      : session === 'quick'
       ? 'QUICK RUN (keep it under 6 minutes): first the pitches from your role (approve the strongest for writing, reject weak ones), then the publishing gate (publish the strongest waiting draft, reject weak ones), then check only the articles published since your last journal entry. For each: headline states the news (no outlet name), facts match the sources, it is real reporting and not a write-up of another outlet\'s headline, category and image fit. Fix it, or set `_status: draft` if it is thin or wrong, and note it. Do not do the hourly tasks. Append one short journal line.'
       : "Start by reading ops/agents/PLAYBOOK.md and your journal. Do this session's work, then append a dated journal entry.",
     'Finish with a 3-line summary of what you did.',

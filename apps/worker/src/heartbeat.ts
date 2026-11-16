@@ -6,7 +6,7 @@ import { geminiModelStatus } from '@zaviya/llm'
 import { logger } from './logger.js'
 import { finishGated, gateFallback } from './pipeline/publish.js'
 import { decidePitch, pitchFallback } from './pipeline/pitch.js'
-import { sweepMissingHeroes } from './pipeline/hero-backfill.js'
+import { HERO_BACKFILL_JOB, sweepMissingHeroes, type HeroBackfillData } from './pipeline/hero-backfill.js'
 
 async function readJson<T>(runtime: WorkerRuntime, key: string): Promise<T | null> {
   try {
@@ -52,6 +52,23 @@ export async function handleCommand(runtime: WorkerRuntime, cmd: WorkerCommand):
         const action = cmd.payload?.action === 'reject' ? 'reject' : 'write'
         const done = await decidePitch(clusterId, action, { payload: runtime.payload, writeQueue: runtime.queues.write, redis: runtime.redis, triageQueue: runtime.queues.triage }, cmd.payload?.note ?? '')
         if (!done) logger.warn({ clusterId }, 'pitch command for a story that is not waiting')
+      }
+      break
+    }
+    case 'reimage': {
+      // The editor judged a story's picture wrong or weak: a new one (real photo first unless photo=false, else the editor's scene on the M3)
+      const articleId = String(cmd.payload?.articleId ?? '')
+      const brief = String(cmd.payload?.brief ?? '').trim()
+      if (articleId && brief) {
+        const a = await runtime.payload
+          .request<{ title?: string; dek?: string }>('GET', `/api/articles/${articleId}?depth=0&locale=en`)
+          .catch(() => null)
+        await runtime.queues.media.add(
+          HERO_BACKFILL_JOB,
+          { articleId, title: a?.title ?? brief, dek: a?.dek, brief, skipPhoto: cmd.payload?.photo === false } satisfies HeroBackfillData,
+          { priority: 2 },
+        )
+        logger.info({ articleId, brief, photo: cmd.payload?.photo !== false }, 'editor re-image order queued')
       }
       break
     }

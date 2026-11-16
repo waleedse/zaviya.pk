@@ -30,6 +30,8 @@ export interface HeroBackfillData {
   dek?: string
   tags?: string[]
   tries?: number
+  /** Editor's re-image order: skip the photo search (the photo found was wrong) and draw the editor's brief on the M3 */
+  skipPhoto?: boolean
 }
 
 interface ArticleDoc {
@@ -86,7 +88,7 @@ export async function processHeroBackfill(
 ): Promise<void> {
   const brief = data.brief || data.title
   const clusterId = `article_${data.articleId}`
-  const real = await findHeroImage({ title: data.title, dek: data.dek, brief, tags: data.tags ?? [] }).catch(() => null)
+  const real = data.skipPhoto ? null : await findHeroImage({ title: data.title, dek: data.dek, brief, tags: data.tags ?? [] }).catch(() => null)
   if (real) {
     const uploaded = await uploadHeroPhoto(deps.payload, real, data.title, `article-${data.articleId}-photo`)
     await deps.payload.request('PATCH', `/api/articles/${data.articleId}?locale=en`, { heroImage: Number(uploaded.id) })
