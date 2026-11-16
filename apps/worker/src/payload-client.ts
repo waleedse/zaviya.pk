@@ -198,7 +198,7 @@ export class PayloadClient {
     return this.request<{ inserted: { id: string; externalId: string }[]; skipped: number }>(
       'POST',
       '/api/pipeline/source-items',
-      { items },
+      { items: items.map(clampSourceItem) },
     )
   }
 
@@ -470,4 +470,14 @@ export class PayloadClient {
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * Payload text fields hold at most 40,000 characters. One feed (source 89, 16 Nov) put a whole page into an item's
+ * summary, the server refused the batch with 400 and every poll of that feed failed. Long text is cut, never the batch.
+ */
+export const SOURCE_TEXT_MAX = 39_000
+export function clampSourceItem<T extends { title?: string; summary?: string | null; contentText?: string | null }>(it: T): T {
+  const cut = (v: string | null | undefined, max: number) => (typeof v === 'string' && v.length > max ? v.slice(0, max) : v)
+  return { ...it, title: cut(it.title, 1000), summary: cut(it.summary, SOURCE_TEXT_MAX), contentText: cut(it.contentText, SOURCE_TEXT_MAX) } as T
 }
