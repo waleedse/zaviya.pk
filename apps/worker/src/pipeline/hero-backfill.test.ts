@@ -93,6 +93,16 @@ describe('backfillRealPhotos (AI, missing and document heroes)', () => {
     expect(t.calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
 
+  it('gives a card or document story with no photo a labelled M3 scene instead of the card (17 Nov)', async () => {
+    const t = setup(async () => null)
+    const gen = vi.fn(async () => new Blob([new Uint8Array([1, 2])], { type: 'image/png' }))
+    const res = await backfillRealPhotos(t.payload, { find: t.find as never, pauseMs: 0, card: t.card as never, only: ['card', 'document'], generate: gen })
+    expect(res.aiScene).toBe(2)
+    expect(t.card).not.toHaveBeenCalled()
+    expect(gen).toHaveBeenCalledWith(expect.objectContaining({ id: '6', title: 'Branded card already' }))
+    expect(t.raw.uploadMedia).toHaveBeenCalledWith(expect.any(Blob), expect.objectContaining({ isAiGenerated: true, license: 'ai-generated' }))
+  })
+
   it('finds a document hero by its pixels when the name looks fine', async () => {
     const { PNG } = await import('pngjs')
     const page = new PNG({ width: 200, height: 280 })
