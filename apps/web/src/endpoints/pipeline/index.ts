@@ -1496,6 +1496,25 @@ const pipelineEndpoints: Endpoint[] = [
     },
   },
   {
+    // The editor orders a new picture for a published story whose image is wrong, weak or a text card.
+    // brief = the scene to draw if no real photo fits (a generic scene: no real people, no named buildings, no text).
+    // photo=false skips the free-licence photo search (use it when the photo found was the wrong one).
+    path: '/pipeline/reimage/:id',
+    method: 'post',
+    handler: async (req) => {
+      const denied = guard(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ brief: z.string().min(20).max(400), reason: z.string().max(300).optional(), photo: z.boolean().optional() }))
+      if ('error' in parsed) return parsed.error
+      const id = String(req.routeParams?.id ?? '')
+      if (!/^\d+$/.test(id)) return json({ error: 'bad id' }, 400)
+      await req.payload.db.drizzle.execute(
+        sql`INSERT INTO zaviya_commands (kind, payload, created_by) VALUES ('reimage', ${JSON.stringify({ articleId: id, brief: parsed.data.brief, note: parsed.data.reason ?? '', photo: parsed.data.photo ?? true })}::jsonb, 'agent:editor')`,
+      )
+      return json({ ok: true, queued: true, id })
+    },
+  },
+  {
     path: '/pipeline/heartbeat',
     method: 'post',
     handler: async (req) => {

@@ -15,11 +15,12 @@ export interface Slot {
 }
 
 export const SCHEDULE: Record<AgentName, Slot[]> = {
-  // Newsroom oversight (Waleed 13 Nov: Claude usage was too high): a full pass every 6 hours and a quick
-  // check every 3 hours by day (6 at night). Pipeline QA still checks every article before it publishes.
+  // Newsroom (Waleed 17 Nov, docs/EDITOR-RULES.md): a 30-minute cycle (check the last cycle's articles, pictures and
+  // social posts; read the news and search demand; choose what is written next), hourly between 01:00 and 07:00,
+  // and a full pass every 6 hours (front page, sourcing plan, missed stories).
   editor: [
     { session: 'hourly', every: 360 },
-    { session: 'quick', every: 180, nightEvery: 360 },
+    { session: 'cycle', every: 30, nightEvery: 60 },
   ],
   // Growth research once a day: trends, evergreen search demand, ideas for the PM (Linear)
   research: [{ session: 'daily', at: '09:30' }],
