@@ -77,7 +77,7 @@ export default async function CnicFeePage({ params }: { params: Promise<{ locale
               ? `یہ فیس نادرا کی اپنی ویب سائٹ کے فیس صفحے سے لی گئی ہے (نادرا کے مطابق آخری اپڈیٹ: ${asOf})۔`
               : `Fees taken from NADRA's own fee page (NADRA's last update: ${asOf}). Days are NADRA's processing times, counted from when you pay.`}
           </p>
-          <p className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
+          <p dir="ltr" className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
             {`${isUr ? 'خلاصہ (رومن اردو)' : 'In short (Roman Urdu)'}: Pehla ID card normal mein free. Renewal ${r(renew.normal)} normal, ${r(renew.urgent)} urgent, ${r(renew.executive)} executive. Smart card ${r(smart.normal)} se shuru.`}
           </p>
         </div>

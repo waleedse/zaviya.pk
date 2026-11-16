@@ -76,7 +76,7 @@ export default async function DlFeePunjabPage({ params }: { params: Promise<{ lo
               ? `یہ فیس پنجاب حکومت کے DLIMS فیس صفحے سے ${readOn} کو لی گئی ہے۔ فیس ایک سال کی ہے۔`
               : `Fees from the Punjab government's DLIMS fee page, read on ${readOn}. DLIMS says the fees are for one year; a licence can be made for 1 to 5 years.`}
           </p>
-          <p className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
+          <p dir="ltr" className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
             {`${isUr ? 'خلاصہ (رومن اردو)' : 'In short (Roman Urdu)'}: Learner ${rs(LEARNER_FEE)}. Bike ${rs(bike.fee)} + test ${rs(bike.test)}. Car ${rs(car.fee)} + test ${rs(car.test)}. Courier ${rs(COURIER)} alag.`}
           </p>
         </div>

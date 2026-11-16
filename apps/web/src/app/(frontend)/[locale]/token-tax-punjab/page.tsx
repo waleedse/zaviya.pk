@@ -83,7 +83,7 @@ export default async function TokenTaxPunjabPage({ params }: { params: Promise<{
               ? `یہ ریٹ پنجاب ایکسائز اینڈ ٹیکسیشن کی سرکاری ویب سائٹ سے ${readOn} کو لیے گئے ہیں۔`
               : `Rates from the Punjab Excise & Taxation Department's official site, read on ${readOn}. Above 1000cc the 2026-27 token tax is a share of the car's invoice price, so the amount differs by model.`}
           </p>
-          <p className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
+          <p dir="ltr" className="max-w-[720px] rounded-xl bg-accent-soft p-3 text-sm">
             {`${isUr ? 'خلاصہ (رومن اردو)' : 'In short (Roman Urdu)'}: 1000cc tak ${rs(20000)} lifetime. 1001-2000cc invoice price ka 0.3% (Rs50 lakh ki car = ${rs(exTax)}). 2000cc se upar 0.4%. 31 August tak poora saal bharein to 10% kam.`}
           </p>
         </div>

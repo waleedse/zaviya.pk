@@ -1,5 +1,6 @@
 import { LOCALES, RTL_LOCALES, SITE, type Locale } from '@zaviya/shared'
-import { Bricolage_Grotesque, Hanken_Grotesk, Newsreader, Gulzar, Noto_Nastaliq_Urdu } from 'next/font/google'
+import { Bricolage_Grotesque, Hanken_Grotesk, Newsreader, Gulzar } from 'next/font/google'
+import localFont from 'next/font/local'
 import { notFound } from 'next/navigation'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { FrontendShell, defaultLangHref } from '@/components/layout/FrontendShell'
@@ -15,7 +16,15 @@ const hanken = Hanken_Grotesk({ subsets: ['latin'], variable: '--font-hanken', d
 const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader', display: 'swap' })
 const gulzar = Gulzar({ weight: '400', subsets: ['arabic'], variable: '--font-gulzar', display: 'swap' })
 // English pages show Urdu name spellings too; preload is off so English readers only fetch it when Urdu text appears.
-const nastaliq = Noto_Nastaliq_Urdu({ weight: ['400', '600'], subsets: ['arabic'], variable: '--font-nastaliq', display: 'swap', preload: false })
+// Self-hosted (16 Nov): next/font/google stopped resolving Noto Nastaliq Urdu ("queries have exactly one entry") and
+// failed every build. Variable font, Arabic subset, from fonts.gstatic.com v23 (SIL Open Font License).
+const nastaliq = localFont({
+  src: '../../../fonts/noto-nastaliq-urdu-arabic.woff2',
+  weight: '400 700',
+  variable: '--font-nastaliq',
+  display: 'swap',
+  preload: false,
+})
 
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }))
