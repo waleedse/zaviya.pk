@@ -61,6 +61,12 @@ for repo in zaviya-web zaviya-worker zaviya-agents zaviya-video; do
   done
 done
 FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+# '--max-used-space 3gb' does not shrink this cache (17 Nov it had grown to 63 GB and filled the disk mid-build);
+# each build adds ~20 GB, so below 30 GB free drop the whole cache (the next build is slower, prod is untouched).
+if [ "${FREE_GB:-0}" -lt 30 ]; then
+  docker builder prune -af >/dev/null 2>&1 || true
+  FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+fi
 if [ "${FREE_GB:-0}" -lt 12 ]; then
   echo "!! only ${FREE_GB} GB free on / (need 12): not building. Free space first; production is untouched." >&2
   exit 1
