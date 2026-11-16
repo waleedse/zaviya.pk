@@ -135,3 +135,18 @@ describe('quote copy', () => {
     expect(quoteCopy(c).x).toContain('“AI is the future of work.”')
   })
 })
+
+describe('quotes that cannot stand alone (17 Nov)', async () => {
+  const { contextReason } = await import('./quotes.js')
+  it('skips thank-you notes, pointers to a link and mid-conversation replies', () => {
+    expect(contextReason('It’s a great honour. Thanks to all those who sent me messages and this link.')).not.toBeNull()
+    expect(contextReason('Watch the full interview here, it explains everything about the budget')).not.toBeNull()
+    expect(contextReason('Thank you everyone for the wishes on my birthday today')).not.toBeNull()
+    expect(contextReason('He is right, the IMF programme must be completed this year')).not.toBeNull()
+  })
+  it('keeps a quote that says something on its own', () => {
+    expect(contextReason('Pakistan will complete the IMF programme and cut the fiscal deficit to 4 percent this year')).toBeNull()
+    expect(contextReason('Petrol prices will stay unchanged for the next fortnight, the finance ministry has decided')).toBeNull()
+  })
+})
+

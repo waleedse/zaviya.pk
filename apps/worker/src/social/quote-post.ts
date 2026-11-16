@@ -15,7 +15,7 @@ import { currentTrends, pickHashtags, trendKeyword } from './hashtags.js'
 import { postInstagram } from './instagram.js'
 import { articleUrl as storyUrl } from './link.js'
 import { HANDLES_PER_SEARCH, QUOTE_RULES, SEARCHES_PER_SCAN, WATCHLIST, type Personality } from './quote-config.js'
-import { decideQuoteSlot, extractDirectQuotes, pktDay, quoteCopy, quoteFromXPost, quoteId, unsafeReason, type QuoteCandidate } from './quotes.js'
+import { contextReason, decideQuoteSlot, extractDirectQuotes, pktDay, quoteCopy, quoteFromXPost, quoteId, unsafeReason, type QuoteCandidate } from './quotes.js'
 import { postX } from './x.js'
 
 /**
@@ -77,6 +77,7 @@ export async function queueArticleQuotes(
     for (const it of items) {
       const text = [it.title, it.summary, it.contentText].filter(Boolean).join('\n')
       for (const q of extractDirectQuotes(text)) {
+        if (contextReason(q.quote)) continue
         const known = WATCHLIST.find((p) => namedIn(q.speaker, p.name) || q.speaker.toLowerCase() === p.name.toLowerCase())
         const cand: QuoteCandidate = {
           quote: q.quote,
