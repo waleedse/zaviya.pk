@@ -172,6 +172,10 @@ export default async function DlFeePunjabPage({ params }: { params: Promise<{ lo
             <Link href={localePath(locale, '/passport-fee-pakistan')} className="underline">
               {isUr ? 'ای پاسپورٹ فیس' : 'e-passport fee'}
             </Link>
+            {' · '}
+            <Link href={localePath(locale, '/token-tax-punjab')} className="underline">
+              {isUr ? 'ٹوکن ٹیکس پنجاب' : 'Punjab token tax'}
+            </Link>
           </p>
         </section>
         <FAQAccordion faqs={faqs} locale={locale} />
