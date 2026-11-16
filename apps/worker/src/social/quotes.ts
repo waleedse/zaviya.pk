@@ -63,6 +63,26 @@ const UNSAFE: { why: string; re: RegExp }[] = [
   { why: 'spam', re: /\b(giveaway|retweet|follow me|subscribe|link in bio|use code|discount code|airdrop|crypto|bitcoin|token|nft)\b/i },
 ]
 
+/**
+ * A quote card is read on its own, with no tweet or article around it (17 Nov: Hamid Mir's "It's a great honour.
+ * Thanks to all those who sent me messages and this link." went out on three platforms and nobody could tell what
+ * he meant). Words that point outside the quote, thank-you notes and replies are skipped: the editor writes those up
+ * as a story with the context, or leaves them.
+ */
+const NEEDS_CONTEXT: { why: string; re: RegExp }[] = [
+  { why: 'points outside the quote', re: /\b(this|that|the above|the below)\s+(link|video|clip|post|tweet|thread|news|report|story|picture|photo|image|message|honou?r|award|article|interview|book|piece|speech)\b/i },
+  { why: 'points outside the quote', re: /\b(watch|read|see|listen|click|check out|details)\b[^.]{0,20}\b(here|below|above|this)\b|👇|⬇️|🔗/i },
+  { why: 'thanks or greetings only', re: /^\s*(thanks?|thank you|grateful|honou?red|congratulations|congrats|happy birthday|eid mubarak|rip|rest in peace|well done|best wishes)\b/i },
+  { why: 'thanks or greetings only', re: /\b(thanks? (?:to )?(?:all|everyone|you all)|grateful to all|for sending me|for sharing)\b/i },
+  { why: 'starts mid-conversation', re: /^\s*(he|she|they|it|this|that|these|those|yes|no|exactly|agreed|indeed|true|so|and|but)\b/i },
+]
+
+/** Why a quote cannot stand on its own (needs context the card does not carry), or null. */
+export function contextReason(text: string): string | null {
+  for (const c of NEEDS_CONTEXT) if (c.re.test(text)) return c.why
+  return null
+}
+
 /** Why a quote must not go out, or null when it is fine. */
 export function unsafeReason(text: string): string | null {
   for (const u of UNSAFE) if (u.re.test(text)) return u.why
@@ -141,6 +161,7 @@ export function quoteFromXPost(post: XPost, who: Personality, now = Date.now()):
   if (/#[\p{L}\p{N}_]/u.test(text) || (text.match(/@\w+/g) ?? []).length > 1) return null
   if (text.split(/\s+/).length < 8) return null
   if (!isVerbatim(text, post.text)) return null
+  if (contextReason(text)) return null
   return {
     quote: text,
     speaker: who.name,
