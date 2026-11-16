@@ -179,6 +179,14 @@ export default async function CnicFeePage({ params }: { params: Promise<{ locale
                 e-passport fee chart
               </Link>
             )}
+            {!isUr && (
+              <>
+                {' and the '}
+                <Link href={localePath(locale, '/driving-licence-fee-punjab')} className="underline">
+                  Punjab driving licence fee
+                </Link>
+              </>
+            )}
             {!isUr && '.'}
           </p>
         </section>
