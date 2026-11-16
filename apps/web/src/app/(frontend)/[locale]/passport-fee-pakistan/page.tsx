@@ -136,6 +136,11 @@ export default async function PassportFeePage({ params }: { params: Promise<{ lo
           <p className="mt-3 text-sm text-fg-muted">
             {isUr ? 'ہم درخواست یا ادائیگی نہیں لیتے۔ ہر مرحلہ DGIP کی سائٹ پر ہوتا ہے۔' : 'Zaviya does not take applications or payments; every step happens on the DGIP site.'}
           </p>
+          <p className="mt-2 text-sm">
+            <Link href={localePath(locale, '/cnic-fee-pakistan')} className="underline">
+              {isUr ? 'نادرا شناختی کارڈ فیس 2026' : 'NADRA ID card (CNIC) fee 2026'}
+            </Link>
+          </p>
         </section>
 
         <section>
