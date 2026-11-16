@@ -11,8 +11,12 @@ describe('M3 Z-Image (ComfyUI)', () => {
     let polls = 0
     const fetchImpl = (async (url: string, init?: RequestInit) => {
       urls.push(String(url))
+      if (String(url).endsWith('/object_info/UnetLoaderGGUF')) {
+        return new Response(JSON.stringify({ UnetLoaderGGUF: { input: { required: { unet_name: [['Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf', 'z_image_turbo-Q8_0-comfy.gguf']] } } } }))
+      }
       if (String(url).endsWith('/prompt')) {
         expect(JSON.parse(init!.body as string).prompt['5'].inputs.text).toBe('a cricket ground')
+        expect(JSON.parse(init!.body as string).prompt['1'].inputs.unet_name).toBe('z_image_turbo-Q8_0-comfy.gguf')
         return new Response(JSON.stringify({ prompt_id: 'p1' }))
       }
       if (String(url).includes('/history/')) {
