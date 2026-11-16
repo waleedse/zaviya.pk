@@ -51,6 +51,15 @@ echo "==> $RELEASE ($SHA): live=$LIVE, deploying to $NEXT"
 # A build on a nearly full disk fills it to 100% (15 Oct: 43 GB of build cache), and then Redis and
 # Postgres stop writing. Trim the cache first and refuse to build without enough room.
 docker builder prune -f --max-used-space 3gb >/dev/null 2>&1 || true
+# Images from failed releases were only removed after a successful deploy, so each failure left ~14 GB behind and the
+# next deploy refused to build (16-17 Nov: three failures in a row). Before building, keep only the live release and
+# the last good release before it (the rollback target); every other zaviya image is unused.
+ROLLBACK=$(grep ' ok (' "$STATE/history.log" 2>/dev/null | awk '{print $2}' | grep -vx "${PREVIOUS:-none}" | tail -1 || true)
+for repo in zaviya-web zaviya-worker zaviya-agents zaviya-video; do
+  docker images "$repo" --format '{{.Tag}}' | while read -r tag; do
+    [ "$tag" = "$PREVIOUS" ] || [ "$tag" = "$ROLLBACK" ] || docker rmi "$repo:$tag" >/dev/null 2>&1 || true
+  done
+done
 FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
 if [ "${FREE_GB:-0}" -lt 12 ]; then
   echo "!! only ${FREE_GB} GB free on / (need 12): not building. Free space first; production is untouched." >&2
