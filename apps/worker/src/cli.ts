@@ -11,7 +11,8 @@ import { triageSystemPrompt, triageUserPrompt } from './prompts/triage.js'
 import { logger } from './logger.js'
 import { Queue } from 'bullmq'
 import { buildRouter, createConnection } from './queues.js'
-import { queueHeroBackfill, backfillRealPhotos } from './pipeline/hero-backfill.js'
+import { queueHeroBackfill, backfillRealPhotos, type HeroProblem } from './pipeline/hero-backfill.js'
+import { genericScene, m3Generator } from './pipeline/m3-hero.js'
 
 const cmd = process.argv[2]
 
@@ -41,6 +42,11 @@ async function run() {
       dryRun: process.argv.includes('--dry-run'),
       mediaBase: env.PUBLIC_MEDIA_URL ?? env.PAYLOAD_URL,
       cdnBase: env.MEDIA_CDN_URL,
+      // --ai: stories with no real photo get a labelled M3 scene instead of keeping the branded card
+      ...(process.argv.includes('--ai') && m3Generator('', 'cli')
+        ? { generate: async (a: { id: string; title: string; category: string }) => (await m3Generator(genericScene(a.title, a.category), `cli_${a.id}`)?.()) ?? null }
+        : {}),
+      ...(arg('only') ? { only: arg('only')!.split(',') as HeroProblem[] } : {}),
     })
     console.log(JSON.stringify({ ...res, items: undefined }, null, 1))
     console.log(JSON.stringify(res.items))

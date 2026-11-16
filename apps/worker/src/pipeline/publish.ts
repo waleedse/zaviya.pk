@@ -17,6 +17,7 @@ import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 import { CARD_VERSION } from './card-version.js'
 import { HERO_BACKFILL_JOB, type HeroBackfillData } from './hero-backfill.js'
 import { ensureHeroMedia } from './hero-photo.js'
+import { genericScene, m3Generator } from './m3-hero.js'
 
 /** Google News / Trends items carry the real outlet in the title ("Headline - Dawn"). */
 const HOST_NAMES: Record<string, string> = {
@@ -461,7 +462,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
       category,
       slug: data.write.en.slug,
       breaking: data.priority === 'breaking',
-    }).catch(() => null)
+    }, {}, m3Generator(data.write.en.imageBrief || genericScene(data.write.en.title, category), data.clusterId)).catch(() => null)
     if (hero) {
       heroMediaId = hero.id
       if (hero.kind === 'card') heroFallback = true

@@ -1,13 +1,14 @@
 import type { Queue } from 'bullmq'
-import { fluxCreds, type WorkerEnv } from '../config.js'
+import type { WorkerEnv } from '../config.js'
 import type { PayloadClient } from '../payload-client.js'
 import type { BridgeServer } from '../bridge/server.js'
 import { logger } from '../logger.js'
 import { generateHeroViaExtension, geminiAccounts, AI_MEDIA, absoluteMediaUrl } from './media.js'
-import { geminiPrompt, generateHeroViaWorkersAI } from './flux.js'
+import { geminiPrompt } from './flux.js'
 import { findHeroImage, uploadHeroPhoto, uploadBrandCard, heroKindOf, type HeroInput } from './hero-photo.js'
 import type { RealPhoto } from './real-photo.js'
 import { combatReason, documentNameReason, documentPixelReason } from './photo-qa.js'
+import { genericScene, m3Generator } from './m3-hero.js'
 
 /**
  * Stories that went out without a hero image (or with only the branded text card) get one
@@ -93,11 +94,10 @@ export async function processHeroBackfill(
     return
   }
   // No real photo: AI illustrations only when switched on (off since 13 Nov 2026); otherwise look again later, then keep the branded card.
+  // 17 Nov: our M3 first (free, always on), then Gemini on the laptop. Paid FLUX is no longer tried here.
+  const m3 = m3Generator(brief, clusterId)
   const blob = deps.env.AI_HERO_IMAGES
-    ? ((await generateHeroViaWorkersAI(brief, {
-        ...fluxCreds(deps.env),
-        clusterId,
-      })) ?? (await generateHeroViaExtension(geminiPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0])))
+    ? ((m3 ? await m3() : null) ?? (await generateHeroViaExtension(geminiPrompt(brief), deps.bridge, clusterId, geminiAccounts(deps.env.GEMINI_WEB_ACCOUNT)[0])))
     : null
   if (!blob) {
     const tries = (data.tries ?? 0) + 1
@@ -142,6 +142,8 @@ interface RecentArticle {
 export type HeroProblem = 'missing' | 'ai' | 'document' | 'combat' | 'card'
 
 export interface HeroFixResult {
+  /** Stories that got a labelled M3 AI scene because no real photo exists */
+  aiScene?: number
   scanned: number
   /** Stories whose hero is missing, AI-generated, a document/screenshot, or the branded card (card: only upgraded when a photo is found) */
   candidates: number
@@ -153,7 +155,7 @@ export interface HeroFixResult {
   failed: number
   /** Headlines for which no real photo could be found */
   noPhoto: string[]
-  items: { id: string; title: string; views: number; problem?: HeroProblem; status: 'commons' | 'openverse' | 'card' | 'unchanged' | 'failed' | 'would-try'; file?: string; credit?: string; reason?: string; oldMediaId?: string }[]
+  items: { id: string; title: string; views: number; problem?: HeroProblem; status: 'commons' | 'openverse' | 'ai' | 'card' | 'unchanged' | 'failed' | 'would-try'; file?: string; credit?: string; reason?: string; oldMediaId?: string }[]
 }
 
 type FetchImage = (m: HeroMedia) => Promise<{ bytes: Buffer; mime: string } | null>
@@ -202,6 +204,8 @@ export async function backfillRealPhotos(
     card?: typeof uploadBrandCard
     /** Only these problems (the sweep passes ['missing']) */
     only?: HeroProblem[]
+    /** No real photo: a labelled AI scene (M3) for this story instead of the branded card */
+    generate?: (a: { id: string; title: string; dek?: string; category: string }) => Promise<Blob | null>
   } = {},
 ): Promise<HeroFixResult> {
   const days = opts.days ?? 7
@@ -272,7 +276,15 @@ export async function backfillRealPhotos(
         logger.info({ articleId: id, newMediaId: uploaded.id, oldMediaId: old, kind, file: real.meta.file }, 'hero fix backfill: hero replaced with a real photo')
       } else {
         out.noPhoto.push(title)
-        if (problem === 'card') {
+        const slugOf = typeof a.category === 'object' && a.category?.slug ? a.category.slug : 'pakistan'
+        const ai = opts.generate && problem !== 'ai' ? await opts.generate({ id, title, dek: a.dek, category: slugOf }).catch(() => null) : null
+        if (ai) {
+          const up = await payload.uploadMedia(ai, { alt: title, ...AI_MEDIA, filename: `article-${id}-hero` })
+          await payload.request('PATCH', `/api/articles/${id}?locale=en`, { heroImage: Number(up.id) })
+          out.aiScene = (out.aiScene ?? 0) + 1
+          out.items.push({ ...item, status: 'ai' })
+          logger.info({ articleId: id, newMediaId: up.id, oldMediaId: old, problem }, 'hero fix backfill: no real photo, M3 AI scene')
+        } else if (problem === 'card') {
           out.unchanged++
           out.items.push({ ...item, status: 'unchanged' })
         } else {
@@ -306,7 +318,11 @@ export async function sweepMissingHeroes(payload: PayloadClient): Promise<HeroFi
   if (sweeping) return null
   sweeping = true
   try {
-    const res = await backfillRealPhotos(payload, { days: 2, only: ['missing'], pauseMs: 500 })
+    // 17 Nov: cards are upgraded too (real photo, else an M3 scene), 4 per run so the M3 is never flooded
+    const gen = m3Generator('', 'sweep')
+      ? async (a: { id: string; title: string; category: string }) => (await m3Generator(genericScene(a.title, a.category), `sweep_${a.id}`)?.()) ?? null
+      : undefined
+    const res = await backfillRealPhotos(payload, { days: 2, only: gen ? ['missing', 'card'] : ['missing'], pauseMs: 500, limit: gen ? 4 : undefined, generate: gen })
     if (res.candidates) logger.warn({ fixed: res.replacedCommons + res.replacedOpenverse + res.brandedCard, failed: res.failed }, 'hero sweep: published stories had no hero')
     return res
   } finally {

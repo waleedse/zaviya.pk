@@ -20,7 +20,7 @@ export interface HeroFinders {
   openverse?: (input: HeroInput, accept: (p: RealPhoto) => boolean) => Promise<RealPhoto | null>
 }
 
-export type HeroKind = 'commons' | 'openverse' | 'card'
+export type HeroKind = 'commons' | 'openverse' | 'ai' | 'card'
 
 export function heroKindOf(photo: RealPhoto): 'commons' | 'openverse' {
   return photo.meta.provider === 'openverse' ? 'openverse' : 'commons'
@@ -88,6 +88,8 @@ export async function ensureHeroMedia(
   payload: PayloadClient,
   input: HeroInput & { category: string; slug?: string; breaking?: boolean },
   finders: HeroFinders = {},
+  /** No real photo: a labelled AI scene (our M3) before falling back to the branded card */
+  generate?: () => Promise<Blob | null>,
 ): Promise<{ id: string; kind: HeroKind } | null> {
   const name = input.slug ?? input.title
   try {
@@ -99,6 +101,17 @@ export async function ensureHeroMedia(
     }
   } catch (e) {
     logger.warn({ err: e instanceof Error ? e.message : e, title: input.title }, 'hero guard: real photo upload failed')
+  }
+  if (generate) {
+    try {
+      const blob = await generate()
+      if (blob) {
+        const up = await payload.uploadMedia(blob, { alt: input.title, license: 'ai-generated', isAiGenerated: true, credit: 'Zaviya (AI-generated image)', filename: `${name}-hero` })
+        return { id: String(up.id), kind: 'ai' }
+      }
+    } catch (e) {
+      logger.warn({ err: e instanceof Error ? e.message : e, title: input.title }, 'hero guard: AI scene failed')
+    }
   }
   try {
     const up = await uploadBrandCard(payload, { title: input.title, dek: input.dek, category: input.category, breaking: input.breaking }, `${name}-card`)
