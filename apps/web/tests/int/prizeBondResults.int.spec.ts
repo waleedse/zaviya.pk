@@ -50,6 +50,21 @@ describe('prize bond results', () => {
     expect(parseDrawLinks(html).map((l) => l.date)).toEqual(['2026-05-15', '2026-02-16'])
     const named = `<a href="https://savings.gov.pk/wp-content/uploads/2026/08/100_170826.txt" target="_blank">100_170826_Txt</a><a href="https://savings.gov.pk/wp-content/uploads/2026/10/750_15102026-1.txt">x</a>`
     expect(parseDrawLinks(named).map((l) => l.date)).toEqual(['2026-10-15', '2026-08-17'])
+    // Nov 2026 naming: dashes in the file, a compact date only in the link text
+    const nov = `<a href="https://savings.gov.pk/wp-content/uploads/2026/11/1500-16-11-26.txt">1500_161126_Text File</a><a href="https://savings.gov.pk/wp-content/uploads/2026/05/DRAW-RESULT-OF-RS.1500-DENOMINATIO.txt">15-05-2026</a>`
+    expect(parseDrawLinks(nov).map((l) => l.date)).toEqual(['2026-11-16', '2026-05-15'])
+  })
+  it('reads the Nov 2026 layout: prize numbers on the heading line, third-prize heading repeated per page', () => {
+    const page = (n: string) => `108th Draw of RS. 1500/- Denomination National Prize Bonds Held on 16-11-2026\n at SBP BSC Hyderabad (1696 Prizes of RS.18,500/- each)\n${n}\n`
+    const txt = `DRAW RESULT OF RS.1500/- DENOMINATION NATIONAL PRIZE BONDS – 108th DRAW\nFirst Prize of Rs. 3,000,000/- \t\t290479\nSecond Prize of Rs. 1,000,000/- (each)\t699105\t780676\t839522\t(03 PRIZES)\n${page('NUMS')}${page('NUMS')}`.replaceAll('NUMS', '100000 100007 100014 100021 100028 100035 100042 100049 100056 100063 100070 100077 100084 100091 100098 100105 100112 100119 100126 100133 100140 100147 100154 100161 100168 100175 100182 100189 100196 100203')
+    const r = parseDrawText(txt, 1500, '2026-11-16', 'x')!
+    expect(r.drawNo).toBe(108)
+    expect(r.tiers.map((t) => [t.amount, t.numbers.length])).toEqual([
+      [3_000_000, 1],
+      [1_000_000, 3],
+      [18_500, 60],
+    ])
+    expect(r.tiers[0]!.numbers).toEqual(['290479'])
   })
   it('restores leading zeros the official file lost on a numbers-only line', () => {
     const t = rs1500.replace('026284      355420        407321', '7447\t827353\t876615')

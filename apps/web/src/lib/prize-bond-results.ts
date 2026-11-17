@@ -51,9 +51,14 @@ function dateFromText(text: string): string | null {
   return d ? isoDate(Number(d[1]), Number(d[2]), Number(d[3])) : null
 }
 
-/** Newer files are named by date only: 100_170826.txt, 750_15102026-1.txt (link text "100_170826_Txt") */
-function dateFromFile(url: string): string | null {
-  const d = /_(\d{2})(\d{2})(\d{4}|\d{2})(?=\D)/.exec(url.split('/').pop() ?? '')
+/**
+ * Newer files are named by date only: 100_170826.txt, 750_15102026-1.txt (link text "100_170826_Txt"), and since
+ * Nov 2026 also 1500-16-11-26.txt (link text "1500_161126_Text File"): that draw was missed until 17 Nov while
+ * "1500 prize bond list 16 november 2026" had 10K+ searches.
+ */
+function dateFromFile(name: string): string | null {
+  const file = name.split('/').pop() ?? ''
+  const d = /_(\d{2})(\d{2})(\d{4}|\d{2})(?=\D)/.exec(file) ?? /(?<!\d)(\d{2})-(\d{2})-(\d{4}|\d{2})(?=\D|$)/.exec(file.replace(/^\d{3,4}-/, ''))
   if (!d) return null
   const y = d[3]!.length === 2 ? 2000 + Number(d[3]) : Number(d[3])
   return isoDate(Number(d[1]), Number(d[2]), y)
@@ -64,7 +69,7 @@ export function parseDrawLinks(html: string): DrawLink[] {
   const out = new Map<string, DrawLink>()
   const re = /<a[^>]+href="(https?:\/\/(?:www\.)?savings\.gov\.pk\/wp-content\/uploads\/[^"]+\.txt)"[^>]*>([^<]*)/gi
   for (const m of html.matchAll(re)) {
-    const date = dateFromText(m[2] ?? '') ?? dateFromFile(m[1]!)
+    const date = dateFromText(m[2] ?? '') ?? dateFromFile(m[1]!) ?? dateFromFile(m[2] ?? '')
     if (!date) continue
     if (!out.has(date)) out.set(date, { date, url: m[1]! })
   }
@@ -93,8 +98,13 @@ export function parseDrawText(text: string, denomination: ResultDenomination, da
       const d = /(\d{2,3})\s*(?:st|nd|rd|th)?\s*draw/i.exec(line) ?? /draw\s*(?:no\.?)?\s*(\d{2,3})\b/i.exec(line)
       if (d && /draw/i.test(line) && !/prize of/i.test(line)) drawNo = Number(d[1])
     }
-    if (/prize/i.test(line) && /Rs/i.test(line)) {
-      tiers.push({ rank: tiers.length + 1, amount: amountOf(line), numbers: [] })
+    if (/prize/i.test(line) && /Rs/i.test(line) && !/prize\s+bonds?\b/i.test(line)) {
+      const amount = amountOf(line)
+      const last = tiers[tiers.length - 1]
+      // The Nov 2026 lists repeat the third-prize heading on every page: same amount = same tier
+      if (!last || last.amount !== amount) tiers.push({ rank: tiers.length + 1, amount, numbers: [] })
+      // and print the first and second prize numbers on the heading line itself
+      for (const n of line.match(/(?<![\d,.-])\d{6}(?![\d,.-])/g) ?? []) tiers[tiers.length - 1]!.numbers.push(n)
       continue
     }
     const tier = tiers[tiers.length - 1]
