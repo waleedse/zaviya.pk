@@ -427,8 +427,13 @@ export function pickCredible(
 const OFFICIAL_IS_ENOUGH = /\b(weather|rain|rainfall|forecast|temperature|heatwave|heat wave|cold wave|fog|monsoon|pmd|met office|fbr|sbp|policy rate|nadra|pta|ogra|bisp|hec|ppsc|fpsc|datesheet|date sheet)\b/i
 
 /** The bar for ingesting: 2+ items and 2+ distinct outlets, or an official item plus one more; one official item alone for weather and government data. */
-export function enoughSources(picks: Pick2[], term = ''): boolean {
+/** 18 Nov: "saqib khan" (50K) and "india pakistan football match" (50K) were dropped with one Dawn/Geo-level report each */
+export const BIG_TREND_ONE_SOURCE = 20_000
+
+export function enoughSources(picks: Pick2[], term = '', volume = 0): boolean {
   if (picks.length === 1 && picks[0]!.match.official && OFFICIAL_IS_ENOUGH.test(expandCricketShorthand(term))) return true
+  // A very big search with one tier-1 outlet: write it (attributed to that outlet) rather than miss it
+  if (volume >= BIG_TREND_ONE_SOURCE && picks.some((p) => p.match.official || p.match.source.trustTier === 1)) return true
   if (picks.length < 2) return false
   return new Set(picks.map((p) => p.match.source.id)).size >= 2 || picks.some((p) => p.match.official)
 }
@@ -598,8 +603,8 @@ export async function runTrendGap(deps: TrendGapDeps): Promise<TrendGapRun> {
     }
 
     const picks = pickCredible(topic.term, batches, sources, official ?? null, now())
-    if (!enoughSources(picks, topic.term)) {
-      await done('no-credible-source', `${picks.length} credible item(s) found, 2+ from different outlets needed`)
+    if (!enoughSources(picks, topic.term, topic.volume)) {
+      await done('no-credible-source', `${picks.length} credible item(s) found, 2+ from different outlets needed (or one tier-1 outlet at ${BIG_TREND_ONE_SOURCE / 1000}K+ searches)`)
       continue
     }
 

@@ -180,6 +180,12 @@ describe('source filtering', () => {
     expect(enoughSources(sameOutlet)).toBe(false)
     const withOfficial = pickCredible(term, [{ hits: [hit('Pakistan U19 beat Bangladesh U19', 'Dawn', 'www.dawn.com'), hit('Pakistan U19 win over Bangladesh U19 report', 'ACC', 'www.pcb.com.pk')], lang: 'en' }], SOURCES, OFFICIAL, NOW)
     expect(enoughSources(withOfficial)).toBe(true)
+    // 18 Nov: one tier-1 outlet is enough for a 20K+ search, never for a small one or a tier-2 outlet
+    const tier1 = [{ ...one[0]!, match: { ...one[0]!.match, official: false, source: { ...one[0]!.match.source, trustTier: 1 } } }]
+    const tier2 = [{ ...one[0]!, match: { ...one[0]!.match, official: false, source: { ...one[0]!.match.source, trustTier: 2 } } }]
+    expect(enoughSources(tier1 as never, 'saqib khan', 50_000)).toBe(true)
+    expect(enoughSources(tier1 as never, 'saqib khan', 5_000)).toBe(false)
+    expect(enoughSources(tier2 as never, 'saqib khan', 50_000)).toBe(false)
   })
   it('marks ingested items so triage sees a trend hit, and stores only title, link and outlet', () => {
     const picks = pickCredible(term, [{ hits: [hit('Pakistan U19 beat Bangladesh U19', 'Dawn', 'www.dawn.com'), hit('Pakistan U19 win over Bangladesh U19', 'Geo News', 'www.geo.tv')], lang: 'en' }], SOURCES, OFFICIAL, NOW)
