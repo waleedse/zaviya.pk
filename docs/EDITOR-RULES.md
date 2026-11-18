@@ -75,7 +75,7 @@ The editor runs every 30 minutes by day (every 60 minutes between 01:00 and 07:0
 - Headline: states the news, under 110 characters, contains the term Pakistanis search for it, no outlet name.
 - Facts and quotes: each one is in a source listed on the article; quotes are word for word.
 - Context: the first two lines say who, what, why it matters to a Pakistani reader, what happens next.
-- Picture: open it. It must be a real free-licence photo of the subject or topic, or a labelled AI scene that
+- Picture: open it and look at it (download it and view the file; a file name or credit is not a check). It must be a real free-licence photo of the subject or topic, or a labelled AI scene that
   shows nothing the story did not say. Wrong person, wrong place, wrong country, a document screenshot, a logo,
   a text card or a placeholder tile = order a new one (`/api/pipeline/reimage/<id>`, with a scene brief).
 - Category, tags and hashtags: real names and the searched terms; no outlet names; never only `#PakistanNews`.
