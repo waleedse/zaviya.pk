@@ -15,7 +15,9 @@ export interface EngineRun {
   output: string
 }
 
-const LIMIT_PATTERN = /usage limit|rate limit|limit reached|quota|too many requests|\b429\b|out of (?:fast )?requests/i
+// 19 Nov: the Claude CLI says "You've hit your weekly limit · resets 7am (UTC)", which the old pattern missed, so the claude
+// engine never rested and failed every 30-minute editor cycle from 08:08 to 11:38 PKT.
+export const LIMIT_PATTERN = /usage limit|rate limit|limit reached|quota|too many requests|\b429\b|out of (?:fast )?requests|you['\u2019]ve hit your [a-z ]{0,15}limit/i
 
 export class Engines {
   private readonly stateFile: string
@@ -112,9 +114,19 @@ export class Engines {
   }
 }
 
-export function parseReset(text: string): number | null {
+export function parseReset(text: string, now = Date.now()): number | null {
   const epoch = text.match(/\|(\d{10})\b/)
   if (epoch) return Number(epoch[1]) * 1000
+  // "resets 7am (UTC)" / "resets 7:30pm (UTC)": the next time that clock reads
+  const clock = text.match(/resets\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*\((?:UTC|GMT)\)/i)
+  if (clock) {
+    let h = Number(clock[1]) % 12
+    if (clock[3]!.toLowerCase() === 'pm') h += 12
+    const d = new Date(now)
+    d.setUTCHours(h, Number(clock[2] ?? 0), 0, 0)
+    if (d.getTime() <= now) d.setUTCDate(d.getUTCDate() + 1)
+    return d.getTime()
+  }
   const iso = text.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z)/)
   return iso ? Date.parse(iso[1]!) || null : null
 }
