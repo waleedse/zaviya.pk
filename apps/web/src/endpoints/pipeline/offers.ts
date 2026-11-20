@@ -18,7 +18,7 @@ interface ApplianceKey {
 let cache: { at: number; phones: PhoneKey[]; appliances: ApplianceKey[] } | null = null
 const CACHE_MS = 10 * 60_000
 
-async function keys(req: PayloadRequest) {
+export async function keys(req: PayloadRequest) {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache
   const rows = (async (q: ReturnType<typeof sql>) => ((await req.payload.db.drizzle.execute(q)) as unknown as { rows?: Record<string, string>[] }).rows ?? [])
   const phones = (await rows(sql`SELECT p.slug, p.name, b.name AS brand FROM phones p JOIN phone_brands b ON b.id = p.brand_id WHERE coalesce(p.hidden, false) = false`)).map((r) => ({ slug: r.slug!, name: r.name!, brand: r.brand! }))
