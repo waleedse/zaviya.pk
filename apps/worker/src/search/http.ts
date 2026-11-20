@@ -24,3 +24,24 @@ export async function politeJson<T>(url: string, opts: { timeoutMs?: number } = 
     return { ok: false, status: 0, error: String((e as Error).message).slice(0, 120) }
   }
 }
+
+/** Same politeness as politeJson, for HTML and XML */
+export async function politeText(url: string, opts: { timeoutMs?: number } = {}): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string }> {
+  let host: string
+  try {
+    host = new URL(url).host
+  } catch {
+    return { ok: false, status: 0, error: 'bad url' }
+  }
+  if (!(await isAllowedByRobots(url, ZAVIYA_USER_AGENT))) return { ok: false, status: 0, error: 'robots.txt disallows' }
+  const wait = (lastHit.get(host) ?? 0) + HOST_DELAY_MS - Date.now()
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+  lastHit.set(host, Date.now())
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': ZAVIYA_USER_AGENT, Accept: 'text/html,application/xml,*/*' }, redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000) })
+    if (!res.ok) return { ok: false, status: res.status, error: `http ${res.status}` }
+    return { ok: true, text: (await res.text()).slice(0, 3_000_000) }
+  } catch (e) {
+    return { ok: false, status: 0, error: String((e as Error).message).slice(0, 120) }
+  }
+}

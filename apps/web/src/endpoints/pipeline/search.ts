@@ -161,7 +161,7 @@ const HostsBody = z.object({ hosts: z.array(z.object({ host: z.string().max(120)
 const ResultBody = z.object({
   host: z.string(),
   state: z.enum(['candidate', 'probing', 'active', 'rejected', 'paused']).optional(),
-  platform: z.enum(['shopify', 'woo']).optional(),
+  platform: z.enum(['shopify', 'woo', 'jsonld']).optional(),
   page: z.number().int().min(1).max(5000).optional(),
   cycleDone: z.boolean().optional(),
   listings: z.number().int().min(0).optional(),
