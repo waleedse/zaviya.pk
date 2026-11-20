@@ -70,6 +70,8 @@ export const BridgeJobSchema = z.discriminatedUnion('type', [
   z.object({ id: z.string(), type: z.literal('instagram.post'), payload: z.object({ caption: z.string(), mediaUrls: z.array(z.string()).min(1) }) }),
   z.object({ id: z.string(), type: z.literal('gemini.image'), payload: z.object({ prompt: z.string(), account: z.string().optional() }) }),
   z.object({ id: z.string(), type: z.literal('x.search'), payload: z.object({ query: z.string(), limit: z.number().int().max(50).default(20) }) }),
+  /** Product-search store discovery: one Google search in the owner's own Chrome, returns the result links (docs/PRODUCT-SEARCH.md section 11) */
+  z.object({ id: z.string(), type: z.literal('web.search'), payload: z.object({ query: z.string().max(200) }) }),
   z.object({ id: z.string(), type: z.literal('x.trending'), payload: z.object({}).default({}) }),
   z.object({ id: z.string(), type: z.literal('instagram.readProfile'), payload: z.object({ username: z.string(), limit: z.number().int().max(24).default(9) }) }),
   /**

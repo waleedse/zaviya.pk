@@ -80,3 +80,40 @@ export async function seedFromSearchApi(deps: { request: Request; kv: Kv }) {
     return 0
   }
 }
+
+/**
+ * Searches in the owner's own Chrome through the extension bridge (web.search): one query at a time, never more than 60 a day, a random pause before each.
+ * A CAPTCHA or consent page stops it for 6 hours. Only the domains of the result links are kept; every domain is probed before it counts as a store.
+ */
+interface Bridge {
+  isOnline(): boolean
+  send(job: { id: string; type: 'web.search'; payload: { query: string } }, timeoutMs?: number): Promise<unknown>
+}
+export async function seedFromBrowser(deps: { request: Request; kv: Kv; bridge: Bridge }) {
+  if (!deps.bridge.isOnline()) return 0
+  const now = Date.now()
+  if (Number((await deps.kv.get('zaviya:search:gblock')) ?? '0') > now) return 0
+  const day = new Date().toISOString().slice(0, 10)
+  const used = JSON.parse((await deps.kv.get('zaviya:search:gcount')) ?? '{}') as { day?: string; n?: number }
+  const n = used.day === day ? (used.n ?? 0) : 0
+  if (n >= 60) return 0
+  const w = await deps.request<{ labels: string[] }>('GET', '/api/pipeline/search/work?labels=15', undefined, { timeoutMs: 30_000 })
+  const terms = [...OFFER_GROUPS.map((g) => g.name.toLowerCase()), ...w.labels]
+  const term = terms[Math.floor(Math.random() * terms.length)]!
+  const templates = ['buy {t} online Pakistan', '{t} price in Pakistan online store', 'best {t} shop Pakistan cash on delivery']
+  const query = templates[Math.floor(Math.random() * templates.length)]!.replace('{t}', term)
+  await deps.kv.set('zaviya:search:gcount', JSON.stringify({ day, n: n + 1 }))
+  await new Promise((r) => setTimeout(r, 5_000 + Math.random() * 25_000))
+  try {
+    const res = (await deps.bridge.send({ id: `gs_${now}`, type: 'web.search', payload: { query } }, 90_000)) as { links?: string[] }
+    const hosts = [...new Set((res.links ?? []).map(hostOf).filter((h): h is string => Boolean(h)))]
+    if (hosts.length) await deps.request('POST', '/api/pipeline/search/hosts', { hosts: hosts.map((host) => ({ host, source: 'google' })) }, { timeoutMs: 30_000 })
+    logger.info({ query, hosts: hosts.length }, 'search seed: browser search')
+    return hosts.length
+  } catch (e) {
+    const msg = String((e as Error).message)
+    if (/captcha|consent/.test(msg)) await deps.kv.set('zaviya:search:gblock', String(now + 6 * 3_600_000))
+    logger.warn({ query, err: msg }, 'search seed: browser search failed')
+    return 0
+  }
+}

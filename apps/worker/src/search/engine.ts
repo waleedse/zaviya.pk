@@ -1,6 +1,6 @@
 import { logger } from '../logger.js'
 import { politeJson } from './http.js'
-import { seedFromCommonCrawl, seedFromSearchApi } from './seed.js'
+import { seedFromBrowser, seedFromCommonCrawl, seedFromSearchApi } from './seed.js'
 import { parseShopify, parseWoo, type Listing } from './parsers.js'
 
 /**
@@ -17,7 +17,7 @@ interface Kv {
 }
 
 const PAGE = 250
-const MAX_PAGES_PER_TICK = 6
+const MAX_PAGES_PER_TICK = 8
 export const SEARCH_TICK_MS = 60_000
 const TICK_BUDGET_MS = 50_000
 
@@ -66,10 +66,10 @@ export async function crawlPages(h: CrawlHost, name: string, deadline: number, r
   return { page, listings, cycleDone: false }
 }
 
-export async function runSearchTick(deps: { request: Request; kv: Kv }) {
+export async function runSearchTick(deps: { request: Request; kv: Kv; bridge?: Parameters<typeof seedFromBrowser>[0]['bridge'] }) {
   const deadline = Date.now() + TICK_BUDGET_MS
   const { request } = deps
-  const work = await request<{ probe: ProbeHost[]; crawl: (CrawlHost & { name?: string })[] }>('GET', '/api/pipeline/search/work?probe=8&crawl=4', undefined, { timeoutMs: 30_000 })
+  const work = await request<{ probe: ProbeHost[]; crawl: (CrawlHost & { name?: string })[] }>('GET', '/api/pipeline/search/work?probe=8&crawl=10', undefined, { timeoutMs: 30_000 })
   const out = { probed: 0, activated: 0, crawled: 0, listings: 0, errors: 0 }
   const jobs: Promise<void>[] = []
   jobs.push(
@@ -103,6 +103,8 @@ export async function runSearchTick(deps: { request: Request; kv: Kv }) {
   await deps.kv.set('zaviya:search:tick', String(tick))
   if (tick % 5 === 0) jobs.push(seedFromCommonCrawl(deps).then(() => {}))
   if (tick % 20 === 0) jobs.push(seedFromSearchApi(deps).then(() => {}))
+  // browser searches: about one every 20 minutes at most (the seed itself caps 60 a day)
+  if (deps.bridge && tick % 20 === 10) jobs.push(seedFromBrowser({ ...deps, bridge: deps.bridge }).then(() => {}))
   await Promise.all(jobs)
   logger.info(out, 'product search tick')
   return out
