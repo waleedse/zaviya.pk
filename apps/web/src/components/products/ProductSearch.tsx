@@ -13,6 +13,7 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
   const [q, setQ] = useState(initialQuery)
   const [sort, setSort] = useState('')
   const [store, setStore] = useState('')
+  const [cat, setCat] = useState('')
   const [stock, setStock] = useState(false)
   const [res, setRes] = useState<Res | null>(null)
   const [busy, setBusy] = useState(false)
@@ -26,6 +27,7 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
         const p = new URLSearchParams({ q, limit: '24' })
         if (sort) p.set('sort', sort)
         if (store) p.set('store', store)
+        if (cat) p.set('cat', cat)
         if (stock) p.set('stock', '1')
         const r = await fetch(`/api/search?${p}`)
         const j = (await r.json()) as Res
@@ -41,9 +43,10 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
       window.history.replaceState(null, '', u)
     }, 80)
     return () => clearTimeout(t)
-  }, [q, sort, store, stock])
+  }, [q, sort, store, stock, cat])
 
   const stores = Object.entries(res?.facets?.stores ?? {}).sort((a, b) => b[1] - a[1])
+  const cats = Object.entries(res?.facets?.category_path ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 40)
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <h1 className="mb-3 text-2xl font-bold">Search any product in Pakistan</h1>
@@ -60,6 +63,12 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
           <option value="">Best match</option>
           <option value="price">Cheapest first</option>
           <option value="drop">Biggest price drop</option>
+        </select>
+        <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded border px-2 py-1" aria-label="Category">
+          <option value="">All categories</option>
+          {cats.map(([c, n]) => (
+            <option key={c} value={c}>{c} ({n})</option>
+          ))}
         </select>
         <select value={store} onChange={(e) => setStore(e.target.value)} className="rounded border px-2 py-1" aria-label="Store">
           <option value="">All stores</option>

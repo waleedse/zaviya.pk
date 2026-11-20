@@ -20,6 +20,8 @@ export async function GET(request: Request) {
   const group = clean(sp.get('group'))
   const store = clean(sp.get('store'))
   const brand = clean(sp.get('brand'))
+  const cat = clean(sp.get('cat'), 120)
+  if (cat) filter.push(`category_path = "${cat}"`)
   if (group) filter.push(`group = "${group}"`)
   if (store) filter.push(`stores = "${store}"`)
   if (brand) filter.push(`brand = "${brand}"`)
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
           offset,
           filter: filter.length ? filter : undefined,
           sort: SORTS[sp.get('sort') ?? ''],
-          facets: ['group', 'stores', 'brand'],
+          facets: ['category_path', 'stores', 'brand'],
           attributesToRetrieve: ['id', 'title', 'brand', 'group', 'image', 'image_store', 'offers', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'price_drop_pct', 'match_kind', 'match_slug'],
         },
         2500,

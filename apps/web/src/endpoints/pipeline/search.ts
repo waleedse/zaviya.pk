@@ -1,7 +1,7 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 import { z } from 'zod'
-import { PRODUCTS_INDEX, docId, offerGroup, offerSlug, productKey, productsIndexSettings, type ProductDoc } from '@zaviya/shared'
+import { PRODUCTS_INDEX, categorize, categoryLevels, docId, offerGroup, offerSlug, productKey, productsIndexSettings, type ProductDoc } from '@zaviya/shared'
 import { keys as matchKeys, matchOffer } from './offers'
 import { meili, meiliConfigured, waitTask } from '@/lib/search/meili'
 import { discoveryReport, searchStatus } from '@/lib/search/status'
@@ -77,6 +77,7 @@ export function buildDoc(key: string, rows: Row[], storeName: (slug: string) => 
     brand: (best.brand as string | null) ?? null,
     model: (best.model as string | null) ?? null,
     group: String(best.group),
+    category_path: categoryLevels(((best.cat as string | null) ?? null) === 'Other' ? null : ((best.cat as string | null) ?? null)),
     image: (withImage?.image_url as string | null) ?? null,
     image_store: withImage ? String(withImage.store) : null,
     offers,
@@ -99,6 +100,12 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
   await ensureIndex()
   const nameMap = await loadNames(req)
   if (opts.reindex) await run(req, sql`UPDATE store_offers SET search_synced_at = NULL`)
+  // classify listings that have no category yet (rules only, 2 batches per call); changed rows are sent to the index again
+  for (let i = 0; i < 2; i++) {
+    const todo = await run(req, sql`SELECT id, title, category_path FROM store_offers WHERE cat IS NULL ORDER BY id LIMIT 2000`)
+    if (!todo.length) break
+    await run(req, sql`UPDATE store_offers o SET cat = v.c, search_synced_at = NULL FROM (VALUES ${sql.join(todo.map((r) => sql`(${Number(r.id)}::int, ${categorize(String(r.title), String(r.category_path ?? '')) ?? 'Other'}::text)`), sql`, `)}) AS v(id, c) WHERE o.id = v.id`)
+  }
   let docs = 0
   let removed = 0
   let rowsDone = 0
@@ -111,7 +118,7 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
     await run(req, sql`UPDATE store_offers o SET product_key = v.k FROM (VALUES ${sql.join(keyed.map((k) => sql`(${k.id}::int, ${k.key}::text)`), sql`, `)}) AS v(id, k) WHERE o.id = v.id AND o.product_key IS DISTINCT FROM v.k`)
     const all = await run(
       req,
-      sql`SELECT slug, store, title, brand, model, "group", url, image_url, price_pkr, list_price_pkr, prev_price_pkr, price_changed_at, in_stock, match_kind, match_slug, seen_at, product_key FROM store_offers WHERE product_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) AND price_pkr IS NOT NULL AND seen_at > now() - ${`${FRESH_DAYS} days`}::interval`,
+      sql`SELECT slug, store, title, brand, model, "group", cat, url, image_url, price_pkr, list_price_pkr, prev_price_pkr, price_changed_at, in_stock, match_kind, match_slug, seen_at, product_key FROM store_offers WHERE product_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) AND price_pkr IS NOT NULL AND seen_at > now() - ${`${FRESH_DAYS} days`}::interval`,
     )
     const byKey = new Map<string, Row[]>()
     for (const r of all) byKey.set(r.product_key, [...(byKey.get(r.product_key) ?? []), r])
@@ -280,12 +287,12 @@ export const searchEndpoints: Endpoint[] = [
       const rows = [...bySlug.values()].map((it) => {
         const group = offerGroup(it.title, it.productType ?? '')
         const m = matchOffer({ title: it.title, brand: it.brand, group, model: it.model }, k)
-        return sql`(${it.slug}, ${store}, ${it.title}, ${it.brand ?? null}, ${group}, ${it.url}, ${it.imageUrl ?? null}, ${it.pricePkr}::numeric, ${it.listPricePkr ?? null}::numeric, ${it.inStock ?? null}::boolean, ${it.model ?? null}, ${m?.kind ?? null}, ${m?.slug ?? null}, ${it.productType ?? null}, ${it.gtin ?? null})`
+        return sql`(${it.slug}, ${store}, ${it.title}, ${it.brand ?? null}, ${group}, ${it.url}, ${it.imageUrl ?? null}, ${it.pricePkr}::numeric, ${it.listPricePkr ?? null}::numeric, ${it.inStock ?? null}::boolean, ${it.model ?? null}, ${m?.kind ?? null}, ${m?.slug ?? null}, ${it.productType ?? null}, ${it.gtin ?? null}, ${categorize(it.title, it.productType ?? '') ?? 'Other'})`
       })
       const res = await run(
         req,
-        sql`INSERT INTO store_offers (slug, store, title, brand, "group", url, image_url, price_pkr, list_price_pkr, in_stock, model, match_kind, match_slug, category_path, gtin, seen_at, first_seen_at, price_changed_at, updated_at, created_at)
-          SELECT v.*, now(), now(), now(), now(), now() FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(slug, store, title, brand, grp, url, image_url, price, list_price, in_stock, model, match_kind, match_slug, category_path, gtin)
+        sql`INSERT INTO store_offers (slug, store, title, brand, "group", url, image_url, price_pkr, list_price_pkr, in_stock, model, match_kind, match_slug, category_path, gtin, cat, seen_at, first_seen_at, price_changed_at, updated_at, created_at)
+          SELECT v.*, now(), now(), now(), now(), now() FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(slug, store, title, brand, grp, url, image_url, price, list_price, in_stock, model, match_kind, match_slug, category_path, gtin, cat)
           ON CONFLICT (slug) DO UPDATE SET
             title = EXCLUDED.title, brand = EXCLUDED.brand, "group" = EXCLUDED."group", url = EXCLUDED.url,
             image_url = coalesce(EXCLUDED.image_url, store_offers.image_url),
@@ -293,7 +300,7 @@ export const searchEndpoints: Endpoint[] = [
             price_changed_at = CASE WHEN EXCLUDED.price_pkr IS DISTINCT FROM store_offers.price_pkr AND store_offers.price_pkr IS NOT NULL THEN now() ELSE store_offers.price_changed_at END,
             price_pkr = EXCLUDED.price_pkr, list_price_pkr = EXCLUDED.list_price_pkr, in_stock = EXCLUDED.in_stock, model = EXCLUDED.model,
             match_kind = EXCLUDED.match_kind, match_slug = EXCLUDED.match_slug, category_path = coalesce(EXCLUDED.category_path, store_offers.category_path),
-            gtin = coalesce(EXCLUDED.gtin, store_offers.gtin), first_seen_at = coalesce(store_offers.first_seen_at, store_offers.created_at),
+            gtin = coalesce(EXCLUDED.gtin, store_offers.gtin), cat = EXCLUDED.cat, first_seen_at = coalesce(store_offers.first_seen_at, store_offers.created_at),
             seen_at = now(),
             -- only a real change makes the row "dirty" for the Meilisearch sync (re-reading an unchanged listing costs nothing downstream)
             updated_at = CASE WHEN EXCLUDED.price_pkr IS DISTINCT FROM store_offers.price_pkr OR EXCLUDED.in_stock IS DISTINCT FROM store_offers.in_stock OR EXCLUDED.title IS DISTINCT FROM store_offers.title OR store_offers.seen_at < now() - interval '1 day' THEN now() ELSE store_offers.updated_at END
