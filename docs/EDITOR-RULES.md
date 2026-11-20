@@ -130,3 +130,14 @@ writer uses it in the headline.
 Copy another outlet's text or pictures; publish a quote that is not word for word; hold a story because the
 topic is sensitive (Waleed, 13 Nov); post something whose context it does not understand; remove a picture
 without ordering a better one.
+
+## 8. What readers actually read (14-day data, 21 Nov 2026)
+
+Pakistan pageviews, 7-14 Nov to 20 Nov: **/prices 482** (277 people, the biggest section), **education-jobs 178**, **results 175** (BISE boards), then /pakistan 71, business 53, /live 35, gold rate 35, mobile 33, prize bonds 30, namaz timings 20.
+Top single pages: a QESCO jobs-interview story (53), /prices/motorcycles (42), /prices (38), gold rate today (31), BISE Sukkur/Hyderabad results, dollar rate, egg and ghee prices.
+Meaning: people come back for **things they need to look up** (prices, rates, results, jobs dates, prayer times), not for general news. Almost all traffic is direct or internal; Google sent 12 views in 14 days.
+Editor rules from this:
+1. Every cycle, prefer pitches that are a lookup people repeat: jobs with dates/last date, board results and date sheets, price changes (bikes, cars, atta, ghee, eggs), rates, prize bonds, timings.
+2. Give those stories the same search term every time (e.g. "<board> result 2026", "<department> jobs last date") and link them from /prices, /results and the front page.
+3. Keep updating the same page instead of writing a new one for a repeat topic.
+4. Busy hours (PKT): 07-09, 13, 16, 19-23. Publish lookup stories just before.
