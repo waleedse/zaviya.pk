@@ -100,8 +100,8 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
   await ensureIndex()
   const nameMap = await loadNames(req)
   if (opts.reindex) await run(req, sql`UPDATE store_offers SET search_synced_at = NULL`)
-  // classify listings that have no category yet (rules only, 2 batches per call); changed rows are sent to the index again
-  for (let i = 0; i < 2; i++) {
+  // classify listings that have no category yet (rules only, 12 batches of 2,000 per call); changed rows are sent to the index again
+  for (let i = 0; i < 12; i++) {
     const todo = await run(req, sql`SELECT id, title, category_path FROM store_offers WHERE cat IS NULL ORDER BY id LIMIT 2000`)
     if (!todo.length) break
     await run(req, sql`UPDATE store_offers o SET cat = v.c, search_synced_at = NULL FROM (VALUES ${sql.join(todo.map((r) => sql`(${Number(r.id)}::int, ${categorize(String(r.title), String(r.category_path ?? '')) ?? 'Other'}::text)`), sql`, `)}) AS v(id, c) WHERE o.id = v.id`)
