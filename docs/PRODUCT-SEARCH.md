@@ -190,3 +190,6 @@ Index: `category_path` becomes a filterable, facetable attribute so the search p
 
 - 21 Nov: plan written. Findings: live DB is `zaviya_live2`; 13.7k offers from 3 stores already crawled; web and worker share the `zaviya_default` network, so the Meilisearch container is reachable by name.
 - 21 Nov: slice 1 merged (PR #279, tag v2026.11.21-1): Meilisearch, sync, /api/search, /products, /product/<id>. Discovery layer designed (section 11).
+- 21 Nov: PR #281 automatic engine (frontier, probe by PKR currency, Common Crawl + optional Google CSE seeding, bulk import). PR #282 owner-approved Google search in his own Chrome (max 60 a day, stops on CAPTCHA/consent), 10 stores per tick.
+- Next (owner: "use Chromium for searches and crawling"): the worker image already has Chromium + puppeteer-core. Add platform `render` for shops with no JSON feed: sitemap -> product pages -> JSON-LD Product/Offer read from the HTML, Chromium only when the HTML has none; one page at a time (~300 MB), robots.txt, ZaviyaBot user agent (never the default HeadlessChrome string spoofed to look like a person), stop on CAPTCHA. Server-side Google searching is not used: a datacenter IP is blocked at once and we do not rotate IPs.
+
