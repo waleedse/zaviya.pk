@@ -81,6 +81,23 @@ async function observe(): Promise<Observation> {
     .then((r) => r.json())
     .catch(() => ({}))) as { docs?: { publishedAt?: string }[] }
   const publishedAt = latest.docs?.[0]?.publishedAt
+  // Product search: the status endpoint answers for the same API key; null means "unknown", never a false alarm
+  const search = await fetch(`${PAYLOAD_URL}/api/pipeline/search/status`, { headers, signal: AbortSignal.timeout(20_000) })
+    .then(async (r) => {
+      if (!r.ok) return null
+      const j = (await r.json()) as { meili?: { healthy?: boolean; docs?: number; dbBytes?: number }; sync?: { last_sync_at?: string; index_docs_yesterday?: number }; offers?: { pending?: number; last_seen?: string }; hosts?: { active?: number } }
+      return {
+        healthy: j.meili?.healthy === true,
+        docs: j.meili?.docs ?? null,
+        docsYesterday: j.sync?.index_docs_yesterday ?? null,
+        pending: j.offers?.pending ?? 0,
+        lastSyncAt: j.sync?.last_sync_at ? Date.parse(j.sync.last_sync_at) : null,
+        activeHosts: j.hosts?.active ?? 0,
+        lastSeenAt: j.offers?.last_seen ? Date.parse(j.offers.last_seen) : null,
+        dbBytes: j.meili?.dbBytes ?? null,
+      }
+    })
+    .catch(() => null)
   // Container overlay shares the host root disk, so this is the server's disk
   const disk = await statfs('/').catch(() => null)
   return {
@@ -88,6 +105,7 @@ async function observe(): Promise<Observation> {
     diskUsedPct: disk ? (1 - disk.bavail / disk.blocks) * 100 : null,
     siteStatus,
     apiOk,
+    search,
     heartbeat: {
       at: settings.lastHeartbeat ? Date.parse(settings.lastHeartbeat) : null,
       queues: settings.lastHeartbeatMeta?.queues ?? {},

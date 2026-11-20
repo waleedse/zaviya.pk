@@ -78,7 +78,7 @@ export default buildConfig({
       title: 'Zaviya Admin',
     },
     components: {
-      beforeDashboard: ['/components/admin/ControlRoom#ControlRoom'],
+      beforeDashboard: ['/components/admin/ControlRoom#ControlRoom', '/components/admin/SearchStatus#SearchStatus'],
     },
     importMap: {
       baseDir: path.resolve(dirname),

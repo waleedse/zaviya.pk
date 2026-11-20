@@ -117,3 +117,24 @@ export async function seedFromBrowser(deps: { request: Request; kv: Kv; bridge: 
     return 0
   }
 }
+
+/**
+ * Brand-name seeding: the brands and vendors that stores already list (Fana, 8AM, Khaadi...) often run their own shop at brand.pk,
+ * brand.com.pk or brand.com. Each guess is only a candidate: the probe accepts it only if it sells in PKR with a public product feed.
+ * It feeds itself, because every crawled store brings new brand names. A cursor walks the alphabetical brand list.
+ */
+export async function seedFromBrands(deps: { request: Request; kv: Kv }) {
+  const offset = Number((await deps.kv.get('zaviya:search:brandcursor')) ?? '0')
+  const w = await deps.request<{ brands: string[] }>('GET', `/api/pipeline/search/work?brands=40&offset=${offset}`, undefined, { timeoutMs: 30_000 })
+  await deps.kv.set('zaviya:search:brandcursor', String(w.brands.length < 40 ? 0 : offset + 40))
+  const hosts: string[] = []
+  for (const b of w.brands) {
+    const slug = b.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (slug.length < 3) continue
+    for (const tld of ['.pk', '.com.pk', '.com']) hosts.push(`${slug}${tld}`)
+  }
+  const uniq = [...new Set(hosts)]
+  if (uniq.length) await deps.request('POST', '/api/pipeline/search/hosts', { hosts: uniq.map((host) => ({ host, source: 'brand' })) }, { timeoutMs: 60_000 })
+  logger.info({ brands: w.brands.length, candidates: uniq.length, offset }, 'search seed: brand names')
+  return uniq.length
+}
