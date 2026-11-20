@@ -22,6 +22,7 @@ export interface ProductDoc {
   brand: string | null
   model: string | null
   group: string
+  category_path: string[]
   image: string | null
   image_store: string | null
   offers: ProductOffer[]
@@ -74,7 +75,7 @@ export function searchSynonyms(): Record<string, string[]> {
 export function productsIndexSettings() {
   return {
     searchableAttributes: ['title', 'brand', 'model', 'category_path', 'stores'],
-    filterableAttributes: ['group', 'brand', 'stores', 'min_price', 'in_stock_any', 'store_count', 'price_drop_pct', 'updated_at'],
+    filterableAttributes: ['group', 'category_path', 'brand', 'stores', 'min_price', 'in_stock_any', 'store_count', 'price_drop_pct', 'updated_at'],
     sortableAttributes: ['min_price', 'popularity', 'updated_at', 'price_drop_pct', 'store_count'],
     rankingRules: ['words', 'typo', 'proximity', 'attribute', 'exactness', 'popularity:desc', 'store_count:desc'],
     typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 } },
