@@ -3,6 +3,9 @@
  * keyword rules, most specific first. Nothing is sent to an AI here; products no rule places stay "Other" and are counted, and only those few
  * (the AI budget is 1% of listings a day) are ever looked at by the capped AI step.
  */
+/** Bump when RULES change: the sync classifies every listing again */
+export const TAXONOMY_VERSION = 2
+
 const RULES: [string, RegExp][] = [
   // electronics
   ['Eyewear > Contact lenses', /\b(contact lens(es)?|lens solution|colou?red lens)\b/i],
@@ -18,8 +21,10 @@ const RULES: [string, RegExp][] = [
   ['Electronics > TVs', /\b(led tv|smart tv|android tv|oled|qled|television|tv \d{2}|\d{2}["”]? ?(tv|led))\b/i],
   ['Electronics > Cameras', /\b(cameras?|dslr|mirrorless|gopro|insta360|tripod|gimbal|drone|dji|instax|camera lens|dslr lens|lens hood)\b/i],
   ['Electronics > Gaming', /\b(ps[345]|playstation|xbox|nintendo|game ?pad|joystick|controller|gaming (chair|desk|mouse|keyboard|headset)|console)\b/i],
-  ['Electronics > Computer accessories', /\b(keyboards?|mouse|mice|monitor|router|usb hub|webcam|ssd|hard ?drive|flash drive|usb drive|memory card|sd card|ram \d|printer|ink|toner|ups\b|motherboard|graphics card|processor|cooling fan)\b/i],
-  ['Electronics > Solar & power', /\b(solar|hybrid inverter|ups inverter|ups battery|lithium battery|tubular battery|panel \d+ ?w|voltage stabilizer|generator)\b/i],
+  ['Electronics > Cameras', /\b(lens|nikkor|fujinon|f\/\d(\.\d)?|mirrorless|camera bag)\b/i],
+  ['Electronics > Projectors', /\b(projectors?|lumens|screen casting)\b/i],
+  ['Electronics > Computer accessories', /\b(keyboards?|mouse|mice|mouse pad|wrist rest|monitor|router|repeater|wifi|wi-fi|access point|d-link|tp-link|power supplies|power supply|motherboards?|graphics cards?|headset|microphone|dvd|webcam|laptop stand|usb hub|webcam|ssd|hard ?drive|flash drive|usb drive|memory card|sd card|ram \d|printer|ink|toner|ups\b|motherboard|graphics card|processor|cooling fan)\b/i],
+  ['Electronics > Solar & power', /\b(car inverter|solar|hybrid inverter|ups inverter|ups battery|lithium battery|tubular battery|panel \d+ ?w|voltage stabilizer|generator)\b/i],
   // appliances
   ['Home appliances > Air conditioners', /\b(air conditioner|split ac|inverter ac|\bac\b|\d(\.\d)? ?ton)\b/i],
   ['Home appliances > Refrigerators & freezers', /\b(refrigerators?|fridge|deep freezer|freezer)\b/i],
@@ -39,6 +44,9 @@ const RULES: [string, RegExp][] = [
   ['Home > Curtains, carpets & decor', /\b(curtains?|carpet|rug|wall (art|clock|decor)|photo frame|vase|artificial (plant|flower)|candle|decor)\b/i],
   ['Home > Lighting', /\b(led (bulb|light|strip)|bulbs?|lamp|chandelier|tube light|fairy lights|lighting)\b/i],
   // fashion
+  ['Fashion > Innerwear & nightwear', /\b(pj|pjs|pyjama|loungewear|night ?dress|night ?suit|nightwear|camisoles?|bralette|bra\b|panties|panty|thong|body shapers?|undergarments?|lingerie|innerwear|boxers?|briefs?|vest|socks?)\b/i],
+  ['Fashion > Footwear', /\b(pumps?|shoes?|sneakers?|sandals?|slippers?|chappal|khussa|boots?|heels|loafers|flip ?flops|joota|sports shoes|running shoes)\b/i],
+  ['Fashion > Women > Unstitched fabric', /\b(\d ?pc|\d ?pcs|\d[- ]piece|piece suit|ladies suit|unstitched suit|embroidered suit|eastern wear)\b/i],
   ['Fashion > Women > Unstitched fabric', /\b(unstitched|lawn|karandi|khaddar|chiffon suit|3 ?pc unstitched|2 ?pc unstitched|fabric|cambric)\b/i],
   ['Fashion > Women > Ready to wear', /\b(rtw|ready to wear|kurta|kurti|shalwar kameez women|co-?ord|tunic|abaya|hijab|scarf|dupatta|stole|shawl|maxi|gown|lehenga|saree|frock|peplum|trouser women|women'?s (shirt|top|suit))\b/i],
   ['Fashion > Men > Shalwar kameez & kurta', /\b(shalwar|kameez|men'?s kurta|waistcoat|sherwani|prince coat|wash ?& ?wear|kurta pajama)\b/i],
@@ -50,7 +58,7 @@ const RULES: [string, RegExp][] = [
   ['Fashion > Footwear', /\b(shoes?|sneakers?|sandals?|slippers?|chappal|khussa|boots?|heels|loafers|flip ?flops|joota|peshawari|kolhapuri|sports shoes|running shoes)\b/i],
   ['Fashion > Bags & wallets', /\b(bags?|backpack|handbag|wallet|purse|clutch|tote|luggage|suitcase|trolley|laptop bag|sling)\b/i],
   ['Fashion > Watches', /\b(watch(es)?|wrist ?watch|chronograph|casio|g-?shock|seiko|citizen)\b/i],
-  ['Fashion > Jewellery', /\b(jewel+ery|necklace|earrings?|rings?|bracelet|bangles?|pendant|chain|tikka|nose pin|anklet|gold plated|artificial jewel+ery)\b/i],
+  ['Fashion > Jewellery', /\b(locket|jewel+ery|necklace|earrings?|rings?|bracelet|bangles?|pendant|chain|tikka|nose pin|anklet|gold plated|artificial jewel+ery)\b/i],
   // eyewear
   // beauty & health
   ['Beauty > Perfume & fragrance', /\b(perfumes?|parfum|eau de|edp|edt|cologne|fragrance|attar|itar|body spray|deodorant|bakhoor|oud|musk)\b/i],
@@ -61,7 +69,8 @@ const RULES: [string, RegExp][] = [
   ['Health > Supplements & medical', /\b(vitamin|supplement|protein|whey|omega|capsules?|tablets? \d|syrup|thermometer|blood pressure|bp monitor|glucometer|oximeter|nebuli[sz]er|mask|first aid|massager|health)\b/i],
   ['Health > Fitness & sports', /\b(dumbbell|yoga|treadmill|gym|exercise|fitness|cricket|bat\b|football|badminton|racket|skipping|sports|helmet|cycle|bicycle|cycling)\b/i],
   // baby, kids, toys
-  ['Baby & kids > Toys & games', /\b(toys?|lego|puzzle|doll|rc car|remote control car|board game|playset|action figure|building blocks|stuffed|teddy|kids (bike|scooter))\b/i],
+  ['Health > Intimate & wellness', /\b(condoms?|delay spray|lubricant|pregnancy test|knee support|support belt|ankle support|back support|arm cuff|bp\b|blood pressure|posture)\b/i],
+  ['Baby & kids > Toys & games', /\b(toys?|blaster|gun\b|monopoly|snake|push n walk|ride[- ]on|game\b|goodie boxes?|lego|puzzle|doll|rc car|remote control car|board game|playset|action figure|building blocks|stuffed|teddy|kids (bike|scooter))\b/i],
   ['Baby & kids > Baby care', /\b(diapers?|pampers|baby (milk|food|lotion|wipes|bottle|stroller|cot|walker|bath|care)|feeder|pacifier|stroller|car seat|nappy|formula|cerelac)\b/i],
   // grocery
   ['Grocery > Atta, rice & pulses', /\b(atta|flour|maida|besan|suji|rice|basmati|chawal|daal|dal\b|lentils?|chana|masoor|moong|mash|lobia|pulses|oats)\b/i],
@@ -72,8 +81,12 @@ const RULES: [string, RegExp][] = [
   ['Grocery > Snacks & beverages', /\b(chips|biscuits?|chocolate|candy|snack|juice|soft drink|cola|pepsi|coke|sprite|energy drink|water\b|noodles|pasta|cereal|jam|ketchup|sauce|pickle|dry fruits?|almonds?|cashew|dates|khajoor|nuts)\b/i],
   ['Grocery > Cleaning & laundry', /\b(detergent|surf excel|washing powder|bleach|dish ?wash|floor cleaner|phenyl|harpic|toilet cleaner|air freshener|tissue|napkin|garbage bags|cleaner)\b/i],
   // stationery, books, automotive, tools, pets, gifts
+  ['Grocery > Fresh & frozen', /\b(vegetables?|fruits?|frozen|fresh|meat|goat|mutton|beef|chicken|fish|prawn|kidney|liver|mince|keema|tortilla|taco|lasagna|paratha|bread|bun|rolls?|samosa|nuggets?|kebab|pizza|cake|pastry|cookies?)\b/i],
+  ['Grocery > Pantry & staples', /\b(pantry|groceries|grocery|staples|essentials|bar\b|chocolatto|float|drink|syrup|jelly|custard|corn ?flakes|ready to eat)\b/i],
   ['Stationery & books > Books', /\b(books?|novel|quran|tafseer|dictionary|guide|notes|past papers|urdu book)\b/i],
   ['Stationery & books > Stationery', /\b(pens?|pencil|notebook|diary|marker|highlighter|stapler|paper|register|files?|calculator|art set|colou?rs|paint|crayons|school bag)\b/i],
+  ['Home & kitchen > Cleaning & utility', /\b(broom|dustpan|mop|duster|insect killer|mortein|spray|repair tape|tape\b|sponge|scrubber|bucket|mason jars?|glassware|jars?|vegetable slicer|slicer|peeler|grater|chopper)\b/i],
+  ['Beauty > Personal care', /\b(toothbrush|toothpaste|hair clipper|clipper|personal care|hygiene|nail clipper|razor)\b/i],
   ['Automotive > Car & bike accessories', /\b(tyres?|tires?|engine oil|car (cover|mat|seat|perfume|polish|charger|mount|camera|vacuum)|dash ?cam|wiper|brake|battery for car|motorcycle|bike (cover|helmet|accessor|chain|seat)|spark plug|oil filter|air filter)\b/i],
   ['Tools & hardware > Tools', /\b(drill|screwdriver|wrench|tool ?kit|hammer|pliers|saw|grinder|welding|ladder|spanner|toolbox|power tool|measuring tape|paint brush|hardware|pipe|plumbing|tap\b|faucet|shower)\b/i],
   ['Pets > Pet supplies', /\b(pets?|cat (food|litter)|dog (food|collar|leash)|fish tank|aquarium|bird cage)\b/i],
