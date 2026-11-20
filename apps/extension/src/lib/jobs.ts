@@ -25,6 +25,8 @@ export async function runBridgeJob(job: BridgeJob): Promise<unknown> {
       return runXSearch(job)
     case 'x.trending':
       return runXTrending()
+    case 'web.search':
+      return runWebSearch(job)
     case 'instagram.post':
       return runInstagramPost(job)
     case 'instagram.readProfile':
@@ -124,6 +126,45 @@ async function runXSearch(job: Extract<BridgeJob, { type: 'x.search' }>): Promis
   const url = `https://x.com/search?q=${encodeURIComponent(job.payload.query)}&src=typed_query&f=live`
   const tabId = await ensureOwnTab(url, 'x')
   return unwrapTabResponse(await sendToTab(tabId, { kind: 'zaviya', action: 'x.scrape', limit: job.payload.limit }))
+}
+
+/**
+ * One Google search in a background tab of the owner's own Chrome (the owner allowed this, 21 Nov 2026). Returns only the result links.
+ * It never solves a CAPTCHA and never clicks a consent page: on either it stops with an error and the worker backs off for hours.
+ */
+async function runWebSearch(job: Extract<BridgeJob, { type: 'web.search' }>): Promise<{ links: string[] }> {
+  const url = `https://www.google.com/search?q=${encodeURIComponent(job.payload.query)}&gl=pk&hl=en&num=20`
+  const tab = await chrome.tabs.create({ url, active: false })
+  const tabId = tab.id!
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('search_timeout')), 25_000)
+      const on = (id: number, info: { status?: string }) => {
+        if (id === tabId && info.status === 'complete') {
+          clearTimeout(t)
+          chrome.tabs.onUpdated.removeListener(on)
+          resolve()
+        }
+      }
+      chrome.tabs.onUpdated.addListener(on)
+    })
+    await sleep(1500 + Math.random() * 1500)
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const text = document.body?.innerText ?? ''
+        if (location.pathname.startsWith('/sorry') || /unusual traffic|not a robot/i.test(text)) return { blocked: 'captcha' }
+        if (location.hostname.startsWith('consent.')) return { blocked: 'consent' }
+        const links = [...document.querySelectorAll('a h3')].map((h) => (h.closest('a') as HTMLAnchorElement | null)?.href ?? '').filter((h) => h.startsWith('http') && !/google\./.test(new URL(h).hostname))
+        return { links: [...new Set(links)].slice(0, 30) }
+      },
+    })
+    const r = res?.result as { blocked?: string; links?: string[] } | undefined
+    if (r?.blocked) throw new Error(`${r.blocked}_detected`)
+    return { links: r?.links ?? [] }
+  } finally {
+    chrome.tabs.remove(tabId).catch(() => {})
+  }
 }
 
 async function runXTrending(): Promise<unknown> {
