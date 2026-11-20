@@ -166,14 +166,18 @@ function readRole(agent: string): { model: string; body: string } {
   return { model: fm?.[1]?.match(/^model:\s*(\S+)/m)?.[1] ?? 'haiku', body: fm ? raw.slice(fm[0].length) : raw }
 }
 
+// Claude Code reads `/x` in a permission rule as relative to the project; an absolute path needs `//x`
+// (journal.md was never written after 5 Nov: the editor kept saying "add this line by hand").
+const ABS_DATA = DATA.startsWith('/') ? `/${DATA}` : DATA
+
 const EDITOR_TOOLS = [
   'Read',
   'Grep',
   'Glob',
   'WebSearch',
   'WebFetch',
-  `Write(${DATA}/**)`,
-  `Edit(${DATA}/**)`,
+  `Write(${ABS_DATA}/**)`,
+  `Edit(${ABS_DATA}/**)`,
   'Bash(curl:*)',
   'Bash(node ops/bin/linear.mjs:*)',
   'Bash(node ops/bin/payload.mjs:*)',
