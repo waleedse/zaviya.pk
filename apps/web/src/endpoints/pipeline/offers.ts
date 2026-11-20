@@ -69,9 +69,14 @@ export const offerEndpoints: Endpoint[] = [
             price_changed_at = CASE WHEN EXCLUDED.price_pkr IS DISTINCT FROM store_offers.price_pkr AND store_offers.price_pkr IS NOT NULL THEN now() ELSE store_offers.price_changed_at END,
             price_pkr = EXCLUDED.price_pkr, list_price_pkr = EXCLUDED.list_price_pkr, in_stock = EXCLUDED.in_stock, model = EXCLUDED.model,
             match_kind = EXCLUDED.match_kind, match_slug = EXCLUDED.match_slug, seen_at = now(), updated_at = now()
-          RETURNING (xmax <> 0 AND price_changed_at = now()) AS changed
+          RETURNING (xmax <> 0 AND price_changed_at = now()) AS changed, (xmax = 0) AS inserted
         `)) as unknown as { rows?: { changed: boolean }[] }
-        if (res.rows?.[0]?.changed) changed++
+        const row = res.rows?.[0] as { changed?: boolean; inserted?: boolean } | undefined
+        if (row?.changed) changed++
+        // price history: first sight and every price change (docs/PRODUCT-SEARCH.md section 2)
+        if (row?.changed || row?.inserted) {
+          await req.payload.db.drizzle.execute(sql`INSERT INTO offer_price_history (offer_slug, price_pkr, list_price_pkr, in_stock) VALUES (${slug}, ${price}, ${it.listPricePkr ?? null}, ${it.inStock ?? null})`)
+        }
       }
       return json({ ok: true, received: parsed.data.items.length, matched, changed })
     },

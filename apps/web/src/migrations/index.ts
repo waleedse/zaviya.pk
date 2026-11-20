@@ -8,6 +8,7 @@ import * as migration_20261104_043222_results_vacations_closures from './2026110
 import * as migration_20261105_064505_appliance_prices from './20261105_064505_appliance_prices';
 import * as migration_20261105_222249_price_engine from './20261105_222249_price_engine';
 import * as migration_20261111_201829_youtube_social_posts from './20261111_201829_youtube_social_posts';
+import * as migration_20261121_120000_product_search from './20261121_120000_product_search';
 import * as migration_20261115_190000_store_offers from './20261115_190000_store_offers';
 
 export const migrations = [
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20261115_190000_store_offers.up,
     down: migration_20261115_190000_store_offers.down,
     name: '20261115_190000_store_offers',
+  },
+  {
+    up: migration_20261121_120000_product_search.up,
+    down: migration_20261121_120000_product_search.down,
+    name: '20261121_120000_product_search',
   },
 ];

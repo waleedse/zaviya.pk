@@ -89,7 +89,7 @@ web "$LIVE" "${PREVIOUS:-latest}" down --remove-orphans 2>/dev/null || true
 # One-time cleanup: the web service used to live in the main stack
 docker rm -f zaviya-web-1 >/dev/null 2>&1 || true
 
-stack "$RELEASE" up -d --remove-orphans postgres redis worker agents video
+stack "$RELEASE" up -d --remove-orphans postgres redis meilisearch worker agents video
 for _ in $(seq 1 20); do
   [ "$(docker inspect -f '{{.State.Running}}' zaviya-worker-1 2>/dev/null)" = true ] && break
   sleep 3
