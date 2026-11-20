@@ -13,6 +13,12 @@ describe('categorize', () => {
     ['Dawlance 1.5 Ton Inverter AC', '', 'Home appliances > Air conditioners'],
     ['Tapal Danedar Tea 950g', '', 'Grocery > Sugar, tea & coffee'],
     ['Sunglasses With 3 Interchangeable Lenses', '', 'Eyewear > Sunglasses'],
+    ['Sajiero Half Sleeves PJ Set - Linen Comfort - Pink', '', 'Fashion > Innerwear & nightwear'],
+    ['Girl Fancy Pumps Fawn 0710710', '', 'Fashion > Footwear'],
+    ['Nikon Nikkor Z MC 105mm f/2.8 VR S Macro Lens', '', 'Electronics > Cameras'],
+    ['ViewSonic SP7 4800 Lumens WXGA Business Projector', '', 'Electronics > Projectors'],
+    ['Dawn Aalo Paratha 3 Pieces', '', 'Grocery > Fresh & frozen'],
+    ['Broom and Dustpan Set Adjustable Handle', '', 'Home & kitchen > Cleaning & utility'],
     ['qwerty widget', '', null],
   ]
   for (const [t, l, want] of cases) it(`${t} -> ${want}`, () => expect(categorize(t, l)).toBe(want))

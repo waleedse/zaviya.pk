@@ -1,7 +1,7 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 import { sql } from '@payloadcms/db-postgres'
 import { z } from 'zod'
-import { PRODUCTS_INDEX, categorize, categoryLevels, docId, offerGroup, offerSlug, productKey, productsIndexSettings, type ProductDoc } from '@zaviya/shared'
+import { PRODUCTS_INDEX, TAXONOMY_VERSION, categorize, categoryLevels, docId, offerGroup, offerSlug, productKey, productsIndexSettings, type ProductDoc } from '@zaviya/shared'
 import { keys as matchKeys, matchOffer } from './offers'
 import { meili, meiliConfigured, waitTask } from '@/lib/search/meili'
 import { discoveryReport, searchStatus } from '@/lib/search/status'
@@ -100,6 +100,12 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
   await ensureIndex()
   const nameMap = await loadNames(req)
   if (opts.reindex) await run(req, sql`UPDATE store_offers SET search_synced_at = NULL`)
+  // new category rules: classify everything again (the version lives in search_sync_state)
+  const [st] = await run(req, sql`SELECT rules_version FROM search_sync_state WHERE id = 1`)
+  if (Number(st?.rules_version ?? 0) < TAXONOMY_VERSION) {
+    await run(req, sql`UPDATE store_offers SET cat = NULL`)
+    await run(req, sql`UPDATE search_sync_state SET rules_version = ${TAXONOMY_VERSION} WHERE id = 1`)
+  }
   // classify listings that have no category yet (rules only, 12 batches of 2,000 per call); changed rows are sent to the index again
   for (let i = 0; i < 12; i++) {
     const todo = await run(req, sql`SELECT id, title, category_path FROM store_offers WHERE cat IS NULL ORDER BY id LIMIT 2000`)
