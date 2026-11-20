@@ -12,6 +12,7 @@ describe('categorize', () => {
     ['RTS | SHIRT, TROUSER & DUPATTA', 'SHIRT, TROUSER & DUPATTA', 'Fashion > Women > Ready to wear'],
     ['Dawlance 1.5 Ton Inverter AC', '', 'Home appliances > Air conditioners'],
     ['Tapal Danedar Tea 950g', '', 'Grocery > Sugar, tea & coffee'],
+    ['Sunglasses With 3 Interchangeable Lenses', '', 'Eyewear > Sunglasses'],
     ['qwerty widget', '', null],
   ]
   for (const [t, l, want] of cases) it(`${t} -> ${want}`, () => expect(categorize(t, l)).toBe(want))

@@ -46,7 +46,7 @@ export async function GET(request: Request) {
           filter: filter.length ? filter : undefined,
           sort: SORTS[sp.get('sort') ?? ''],
           facets: ['category_path', 'stores', 'brand'],
-          attributesToRetrieve: ['id', 'title', 'brand', 'group', 'image', 'image_store', 'offers', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'price_drop_pct', 'match_kind', 'match_slug'],
+          attributesToRetrieve: ['id', 'title', 'brand', 'group', 'category_path', 'image', 'image_store', 'offers', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'price_drop_pct', 'match_kind', 'match_slug'],
         },
         2500,
       )
