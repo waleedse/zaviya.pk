@@ -5,6 +5,9 @@
  */
 const RULES: [string, RegExp][] = [
   // electronics
+  ['Eyewear > Contact lenses', /\b(contact lens(es)?|lens solution|colou?red lens)\b/i],
+  ['Eyewear > Sunglasses', /\b(sun ?glasses?|shades|polari[sz]ed|aviator|wayfarer|ray-?ban|oakley)\b/i],
+  ['Eyewear > Frames & glasses', /\b(eye ?glasses|spectacles?|optical frames?|eyewear|reading glasses|blue ?light|prescription|glasses|chasma|frames?)\b/i],
   ['Electronics > Mobile phones > Accessories', /\b(phone|mobile|iphone|samsung|galaxy)?\s?(cases?|covers?|screen protectors?|tempered|glass protector|back skin|pop ?socket|selfie stick|mobile holder|phone holder)\b|\b(power ?bank|charger|charging|cable|adapter|usb[- ]?c|lightning|type[- ]?c)\b/i],
   ['Electronics > Mobile phones', /\b(iphone|galaxy [asmz]\d+|galaxy (note|fold|flip)|redmi|poco|infinix|tecno|vivo|oppo|realme|honor|itel|nokia|pixel \d|oneplus|sparx|zte|moto [eg]\d|smart ?phones?|mobile phones?|keypad phone|feature phone)\b/i],
   ['Electronics > Tablets', /\b(ipad|tablets?|galaxy tab|redmi pad)\b/i],
@@ -13,7 +16,7 @@ const RULES: [string, RegExp][] = [
   ['Electronics > Audio > Earbuds & headphones', /\b(earbuds?|airpods|ear ?phones?|head ?phones?|neckband|tws|handsfree|hands-free|buds)\b/i],
   ['Electronics > Audio > Speakers', /\b(speakers?|soundbar|sound bar|woofer|boombox|bluetooth speaker)\b/i],
   ['Electronics > TVs', /\b(led tv|smart tv|android tv|oled|qled|television|tv \d{2}|\d{2}["”]? ?(tv|led))\b/i],
-  ['Electronics > Cameras', /\b(cameras?|dslr|mirrorless|gopro|insta360|tripod|gimbal|drone|dji|instax|lens)\b(?!.*contact)/i],
+  ['Electronics > Cameras', /\b(cameras?|dslr|mirrorless|gopro|insta360|tripod|gimbal|drone|dji|instax|camera lens|dslr lens|lens hood)\b/i],
   ['Electronics > Gaming', /\b(ps[345]|playstation|xbox|nintendo|game ?pad|joystick|controller|gaming (chair|desk|mouse|keyboard|headset)|console)\b/i],
   ['Electronics > Computer accessories', /\b(keyboards?|mouse|mice|monitor|router|usb hub|webcam|ssd|hard ?drive|flash drive|usb drive|memory card|sd card|ram \d|printer|ink|toner|ups\b|motherboard|graphics card|processor|cooling fan)\b/i],
   ['Electronics > Solar & power', /\b(solar|hybrid inverter|ups inverter|ups battery|lithium battery|tubular battery|panel \d+ ?w|voltage stabilizer|generator)\b/i],
@@ -49,9 +52,6 @@ const RULES: [string, RegExp][] = [
   ['Fashion > Watches', /\b(watch(es)?|wrist ?watch|chronograph|casio|g-?shock|seiko|citizen)\b/i],
   ['Fashion > Jewellery', /\b(jewel+ery|necklace|earrings?|rings?|bracelet|bangles?|pendant|chain|tikka|nose pin|anklet|gold plated|artificial jewel+ery)\b/i],
   // eyewear
-  ['Eyewear > Contact lenses', /\b(contact lens(es)?|lens solution|colou?red lens)\b/i],
-  ['Eyewear > Sunglasses', /\b(sun ?glasses?|shades|polari[sz]ed|aviator|wayfarer|ray-?ban|oakley)\b/i],
-  ['Eyewear > Frames & glasses', /\b(eye ?glasses|spectacles?|optical frames?|eyewear|reading glasses|blue ?light|prescription|glasses|chasma|frames?)\b/i],
   // beauty & health
   ['Beauty > Perfume & fragrance', /\b(perfumes?|parfum|eau de|edp|edt|cologne|fragrance|attar|itar|body spray|deodorant|bakhoor|oud|musk)\b/i],
   ['Beauty > Makeup', /\b(lipstick|foundation|mascara|eyeliner|kajal|blush|highlighter|compact|concealer|nail polish|makeup|eyeshadow|primer|lip gloss|lip balm|brush set)\b/i],
@@ -77,7 +77,7 @@ const RULES: [string, RegExp][] = [
   ['Automotive > Car & bike accessories', /\b(tyres?|tires?|engine oil|car (cover|mat|seat|perfume|polish|charger|mount|camera|vacuum)|dash ?cam|wiper|brake|battery for car|motorcycle|bike (cover|helmet|accessor|chain|seat)|spark plug|oil filter|air filter)\b/i],
   ['Tools & hardware > Tools', /\b(drill|screwdriver|wrench|tool ?kit|hammer|pliers|saw|grinder|welding|ladder|spanner|toolbox|power tool|measuring tape|paint brush|hardware|pipe|plumbing|tap\b|faucet|shower)\b/i],
   ['Pets > Pet supplies', /\b(pets?|cat (food|litter)|dog (food|collar|leash)|fish tank|aquarium|bird cage)\b/i],
-  ['Gifts & occasions > Gifts', /\b(gift|hamper|bouquet|flowers?|cake|balloon|party|eid|ramadan|wedding|decoration|birthday)\b/i],
+  ['Gifts & occasions > Gifts', /\b(gifts?|foil balloons?|hamper|bouquet|flowers?|cake|balloon|party|eid|ramadan|wedding|decoration|birthday)\b/i],
 ]
 
 export const TOP_LEVELS = [...new Set(RULES.map(([p]) => p.split(' > ')[0]!))]

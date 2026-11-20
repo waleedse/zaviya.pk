@@ -8,6 +8,7 @@ import * as migration_20261104_043222_results_vacations_closures from './2026110
 import * as migration_20261105_064505_appliance_prices from './20261105_064505_appliance_prices';
 import * as migration_20261105_222249_price_engine from './20261105_222249_price_engine';
 import * as migration_20261111_201829_youtube_social_posts from './20261111_201829_youtube_social_posts';
+import * as migration_20261121_230000_search_recategorize from './20261121_230000_search_recategorize';
 import * as migration_20261121_210000_search_category from './20261121_210000_search_category';
 import * as migration_20261121_180000_search_hosts from './20261121_180000_search_hosts';
 import * as migration_20261121_120000_product_search from './20261121_120000_product_search';
@@ -83,5 +84,10 @@ export const migrations = [
     up: migration_20261121_210000_search_category.up,
     down: migration_20261121_210000_search_category.down,
     name: '20261121_210000_search_category',
+  },
+  {
+    up: migration_20261121_230000_search_recategorize.up,
+    down: migration_20261121_230000_search_recategorize.down,
+    name: '20261121_230000_search_recategorize',
   },
 ];
