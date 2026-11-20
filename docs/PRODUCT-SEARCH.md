@@ -154,6 +154,37 @@ Pakistani online stores that expose public structured data: roughly 300-1,000 Sh
 Store discovery: the research agent lists candidate stores per category (official sites only), a probe job checks `/products.json`, the Woo endpoint and sitemap JSON-LD, and adds a
 `search_stores` row when robots.txt allows. Stores are never added from comparison sites.
 
+## 11. Discovery layer (added 21 Nov, Waleed: "which product, which store, which category to search, and a 6-hour check")
+
+Search has two separate jobs. **Pricing** (section 4) keeps known offers fresh. **Discovery** finds what we do not know yet: new stores, new categories, new products, new directions.
+
+```
+Discovery loop (every 6 hours, plus a daily deep pass)
+  1. STORES   candidates from: store domains found in the demand list and in outgoing links of stores we already read,
+              the research agent's per-category lists, and our own search misses. A probe job checks robots.txt, /products.json,
+              the WooCommerce Store API, sitemap + JSON-LD. Pass -> row in search_stores (status "new", then "active" after a clean first crawl).
+  2. PRODUCTS every crawl marks listings first seen in this run (first_seen_at). New products are counted per store and category.
+  3. CATEGORIES our own tree (search_categories, 3 levels: Electronics > Mobiles > Smartphones; Fashion > Men > Shirts; Home > Kitchen > Cutlery > Spoons).
+              Step A rules: store product_type / collection / breadcrumb / JSON-LD category and title keywords map to a node (cheap, covers ~80%).
+              Step B AI: listings the rules cannot place are sent in batches of 40 titles to the LLM chain (Gemini free tier, paced by the existing router)
+              which returns {category path, brand, model, is_product}. The answer is cached by normalised title, so one title is never asked twice.
+              Step C a category the AI proposes that is not in the tree becomes a "proposed category" (counted, shown in the admin view); at 5+ products it is
+              added automatically as a leaf under the closest parent, and Claude reviews the proposals in the daily pass.
+  4. DIRECTIONS what visitors search for and we cannot answer (search misses, price-demand) and categories where stores are thin
+              become the next crawl targets and the research agent's next store hunt.
+  5. REPORT   every 6 hours a row in search_discovery_log and one line to the admin view and the daily email:
+              new stores, new categories (and proposed), new products (total and per top category), new directions (top 10 missed searches),
+              failed probes, products without a category.
+```
+
+Product page: opens from search with the product, then **every store's offer** (all stores that sell the same `product_key`), cheapest first, each with its own price,
+discount, stock and a link; the offers refresh with each crawl (hot products every hour, others daily), and the page shows "updated X minutes ago" per store.
+A store that stops listing the product disappears from the page after 3 days.
+
+Tables added for this: `search_stores` (registry), `search_categories` (tree + synonyms), `search_title_cache` (AI answers), `search_discovery_log` (6-hour counts).
+Index: `category_path` becomes a filterable, facetable attribute so the search page can show the category tree with counts.
+
 ## 10. Progress log
 
 - 21 Nov: plan written. Findings: live DB is `zaviya_live2`; 13.7k offers from 3 stores already crawled; web and worker share the `zaviya_default` network, so the Meilisearch container is reachable by name.
+- 21 Nov: slice 1 merged (PR #279, tag v2026.11.21-1): Meilisearch, sync, /api/search, /products, /product/<id>. Discovery layer designed (section 11).
