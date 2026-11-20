@@ -9,6 +9,21 @@ const healthy: Observation = {
   now,
 }
 
+describe('watchdog: product search', () => {
+  const ok = { healthy: true, docs: 10_000, docsYesterday: 10_000, pending: 0, lastSyncAt: now - 60_000, activeHosts: 5, lastSeenAt: now - 60_000, dbBytes: 1e8 }
+  it('is quiet when search is healthy', () => {
+    expect(findProblems({ ...healthy, search: ok }, healthy)).toEqual([])
+  })
+  it('flags Meilisearch down, a stalled sync and a count drop', () => {
+    expect(findProblems({ ...healthy, search: { ...ok, healthy: false } }).map((p) => p.key)).toEqual(['search-down'])
+    expect(findProblems({ ...healthy, search: { ...ok, pending: 50, lastSyncAt: now - 45 * 60_000 } }).map((p) => p.key)).toEqual(['search-sync-stalled'])
+    expect(findProblems({ ...healthy, search: { ...ok, docs: 7_000 } }).map((p) => p.key)).toEqual(['search-count-drop'])
+  })
+  it('does not alarm when search status is unknown', () => {
+    expect(findProblems({ ...healthy, search: null })).toEqual([])
+  })
+})
+
 describe('watchdog', () => {
   it('is quiet when everything is fine', () => {
     expect(findProblems(healthy, healthy)).toEqual([])

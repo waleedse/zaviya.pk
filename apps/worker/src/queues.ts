@@ -476,6 +476,7 @@ export async function createWorkerRuntime(
         if (job.name === 'appliance-prices') return runAppliancePrices((m, p, b, o) => payload.request(m, p, b, o))
         // Store offers: one page of one retail store feed per tick, all day (appliances/retail.ts)
         // Product search: changed store offers -> Meilisearch (apps/web/src/endpoints/pipeline/search.ts); weekly full reindex
+        if (job.name === 'search-report') return payload.request('POST', '/api/pipeline/search/report', {}, { timeoutMs: 60_000 })
         if (job.name === 'search-sync') return payload.request('POST', '/api/pipeline/search/sync', { reindex: Boolean((job.data as { reindex?: boolean })?.reindex) }, { timeoutMs: 110_000 })
         // Product search engine: probe candidate stores, crawl active ones page by page (apps/worker/src/search/engine.ts)
         if (job.name === 'search-engine') return runSearchTick({ request: (m, p, b, o) => payload.request(m, p, b, o), kv: redis, bridge: bridge as never })
@@ -627,12 +628,14 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
   }
   if (process.env.PRODUCT_SEARCH === '0') {
     await runtime.queues.data.removeJobScheduler('search-engine').catch(() => {})
+    await runtime.queues.data.removeJobScheduler('search-report').catch(() => {})
     await runtime.queues.data.removeJobScheduler('search-sync').catch(() => {})
     await runtime.queues.data.removeJobScheduler('search-reindex').catch(() => {})
   } else {
     // the automatic engine replaces the fixed 3-store rotation (those stores are rows in search_hosts now)
     await runtime.queues.data.removeJobScheduler('store-offers').catch(() => {})
     await runtime.queues.data.upsertJobScheduler('search-engine', { every: SEARCH_TICK_MS }, { name: 'search-engine', data: {} })
+    await runtime.queues.data.upsertJobScheduler('search-report', { every: 6 * 3_600_000 }, { name: 'search-report', data: {} })
     await runtime.queues.data.upsertJobScheduler('search-sync', { every: 2 * 60_000 }, { name: 'search-sync', data: {} })
     // weekly safety net: re-send everything (Sunday 04:00 PKT = 23:00 UTC Saturday)
     await runtime.queues.data.upsertJobScheduler('search-reindex', { pattern: '0 23 * * 6' }, { name: 'search-sync', data: { reindex: true } })

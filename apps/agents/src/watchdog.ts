@@ -11,7 +11,20 @@ export interface Heartbeat {
   extension: boolean | null
 }
 
+/** Product search health (docs/PRODUCT-SEARCH.md section 6), read from /api/pipeline/search/status */
+export interface SearchObservation {
+  healthy: boolean
+  docs: number | null
+  docsYesterday: number | null
+  pending: number
+  lastSyncAt: number | null
+  activeHosts: number
+  lastSeenAt: number | null
+  dbBytes: number | null
+}
+
 export interface Observation {
+  search?: SearchObservation | null
   siteStatus: number
   heartbeat: Heartbeat
   lastPublishedAt: number | null
@@ -105,6 +118,26 @@ export function findProblems(o: Observation, prev?: Observation): Problem[] {
         detail: 'Gemini images and X/Instagram discovery need Chrome open on the Mac with the Zaviya extension connected to wss://zaviya.pk/bridge.',
         label: 'needs-waleed',
       })
+    }
+  }
+
+  const sr = o.search
+  if (sr) {
+    if (!sr.healthy) {
+      problems.push({ key: 'search-down', title: 'Product search (Meilisearch) is not healthy', detail: 'Meilisearch /health is not "available". /products falls back to the slow Postgres search. Check `docker logs zaviya-meilisearch-1`, memory (limit 1.5 GB) and the meilidata volume.', label: 'incident' })
+    } else {
+      if (sr.pending > 0 && (!sr.lastSyncAt || o.now - sr.lastSyncAt > 30 * MIN)) {
+        problems.push({ key: 'search-sync-stalled', title: 'Product search sync has stalled', detail: `${sr.pending} changed listings wait for the index and the last sync was ${sr.lastSyncAt ? Math.round((o.now - sr.lastSyncAt) / MIN) + ' min ago' : 'never'}. Check the worker job "search-sync" and search_sync_state.last_error.`, label: 'incident' })
+      }
+      if (sr.docs != null && sr.docsYesterday && sr.docsYesterday > 1000 && sr.docs < sr.docsYesterday * 0.8) {
+        problems.push({ key: 'search-count-drop', title: 'Product search index lost more than 20% of its products', detail: `${sr.docs} products indexed now against ${sr.docsYesterday} yesterday. Run POST /api/pipeline/search/reindex (sync with reindex: true) after checking store_offers.`, label: 'incident' })
+      }
+      if (sr.activeHosts > 0 && sr.lastSeenAt && o.now - sr.lastSeenAt > 36 * 60 * MIN) {
+        problems.push({ key: 'search-crawl-stalled', title: 'Product search crawl has not read any store for 36 hours', detail: `${sr.activeHosts} active stores but no listing was seen for ${Math.round((o.now - sr.lastSeenAt) / 60 / MIN)} h. Check the worker job "search-engine".`, label: 'incident' })
+      }
+      if (sr.dbBytes != null && sr.dbBytes > 8e9) {
+        problems.push({ key: 'search-disk', title: 'Product search index is over 8 GB', detail: `Meilisearch database is ${(sr.dbBytes / 1e9).toFixed(1)} GB (budget 8 GB). Check disk and consider trimming or a bigger volume.`, label: 'incident' })
+      }
     }
   }
 

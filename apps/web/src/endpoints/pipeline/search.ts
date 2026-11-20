@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { PRODUCTS_INDEX, docId, offerGroup, offerSlug, productKey, productsIndexSettings, type ProductDoc } from '@zaviya/shared'
 import { keys as matchKeys, matchOffer } from './offers'
 import { meili, meiliConfigured, waitTask } from '@/lib/search/meili'
+import { discoveryReport, searchStatus } from '@/lib/search/status'
 import { json, parseJson, requireBotOrAdmin } from './helpers'
 
 /**
@@ -87,7 +88,8 @@ export function buildDoc(key: string, rows: Row[], storeName: (slug: string) => 
     match_kind: (best.match_kind as string | null) ?? null,
     match_slug: (best.match_slug as string | null) ?? null,
     price_drop_pct: drop,
-    popularity: stores.length * 10 + (offers.some((o) => o.in_stock) ? 5 : 0) + (best.match_slug ? 20 : 0),
+    // main products rank above their accessories ("iphone" shows phones before chargers); more stores and a match to our own page rank higher
+    popularity: stores.length * 10 + (offers.some((o) => o.in_stock) ? 5 : 0) + (best.match_slug ? 20 : 0) + (['mobiles', 'laptops', 'tablets', 'tvs', 'cameras', 'home-appliances', 'smartwatches'].includes(String(best.group)) ? 25 : 0) - (best.group === 'accessories' ? 10 : 0),
     updated_at: Math.max(...offers.map((o) => o.updated_at)),
   }
 }
@@ -142,24 +144,6 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
   return { rows: rowsDone, docs, removed, indexDocs: stats.numberOfDocuments, ms: Date.now() - started }
 }
 
-export async function searchStatus(req: PayloadRequest) {
-  let meiliInfo: Record<string, unknown> = { healthy: false }
-  try {
-    const h = await meili<{ status: string }>('GET', '/health', undefined, 2000)
-    const s = await meili<{ databaseSize: number; usedDatabaseSize: number }>('GET', '/stats', undefined, 2000)
-    const i = await meili<{ numberOfDocuments: number; isIndexing: boolean }>('GET', `/indexes/${PRODUCTS_INDEX}/stats`, undefined, 2000)
-    meiliInfo = { healthy: h.status === 'available', dbBytes: s.databaseSize, docs: i.numberOfDocuments, indexing: i.isIndexing }
-  } catch (e) {
-    meiliInfo = { healthy: false, error: String((e as Error).message).slice(0, 120) }
-  }
-  const [state] = await run(req, sql`SELECT * FROM search_sync_state WHERE id = 1`)
-  const [tot] = await run(req, sql`SELECT count(*)::int AS offers, count(*) FILTER (WHERE search_synced_at > now() - interval '24 hours')::int AS synced_24h, count(*) FILTER (WHERE search_synced_at IS NULL OR search_synced_at < updated_at)::int AS pending, count(*) FILTER (WHERE price_changed_at > now() - interval '24 hours')::int AS price_changes_24h FROM store_offers`)
-  const stores = await run(req, sql`SELECT o.store, count(*)::int AS listings, max(o.seen_at) AS last_seen, count(*) FILTER (WHERE o.price_changed_at > now() - interval '24 hours')::int AS price_changes_24h, max(h.state) AS state, max(h.fail_count) AS fails, max(h.last_error) AS last_error FROM store_offers o LEFT JOIN search_hosts h ON h.slug = o.store GROUP BY o.store ORDER BY 2 DESC LIMIT 500`)
-  const [hostCounts] = await run(req, sql`SELECT count(*)::int AS total, count(*) FILTER (WHERE state='active')::int AS active, count(*) FILTER (WHERE state='candidate')::int AS candidates, count(*) FILTER (WHERE state='rejected')::int AS rejected, count(*) FILTER (WHERE found_at > now() - interval '24 hours')::int AS new_24h FROM search_hosts`)
-  const failed = await run(req, sql`SELECT store, at, page, error FROM search_crawl_runs WHERE ok = false AND at > now() - interval '24 hours' ORDER BY at DESC LIMIT 20`)
-  return { meili: meiliInfo, configured: meiliConfigured(), sync: state ?? null, offers: tot ?? null, stores, failedCrawls: failed, hosts: hostCounts ?? null, now: new Date().toISOString() }
-}
-
 /** Never a candidate: comparison sites (standing rule), marketplaces and platforms that block bots, social networks, search engines, reference sites */
 const BLOCKED = /(^|\.)(priceoye|qeemat|whatmobile|pricemeter|mega|pricehunt|pricekar|daraz|olx|pakwheels|facebook|instagram|youtube|twitter|x|tiktok|linkedin|pinterest|wikipedia|google|bing|yahoo|amazon|ebay|alibaba|aliexpress|temu|shein|walmart|etsy|reddit|quora|medium|blogspot|wordpress|wixsite|myshopify|shopify|apple|microsoft|github|whatsapp|t)\.(com|pk|net|org|co|com\.pk|me)$/
 const HOST_RE = /^(?=.{4,100}$)([a-z0-9-]+\.)+[a-z]{2,24}$/
@@ -199,6 +183,16 @@ const ItemBody = z.object({
 })
 
 export const searchEndpoints: Endpoint[] = [
+  {
+    // Every 6 hours (worker job): counts what the engine found, stored in search_discovery_log and shown in the admin view
+    path: '/pipeline/search/report',
+    method: 'post',
+    handler: async (req) => {
+      const denied = requireBotOrAdmin(req)
+      if (denied) return denied
+      return json({ ok: true, report: await discoveryReport(req.payload) })
+    },
+  },
   {
     // Candidate stores found by the worker (Common Crawl, links, probes). New hosts only; known ones are left alone.
     path: '/pipeline/search/hosts',
@@ -341,7 +335,7 @@ export const searchEndpoints: Endpoint[] = [
     handler: async (req) => {
       const denied = requireBotOrAdmin(req)
       if (denied) return denied
-      return json(await searchStatus(req))
+      return json(await searchStatus(req.payload))
     },
   },
 ]
