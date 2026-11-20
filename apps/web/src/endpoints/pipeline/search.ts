@@ -230,9 +230,12 @@ export const searchEndpoints: Endpoint[] = [
       const toCrawl = crawl
         ? await run(req, sql`UPDATE search_hosts SET next_crawl_at = now() + interval '20 minutes' WHERE host IN (SELECT host FROM search_hosts WHERE state = 'active' AND (next_crawl_at IS NULL OR next_crawl_at <= now()) ORDER BY next_crawl_at NULLS FIRST LIMIT ${crawl} FOR UPDATE SKIP LOCKED) RETURNING host, slug, base_url, platform, crawl_page`)
         : []
+      const brandN = Math.min(Number(sp.get('brands')) || 0, 100)
+      const brandOffset = Math.max(Number(sp.get('offset')) || 0, 0)
+      const brands = brandN ? (await run(req, sql`SELECT brand FROM (SELECT brand FROM store_offers WHERE brand IS NOT NULL AND length(brand) BETWEEN 3 AND 30 GROUP BY brand HAVING count(*) >= 2 ORDER BY brand) b OFFSET ${brandOffset} LIMIT ${brandN}`)).map((r) => String(r.brand)) : []
       const labelN = Math.min(Number(sp.get('labels')) || 0, 30)
       const labels = labelN ? (await run(req, sql`SELECT label FROM search_label_map WHERE products >= 3 ORDER BY random() LIMIT ${labelN}`)).map((r) => String(r.label)) : []
-      return json({ probe: toProbe, crawl: toCrawl, labels })
+      return json({ probe: toProbe, crawl: toCrawl, labels, brands })
     },
   },
   {
