@@ -166,9 +166,11 @@ Discovery loop (every 6 hours, plus a daily deep pass)
   2. PRODUCTS every crawl marks listings first seen in this run (first_seen_at). New products are counted per store and category.
   3. CATEGORIES our own tree (search_categories, 3 levels: Electronics > Mobiles > Smartphones; Fashion > Men > Shirts; Home > Kitchen > Cutlery > Spoons).
               Step A rules: store product_type / collection / breadcrumb / JSON-LD category and title keywords map to a node (cheap, covers ~80%).
-              Step B AI: listings the rules cannot place are sent in batches of 40 titles to the LLM chain (Gemini free tier, paced by the existing router)
-              which returns {category path, brand, model, is_product}. The answer is cached by normalised title, so one title is never asked twice.
-              Step C a category the AI proposes that is not in the tree becomes a "proposed category" (counted, shown in the admin view); at 5+ products it is
+              Step B label cache: classification is per distinct store category label ("Men > Shirts" at store X), never per product. One label covers thousands of
+                       products, so millions of products need only thousands of decisions, each made once and stored in search_label_map.
+              Step C AI is the last resort and capped at 1% of new listings per day (a counter in Redis; over the cap the item waits as "uncategorised", visible
+                       in the admin view). Only labels and titles the rules cannot place go to the LLM chain (Gemini free tier), 40 per batch, answer cached.
+              Step D a category the AI proposes that is not in the tree becomes a "proposed category" (counted, shown in the admin view); at 5+ products it is
               added automatically as a leaf under the closest parent, and Claude reviews the proposals in the daily pass.
   4. DIRECTIONS what visitors search for and we cannot answer (search misses, price-demand) and categories where stores are thin
               become the next crawl targets and the research agent's next store hunt.
