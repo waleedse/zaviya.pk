@@ -474,6 +474,8 @@ export async function createWorkerRuntime(
         // Home appliance prices (zaviya.pk/prices): brand stores, once a day
         if (job.name === 'appliance-prices') return runAppliancePrices((m, p, b, o) => payload.request(m, p, b, o))
         // Store offers: one page of one retail store feed per tick, all day (appliances/retail.ts)
+        // Product search: changed store offers -> Meilisearch (apps/web/src/endpoints/pipeline/search.ts); weekly full reindex
+        if (job.name === 'search-sync') return payload.request('POST', '/api/pipeline/search/sync', { reindex: Boolean((job.data as { reindex?: boolean })?.reindex) }, { timeoutMs: 110_000 })
         if (job.name === 'store-offers') return runRetailTick({ request: (m, p, b, o) => payload.request(m, p, b, o), kv: redis })
         const rates = await fetchRatePoints(env, redis)
         await postRatePoints(payload, rates)
@@ -619,6 +621,14 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.data.removeJobScheduler('store-offers').catch(() => {})
   } else {
     await runtime.queues.data.upsertJobScheduler('store-offers', { every: RETAIL_TICK_MS }, { name: 'store-offers', data: {} })
+  }
+  if (process.env.PRODUCT_SEARCH === '0') {
+    await runtime.queues.data.removeJobScheduler('search-sync').catch(() => {})
+    await runtime.queues.data.removeJobScheduler('search-reindex').catch(() => {})
+  } else {
+    await runtime.queues.data.upsertJobScheduler('search-sync', { every: 2 * 60_000 }, { name: 'search-sync', data: {} })
+    // weekly safety net: re-send everything (Sunday 04:00 PKT = 23:00 UTC Saturday)
+    await runtime.queues.data.upsertJobScheduler('search-reindex', { pattern: '0 23 * * 6' }, { name: 'search-sync', data: { reindex: true } })
   }
   // ZAV-109 phase 2: confirmation mails and the 07:30 PKT briefing. Scheduled only with NEWSLETTER_SEND=true and the news@ password set.
   if (runtime.env.NEWSLETTER_SEND && runtime.env.NEWS_MAIL_PASSWORD) {

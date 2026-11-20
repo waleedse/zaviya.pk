@@ -14,6 +14,7 @@ import { handlePipelineArticles } from './articles'
 import { phoneEndpoints } from './phones'
 import { applianceEndpoints } from './appliances'
 import { offerEndpoints } from './offers'
+import { searchEndpoints } from './search'
 import { pageviewsReport } from '../../lib/pageviews-report'
 import { expireBreaking, expireLive, setArticlePriority } from '../../lib/article-flags'
 import { revalidateDataTag } from '../../lib/revalidate'
@@ -1603,4 +1604,4 @@ const pipelineEndpoints: Endpoint[] = [
   },
 ]
 
-export const pipelineEndpointsExport = [...pipelineEndpoints, ...phoneEndpoints, ...applianceEndpoints, ...offerEndpoints]
+export const pipelineEndpointsExport = [...pipelineEndpoints, ...phoneEndpoints, ...applianceEndpoints, ...offerEndpoints, ...searchEndpoints]
