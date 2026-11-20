@@ -1,6 +1,7 @@
 import { logger } from '../logger.js'
 import { politeJson } from './http.js'
 import { seedFromBrands, seedFromBrowser, seedFromCommonCrawl, seedFromSearchApi } from './seed.js'
+import { probeJsonLd, readProductPage, sitemapProductUrls } from './jsonld.js'
 import { parseShopify, parseWoo, type Listing } from './parsers.js'
 
 /**
@@ -22,10 +23,10 @@ export const SEARCH_TICK_MS = 60_000
 const TICK_BUDGET_MS = 50_000
 
 interface ProbeHost { host: string; base_url: string }
-interface CrawlHost { host: string; slug: string; base_url: string; platform: 'shopify' | 'woo'; crawl_page: number }
+interface CrawlHost { host: string; slug: string; base_url: string; platform: 'shopify' | 'woo' | 'jsonld'; crawl_page: number }
 
 /** Probe: is this an online shop that sells in PKR and publishes a public product feed we may read? */
-export async function probeHost(h: ProbeHost): Promise<{ state: 'active' | 'rejected'; platform?: 'shopify' | 'woo'; error?: string }> {
+export async function probeHost(h: ProbeHost): Promise<{ state: 'active' | 'rejected'; platform?: 'shopify' | 'woo' | 'jsonld'; error?: string }> {
   const base = h.base_url.replace(/\/$/, '')
   const meta = await politeJson<{ currency?: string }>(`${base}/meta.json`)
   // a name that does not resolve (most brand guesses) costs one request, not three
@@ -41,10 +42,28 @@ export async function probeHost(h: ProbeHost): Promise<{ state: 'active' | 'reje
   }
   const woo = await politeJson<{ prices?: { currency_code?: string } }[]>(`${base}/wp-json/wc/store/v1/products?per_page=1`)
   if (woo.ok && Array.isArray(woo.data) && woo.data.length && woo.data[0]?.prices?.currency_code === 'PKR') return { state: 'active', platform: 'woo' }
+  if (await probeJsonLd(base).catch(() => false)) return { state: 'active', platform: 'jsonld' }
   return { state: 'rejected', error: 'no public PKR product feed' }
 }
 
-export async function crawlPages(h: CrawlHost, name: string, deadline: number, request: Request) {
+/** Sitemap + product pages: 25 URLs a tick, the cursor walks the sitemap, a finished walk is a finished cycle */
+async function crawlJsonLd(h: CrawlHost, deadline: number, request: Request) {
+  const urls = await sitemapProductUrls(h.base_url)
+  let offset = Math.max(0, (h.crawl_page || 1) - 1)
+  const items: Awaited<ReturnType<typeof readProductPage>>['listing'][] = []
+  let n = 0
+  for (; offset < urls.length && n < 25 && Date.now() < deadline; offset++, n++) {
+    const r = await readProductPage(urls[offset]!)
+    if (r.listing) items.push(r.listing)
+  }
+  const real = items.filter((i): i is NonNullable<typeof i> => Boolean(i))
+  if (real.length) await request('POST', '/api/pipeline/search/import', { store: h.slug, items: real }, { timeoutMs: 120_000 })
+  if (!urls.length) return { page: 1, listings: 0, cycleDone: true, error: 'sitemap empty' }
+  return offset >= urls.length ? { page: 1, listings: real.length, cycleDone: true } : { page: offset + 1, listings: real.length, cycleDone: false }
+}
+
+export async function crawlPages(h: CrawlHost, name: string, deadline: number, request: Request): Promise<{ page: number; listings: number; cycleDone?: boolean; error?: string }> {
+  if (h.platform === 'jsonld') return crawlJsonLd(h, deadline, request)
   let page = h.crawl_page || 1
   let listings = 0
   for (let n = 0; n < MAX_PAGES_PER_TICK && Date.now() < deadline; n++) {
