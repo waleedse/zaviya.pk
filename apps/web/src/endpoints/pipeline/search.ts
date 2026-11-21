@@ -48,6 +48,7 @@ export function buildDoc(key: string, rows: Row[], storeName: (slug: string) => 
   const offers = rows
     .filter((r) => r.price_pkr != null)
     .map((r) => ({
+      slug: String(r.slug),
       store: String(r.store),
       store_name: storeName(String(r.store)),
       price: Number(r.price_pkr),
