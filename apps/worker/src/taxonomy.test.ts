@@ -19,6 +19,8 @@ describe('categorize', () => {
     ['ViewSonic SP7 4800 Lumens WXGA Business Projector', '', 'Electronics > Projectors'],
     ['Dawn Aalo Paratha 3 Pieces', '', 'Grocery > Fresh & frozen'],
     ['Broom and Dustpan Set Adjustable Handle', '', 'Home & kitchen > Cleaning & utility'],
+    ['Neck Fan Adjustment Fan Hands-Free Hanging Rechargeable', '', 'Home appliances > Fans & coolers'],
+    ['Sony WH-1000XM5 Wireless Headphones', '', 'Electronics > Audio > Earbuds & headphones'],
     ['qwerty widget', '', null],
   ]
   for (const [t, l, want] of cases) it(`${t} -> ${want}`, () => expect(categorize(t, l)).toBe(want))
