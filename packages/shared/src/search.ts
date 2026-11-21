@@ -91,11 +91,22 @@ const alnum = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(
  * The same product at different stores shares a key: GTIN when known, else brand + model, else the listing stands alone.
  * Storage and colour variants stay separate products unless the model number already tells them apart.
  */
-export function productKey(o: { slug: string; brand?: string | null; model?: string | null; gtin?: string | null }): string {
+export function productKey(o: { slug: string; title?: string | null; brand?: string | null; model?: string | null; gtin?: string | null }): string {
   if (o.gtin && /^\d{8,14}$/.test(o.gtin)) return `gtin-${o.gtin}`
   const m = alnum(o.model)
   if (m.length >= 4 && /\d/.test(m)) return `m-${alnum(o.brand) || 'x'}-${m}`.slice(0, 120)
+  // no code: the same words in any order (and the same size) at two stores are the same product
+  const tokens = titleTokens(o.title)
+  if (tokens.length >= 4) return `t-${tokens.join('')}`.slice(0, 160)
   return `s-${o.slug}`.slice(0, 160)
+}
+
+const TITLE_NOISE = new Set(['official', 'warranty', 'brand', 'new', 'original', 'free', 'delivery', 'with', 'and', 'the', 'for', 'of', 'in', 'a', 'pack', 'best', 'price', 'pakistan', 'online', 'buy', 'now', 'sale', 'offer', 'genuine', 'authentic'])
+
+/** Sorted, de-duplicated words of a title without filler words ("Oud Perfume 100ml for men" and "100ml Perfume Oud - men" give the same list) */
+export function titleTokens(title: string | null | undefined): string[] {
+  const words = (title ?? '').toLowerCase().replace(/&amp;|&#\d+;/g, ' ').split(/[^a-z0-9]+/).filter((w) => w && !TITLE_NOISE.has(w))
+  return [...new Set(words)].sort()
 }
 
 /** Meilisearch document ids allow letters, digits, - and _ */

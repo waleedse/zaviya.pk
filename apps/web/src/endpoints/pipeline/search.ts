@@ -116,11 +116,12 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
   let removed = 0
   let rowsDone = 0
   while (Date.now() - started < BUDGET_MS) {
-    const rows = await run(req, sql`SELECT id, slug, brand, model, gtin, product_key FROM store_offers WHERE search_synced_at IS NULL OR search_synced_at < updated_at ORDER BY id LIMIT ${BATCH}`)
+    const rows = await run(req, sql`SELECT id, slug, title, brand, model, gtin, product_key FROM store_offers WHERE search_synced_at IS NULL OR search_synced_at < updated_at ORDER BY id LIMIT ${BATCH}`)
     if (!rows.length) break
     const ids = rows.map((r) => Number(r.id))
-    const keyed = rows.map((r) => ({ id: Number(r.id), key: (r.product_key as string) || productKey({ slug: r.slug, brand: r.brand, model: r.model, gtin: r.gtin }) }))
-    const keys = [...new Set(keyed.map((k) => k.key))]
+    const keyed = rows.map((r) => ({ id: Number(r.id), old: (r.product_key as string | null) ?? null, key: productKey({ slug: r.slug, title: r.title, brand: r.brand, model: r.model, gtin: r.gtin }) }))
+    // an old key whose products moved to a new key must be rebuilt too (its document then disappears from the index)
+    const keys = [...new Set(keyed.flatMap((k) => (k.old && k.old !== k.key ? [k.key, k.old] : [k.key])))]
     await run(req, sql`UPDATE store_offers o SET product_key = v.k FROM (VALUES ${sql.join(keyed.map((k) => sql`(${k.id}::int, ${k.key}::text)`), sql`, `)}) AS v(id, k) WHERE o.id = v.id AND o.product_key IS DISTINCT FROM v.k`)
     const all = await run(
       req,
