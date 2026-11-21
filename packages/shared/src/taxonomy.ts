@@ -4,7 +4,7 @@
  * (the AI budget is 1% of listings a day) are ever looked at by the capped AI step.
  */
 /** Bump when RULES change: the sync classifies every listing again */
-export const TAXONOMY_VERSION = 2
+export const TAXONOMY_VERSION = 3
 
 const RULES: [string, RegExp][] = [
   // electronics
@@ -16,7 +16,8 @@ const RULES: [string, RegExp][] = [
   ['Electronics > Tablets', /\b(ipad|tablets?|galaxy tab|redmi pad)\b/i],
   ['Electronics > Laptops', /\b(laptops?|notebooks?|macbook|chromebook|thinkpad|ideapad|vivobook|zenbook|inspiron|latitude|elitebook|probook)\b/i],
   ['Electronics > Smart watches', /\b(smart ?watch(es)?|fitness (band|tracker)|apple watch|galaxy watch|amazfit|smart band)\b/i],
-  ['Electronics > Audio > Earbuds & headphones', /\b(earbuds?|airpods|ear ?phones?|head ?phones?|neckband|tws|handsfree|hands-free|buds)\b/i],
+  ['Home appliances > Fans & coolers', /\b(neck ?fan|mini fan|handheld fan|hand fan|portable fan|usb fan|desk fan)\b/i],
+  ['Electronics > Audio > Earbuds & headphones', /\b(earbuds?|airpods|ear ?phones?|head ?phones?|neckband|tws|hands-?free (ear ?phones?|headset|bluetooth)|buds)\b/i],
   ['Electronics > Audio > Speakers', /\b(speakers?|soundbar|sound bar|woofer|boombox|bluetooth speaker)\b/i],
   ['Electronics > TVs', /\b(led tv|smart tv|android tv|oled|qled|television|tv \d{2}|\d{2}["”]? ?(tv|led))\b/i],
   ['Electronics > Cameras', /\b(cameras?|dslr|mirrorless|gopro|insta360|tripod|gimbal|drone|dji|instax|camera lens|dslr lens|lens hood)\b/i],
