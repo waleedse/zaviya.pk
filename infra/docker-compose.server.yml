@@ -72,6 +72,8 @@ services:
     ports:
       # The Chrome extension reaches this through nginx (wss://<host>/bridge)
       - '127.0.0.1:8787:8787'
+    # The product crawler used 260% of 4 cores and starved the website (TCP connect took 1-2 s): leave 2 cores for web + search
+    cpus: 2
     depends_on:
       redis:
         condition: service_healthy
