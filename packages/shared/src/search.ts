@@ -6,6 +6,7 @@
 export const PRODUCTS_INDEX = 'products'
 
 export interface ProductOffer {
+  slug?: string
   store: string
   store_name: string
   price: number
@@ -77,7 +78,8 @@ export function productsIndexSettings() {
     searchableAttributes: ['title', 'brand', 'model', 'category_path', 'stores'],
     filterableAttributes: ['group', 'category_path', 'brand', 'stores', 'min_price', 'in_stock_any', 'store_count', 'price_drop_pct', 'updated_at'],
     sortableAttributes: ['min_price', 'popularity', 'updated_at', 'price_drop_pct', 'store_count'],
-    rankingRules: ['words', 'typo', 'proximity', 'attribute', 'exactness', 'popularity:desc', 'store_count:desc'],
+    // popularity before exactness: a phone (more stores, our own page, main category) outranks an accessory whose title also starts with the query
+    rankingRules: ['words', 'typo', 'proximity', 'attribute', 'popularity:desc', 'exactness', 'store_count:desc'],
     typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 } },
     synonyms: searchSynonyms(),
     pagination: { maxTotalHits: 2000 },

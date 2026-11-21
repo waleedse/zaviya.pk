@@ -5,6 +5,8 @@ import { meili, meiliConfigured } from '@/lib/search/meili'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/JsonLd'
+import { PriceChart } from '@/components/products/PriceChart'
+import { priceHistory } from '@/lib/search/history'
 
 /** /product/<id>: one product, every store that sells it, each price, the best price (docs/PRODUCT-SEARCH.md section 5) */
 export const revalidate = 120
@@ -38,6 +40,7 @@ export default async function ProductPage({ params }: Props) {
   const p = await load(id)
   if (!p) notFound()
   const best = p.offers.find((o) => o.in_stock) ?? p.offers[0]!
+  const history = await priceHistory(p.offers.map((o) => o.slug).filter((x): x is string => Boolean(x)))
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <JsonLd
@@ -80,6 +83,7 @@ export default async function ProductPage({ params }: Props) {
           </li>
         ))}
       </ul>
+      <PriceChart points={history} />
       <NearestStore branches={[]} />
     </div>
   )
