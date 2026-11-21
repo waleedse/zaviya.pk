@@ -7,6 +7,12 @@ describe('product search', () => {
     const b = productKey({ slug: 'mistore-y', brand: 'samsung', model: 'sm-a546e' })
     expect(a).toBe(b)
   })
+  it('merges the same title at two stores, in any word order', () => {
+    const a = productKey({ slug: 'a', title: 'I-143-You Perfume for Women - Citrus, Floral & Tropical - 50ml' })
+    const b = productKey({ slug: 'b', title: '50ml Tropical Citrus Floral I 143 You Perfume Women (Official Warranty)' })
+    expect(a).toBe(b)
+    expect(productKey({ slug: 'c', title: 'I-143-You Perfume for Women - Citrus, Floral & Tropical - 100ml' })).not.toBe(a)
+  })
   it('keeps listings without a model separate', () => {
     expect(productKey({ slug: 'a-spoon' })).not.toBe(productKey({ slug: 'b-spoon' }))
   })
