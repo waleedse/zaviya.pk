@@ -6,7 +6,7 @@ import { formatPkr } from '@zaviya/shared'
 
 interface Offer { store: string; store_name: string; price: number; list_price: number | null; in_stock: boolean; url: string }
 interface Hit { id: string; title: string; brand: string | null; image: string | null; offers: Offer[]; min_price: number; max_price: number; store_count: number; in_stock_any: boolean; price_drop_pct: number }
-interface Res { total: number; hits: Hit[]; facets: Record<string, Record<string, number>>; ms: number }
+interface Res { used?: string; total: number; hits: Hit[]; facets: Record<string, Record<string, number>>; ms: number }
 
 /** Instant search as you type: debounced 80 ms, results come from our own Meilisearch through /api/search. */
 export function ProductSearch({ initialQuery }: { initialQuery: string }) {
@@ -17,6 +17,9 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
   const [stock, setStock] = useState(false)
   const [res, setRes] = useState<Res | null>(null)
   const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [tries, setTries] = useState(0)
+  const retries = useRef(0)
   const seq = useRef(0)
 
   useEffect(() => {
@@ -29,11 +32,20 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
         if (store) p.set('store', store)
         if (cat) p.set('cat', cat)
         if (stock) p.set('stock', '1')
-        const r = await fetch(`/api/search?${p}`)
+        const r = await fetch(`/api/search?${p}`, { signal: AbortSignal.timeout(12_000) })
+        if (!r.ok) throw new Error(String(r.status))
         const j = (await r.json()) as Res
-        if (id === seq.current) setRes(j)
+        if (id === seq.current) {
+          setRes(j)
+          setFailed(false)
+          retries.current = 0
+        }
       } catch {
-        /* keep the last results */
+        // keep the last results, say so, and try once more
+        if (id === seq.current) {
+          setFailed(true)
+          if (retries.current++ < 2) setTimeout(() => id === seq.current && setTries((n) => n + 1), 1500)
+        }
       } finally {
         if (id === seq.current) setBusy(false)
       }
@@ -43,7 +55,7 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
       window.history.replaceState(null, '', u)
     }, 80)
     return () => clearTimeout(t)
-  }, [q, sort, store, stock, cat])
+  }, [q, sort, store, stock, cat, tries])
 
   const stores = Object.entries(res?.facets?.stores ?? {}).sort((a, b) => b[1] - a[1])
   const cats = Object.entries(res?.facets?.category_path ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 40)
@@ -79,6 +91,9 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
         <label className="flex items-center gap-1"><input type="checkbox" checked={stock} onChange={(e) => setStock(e.target.checked)} /> In stock only</label>
         {res ? <span className="text-neutral-500">{res.total.toLocaleString('en-US')} products{busy ? '…' : ''}</span> : null}
       </div>
+      {failed ? <p className="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">Search is slow right now, trying again…</p> : null}
+      {!res && busy ? <p className="mt-6 text-neutral-500">Searching…</p> : null}
+      {res?.used ? <p className="mt-3 text-sm text-neutral-500">Showing results for “{res.used}”</p> : null}
       <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {(res?.hits ?? []).map((h) => (
           <li key={h.id} className="rounded-lg border p-3">

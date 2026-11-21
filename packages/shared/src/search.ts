@@ -59,17 +59,31 @@ const SYNONYM_GROUPS: string[][] = [
   ['fridge', 'refrigerator', 'فریج'],
   ['tv', 'television', 'led tv', 'ٹی وی'],
   ['washing machine', 'washer', 'kapray dhone wali machine'],
-  ['earbuds', 'earphones', 'airpods', 'ایئربڈز', 'headphones'],
+  ['earbuds', 'earphones', 'airpods', 'ایئربڈز', 'ear buds', 'air pods'],
+  ['headphones', 'headphone', 'headset', 'headsets', 'head phones', 'ہیڈ فون'],
+  ['powerbank', 'power bank'],
+  ['smartwatch', 'smart watch'],
+  ['iphone', 'i phone'],
+  ['playstation', 'play station'],
+  ['airfryer', 'air fryer'],
   ['charger', 'adapter', 'چارجر'],
   ['cover', 'case', 'کور'],
   ['shirt', 'qameez', 'قمیض'],
   ['bike', 'motorcycle', 'motorbike', 'موٹر سائیکل'],
 ]
 
+/** Brands people type as two words: [typed, real] */
+const SPLIT_BRANDS: [string, string][] = [
+  ['logi tech', 'logitech'], ['hyper x', 'hyperx'], ['one plus', 'oneplus'], ['sam sung', 'samsung'], ['hua wei', 'huawei'],
+  ['shao mi', 'xiaomi'], ['tp link', 'tplink'], ['d link', 'dlink'], ['red mi', 'redmi'], ['real me', 'realme'], ['nest le', 'nestle'],
+]
+
 /** Every word maps to the others of its group (Meilisearch wants the two-way map spelled out) */
 export function searchSynonyms(): Record<string, string[]> {
   const out: Record<string, string[]> = {}
   for (const g of SYNONYM_GROUPS) for (const w of g) out[w] = g.filter((x) => x !== w)
+  // A brand typed as two words finds the one-word brand (logi tech -> logitech)
+  for (const [split, joined] of SPLIT_BRANDS) out[split] = [...(out[split] ?? []), joined]
   return out
 }
 
