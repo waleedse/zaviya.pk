@@ -11,7 +11,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/admin', '/api/', '/search', '/ur/search', '/*?q='],
       },
     ],
-    sitemap: [`${base}/sitemap.xml`, `${base}/news-sitemap.xml`],
+    sitemap: [`${base}/sitemap.xml`, `${base}/news-sitemap.xml`, `${base}/product-sitemap.xml`],
     host: base,
   }
 }
