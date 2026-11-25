@@ -52,10 +52,10 @@ export async function similarProducts(p: ProductDoc, limit = 8): Promise<Product
       const r = await meili<{ hits: ProductDoc[] }>(
         'POST',
         `/indexes/${PRODUCTS_INDEX}/search`,
-        { q: '', filter: [`category_path = "${cat.replace(/"/g, '')}"`, `id != "${p.id}"`], sort: ['popularity:desc'], limit: limit + 4, attributesToRetrieve: ['id', 'title', 'brand', 'image', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'offers', 'category_path'] },
+        { q: '', filter: [`category_path = "${cat.replace(/"/g, '')}"`, 'in_stock_any = true'], sort: ['popularity:desc'], limit: limit + 4, attributesToRetrieve: ['id', 'title', 'brand', 'image', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'offers', 'category_path'] },
         4000,
       )
-      const hits = r.hits.filter((h) => h.in_stock_any).slice(0, limit)
+      const hits = r.hits.filter((h) => h.id !== p.id && h.in_stock_any).slice(0, limit)
       if (hits.length >= 3) return hits
     } catch {
       return []

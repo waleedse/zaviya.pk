@@ -118,7 +118,7 @@ export default async function PricesHub({ params }: { params: Promise<{ locale: 
               ))}
             </div>
           </section>
-          <div id="official" className="scroll-mt-24"><ShopByCategory tiles={tiles} /></div>
+          <div id="official" className="scroll-mt-24"><ShopByCategory tiles={tiles} title="Official prices and brand stores" /></div>
         </>
       }
       deals={

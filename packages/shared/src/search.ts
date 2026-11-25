@@ -99,8 +99,9 @@ export function productsIndexSettings() {
     searchableAttributes: ['title', 'brand', 'model', 'category_path'],
     filterableAttributes: ['group', 'category_path', 'brand', 'stores', 'min_price', 'in_stock_any', 'store_count', 'price_drop_pct', 'updated_at'],
     sortableAttributes: ['min_price', 'popularity', 'updated_at', 'price_drop_pct', 'store_count'],
+    // 'sort' must be listed or every search with a sort (cheapest first, popular, category pages) fails with invalid_search_sort
     // popularity right after words/typo (all query words must match first): the 'attribute' rule prefers a word at the start of the title, which put "iPhone 17 Handsfree" above "Apple iPhone 18 Pro". A phone (more stores, our own page, main category) outranks an accessory whose title also starts with the query
-    rankingRules: ['words', 'typo', 'popularity:desc', 'proximity', 'attribute', 'exactness', 'store_count:desc'],
+    rankingRules: ['words', 'typo', 'sort', 'popularity:desc', 'proximity', 'attribute', 'exactness', 'store_count:desc'],
     typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 } },
     synonyms: searchSynonyms(),
     pagination: { maxTotalHits: 2000 },
