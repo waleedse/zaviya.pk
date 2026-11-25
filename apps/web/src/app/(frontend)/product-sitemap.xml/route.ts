@@ -1,5 +1,8 @@
 import { PRODUCTS_INDEX } from '@zaviya/shared'
 import { meili, meiliConfigured } from '@/lib/search/meili'
+import { getCategoryTree } from '@/lib/search/categories'
+import { catHref } from '@/lib/search/hub-data'
+import { compareHref } from '@/lib/search/product-pure'
 
 /**
  * /product-sitemap.xml: every product page Google may index (sold by 2+ stores, same rule as the noindex
@@ -7,7 +10,8 @@ import { meili, meiliConfigured } from '@/lib/search/meili'
  */
 export const dynamic = 'force-dynamic'
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-const MAX_URLS = 45_000
+const MAX_URLS = 40_000
+const MAX_COMPARE = 3_000
 const PAGE = 1000
 
 type Doc = { id: string; updated_at?: number | string }
@@ -34,6 +38,37 @@ export async function GET() {
     } catch {
       // Meilisearch down: serve what we have (possibly empty) instead of failing the crawl
     }
+  }
+  // category pages (every level with 3+ products) and compare pages (popular products against their neighbours in the same category)
+  try {
+    const tree = await getCategoryTree()
+    for (const c of tree) if (c.products >= 3 && c.path !== 'Other') urls.push(`<url><loc>${siteUrl}${catHref(c.path)}</loc><changefreq>daily</changefreq><priority>0.7</priority></url>`)
+    const pop = await meili<{ hits: { id: string; category_path: string[] }[] }>(
+      'POST',
+      `/indexes/${PRODUCTS_INDEX}/search`,
+      { q: '', filter: ['store_count >= 2', 'in_stock_any = true'], sort: ['popularity:desc'], limit: 1000, attributesToRetrieve: ['id', 'category_path'] },
+      10_000,
+    )
+    const byCat = new Map<string, string[]>()
+    for (const h of pop.hits) {
+      const leaf = h.category_path.at(-1)
+      if (leaf && leaf !== 'Other') byCat.set(leaf, [...(byCat.get(leaf) ?? []), h.id])
+    }
+    const seen = new Set<string>()
+    for (const ids of byCat.values()) {
+      for (let i = 0; i < ids.length - 1 && seen.size < MAX_COMPARE; i++) {
+        for (const j of [i + 1, i + 2]) {
+          if (j >= ids.length) continue
+          const href = compareHref(ids[i]!, ids[j]!)
+          if (!seen.has(href)) {
+            seen.add(href)
+            urls.push(`<url><loc>${siteUrl}${href}</loc><changefreq>weekly</changefreq><priority>0.4</priority></url>`)
+          }
+        }
+      }
+    }
+  } catch {
+    // categories and compare pages are an extra: the product URLs above still go out
   }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}

@@ -273,7 +273,13 @@ export function ApplianceHubView({
   basketUpdated,
   shop,
   deals,
+  hero,
+  bar,
 }: {
+  /** The shop hero (tagline, big search) in place of the old title block */
+  hero?: React.ReactNode
+  /** The category bar, right under the site header */
+  bar?: React.ReactNode
   summaries: CategorySummary[]
   movers: { up: Mover[]; down: Mover[]; windowDays: number }
   baskets: CityBasket[]
@@ -305,6 +311,9 @@ export function ApplianceHubView({
   return (
     <div className="pb-10">
       <JsonLd data={[breadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: 'Prices', url: PRICES_HUB }]), ...(faqs.length ? [faqJsonLd(faqs)] : [])]} />
+      {bar}
+      {hero ?? null}
+      {hero ? null : (
       <section className="border-b border-border py-8 md:py-12" style={{ background: `color-mix(in oklab, ${COLOR} 8%, var(--bg))` }}>
         <div className="container-wide max-w-[860px]">
           <nav aria-label="Breadcrumb" className="mb-4 text-sm text-fg-muted">
@@ -318,8 +327,9 @@ export function ApplianceHubView({
           <PriceSearch className="mt-5" variant="hero" />
         </div>
       </section>
+      )}
       <div className="container-wide mt-8 space-y-10">
-        <CategoryChips summaries={summaries} />
+        {hero ? null : <CategoryChips summaries={summaries} />}
         {shop}
 
         {hasMovers ? (

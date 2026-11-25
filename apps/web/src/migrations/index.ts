@@ -9,6 +9,7 @@ import * as migration_20261105_064505_appliance_prices from './20261105_064505_a
 import * as migration_20261105_222249_price_engine from './20261105_222249_price_engine';
 import * as migration_20261111_201829_youtube_social_posts from './20261111_201829_youtube_social_posts';
 import * as migration_20261122_030000_search_rekey from './20261122_030000_search_rekey';
+import * as migration_20261126_120000_product_pages from './20261126_120000_product_pages';
 import * as migration_20261122_010000_search_rules_version from './20261122_010000_search_rules_version';
 import * as migration_20261121_230000_search_recategorize from './20261121_230000_search_recategorize';
 import * as migration_20261121_210000_search_category from './20261121_210000_search_category';
@@ -101,5 +102,10 @@ export const migrations = [
     up: migration_20261122_030000_search_rekey.up,
     down: migration_20261122_030000_search_rekey.down,
     name: '20261122_030000_search_rekey',
+  },
+  {
+    up: migration_20261126_120000_product_pages.up,
+    down: migration_20261126_120000_product_pages.down,
+    name: '20261126_120000_product_pages',
   },
 ];

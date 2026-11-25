@@ -43,6 +43,7 @@ import { fetchRatePoints, postRatePoints } from './data/rates.js'
 import { runPhonePrices } from './phones/refresh.js'
 import { runAppliancePrices } from './appliances/collect.js'
 import { RETAIL_TICK_MS, runRetailTick } from './appliances/retail.js'
+import { runAiNotes } from './search/ai-notes.js'
 import { SEARCH_TICK_MS, runSearchTick } from './search/engine.js'
 import type { BridgeServer } from './bridge/server.js'
 import type { TelegramAlerts } from './telegram/bot.js'
@@ -477,6 +478,8 @@ export async function createWorkerRuntime(
         // Store offers: one page of one retail store feed per tick, all day (appliances/retail.ts)
         // Product search: changed store offers -> Meilisearch (apps/web/src/endpoints/pipeline/search.ts); weekly full reindex
         if (job.name === 'search-report') return payload.request('POST', '/api/pipeline/search/report', {}, { timeoutMs: 60_000 })
+        // AI buying notes for the most popular product pages (low LLM priority, 2 per run)
+        if (job.name === 'search-ai-notes') return runAiNotes({ request: (m, p, b, o) => payload.request(m, p, b, o), router })
         if (job.name === 'search-sync') return payload.request('POST', '/api/pipeline/search/sync', { reindex: Boolean((job.data as { reindex?: boolean })?.reindex) }, { timeoutMs: 110_000 })
         // Product search engine: probe candidate stores, crawl active ones page by page (apps/worker/src/search/engine.ts)
         if (job.name === 'search-engine') return runSearchTick({ request: (m, p, b, o) => payload.request(m, p, b, o), kv: redis, bridge: bridge as never })
@@ -630,6 +633,7 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.data.removeJobScheduler('search-engine').catch(() => {})
     await runtime.queues.data.removeJobScheduler('search-report').catch(() => {})
     await runtime.queues.data.removeJobScheduler('search-sync').catch(() => {})
+    await runtime.queues.data.removeJobScheduler('search-ai-notes').catch(() => {})
     await runtime.queues.data.removeJobScheduler('search-reindex').catch(() => {})
   } else {
     // the automatic engine replaces the fixed 3-store rotation (those stores are rows in search_hosts now)
@@ -637,6 +641,7 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.data.upsertJobScheduler('search-engine', { every: SEARCH_TICK_MS }, { name: 'search-engine', data: {} })
     await runtime.queues.data.upsertJobScheduler('search-report', { every: 6 * 3_600_000 }, { name: 'search-report', data: {} })
     await runtime.queues.data.upsertJobScheduler('search-sync', { every: 2 * 60_000 }, { name: 'search-sync', data: {} })
+    await runtime.queues.data.upsertJobScheduler('search-ai-notes', { every: 30 * 60_000 }, { name: 'search-ai-notes', data: {} })
     // weekly safety net: re-send everything (Sunday 04:00 PKT = 23:00 UTC Saturday)
     await runtime.queues.data.upsertJobScheduler('search-reindex', { pattern: '0 23 * * 6' }, { name: 'search-sync', data: { reindex: true } })
   }
