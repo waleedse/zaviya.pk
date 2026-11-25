@@ -18,7 +18,8 @@ import { popularItems } from '@/lib/search/hub'
 import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
-export const revalidate = 1800
+// rendered per request (not at build, where Meilisearch is unreachable and the page would be cached empty); the data underneath is cached for 10 minutes
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const locale = parseLocale((await params).locale)

@@ -8,7 +8,8 @@ import { parseLocale } from '@/lib/locale'
 import { buildPageMetadata } from '@/lib/seo'
 
 /** /prices/on-sale: every product with a real cut against the store's own list price, biggest cut first */
-export const revalidate = 600
+// rendered per request (not at build, where Meilisearch is unreachable and the page would be cached empty); the data underneath is cached for 10 minutes
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   return buildPageMetadata({
