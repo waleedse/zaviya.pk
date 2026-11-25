@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { PRODUCTS_INDEX, type ProductDoc } from '@zaviya/shared'
 import { meili, meiliConfigured } from '@/lib/search/meili'
 import { searchOffers } from '@/lib/offers/search'
+import { droppedWords, matchingStrategyFor, tokenize, type SearchNote } from '@/lib/search/relevance'
 
 /**
  * Product search (docs/PRODUCT-SEARCH.md). GET /api/search?q=&group=&store=&sort=price|drop&min=&max=&stock=1&limit=
@@ -54,7 +55,9 @@ export async function GET(request: Request) {
     const cached = CACHE.get(cacheKey)
     if (cached && Date.now() - cached.at < CACHE_MS) return NextResponse.json(cached.body, { headers: { ...headers, 'server-timing': 'cache;dur=0' } })
     try {
-      type R = { hits: ProductDoc[]; estimatedTotalHits: number; processingTimeMs: number; facetDistribution?: Record<string, Record<string, number>> }
+      type R = { hits: (ProductDoc & { _rankingScoreDetails?: { words?: { matchingWords: number; maxMatchingWords: number } } })[]; estimatedTotalHits: number; processingTimeMs: number; facetDistribution?: Record<string, Record<string, number>> }
+      // part/accessory queries ('macbook speakers') must match every word; the rest may drop trailing words, and we say so
+      const strategy = matchingStrategyFor(q)
       const run = (query: string) =>
         meili<R>(
           'POST',
@@ -66,7 +69,8 @@ export async function GET(request: Request) {
             filter: filter.length ? filter : undefined,
             sort: SORTS[sp.get('sort') ?? ''],
             facets: ['category_path', 'stores', 'brand'],
-            matchingStrategy: 'last',
+            matchingStrategy: strategy,
+            showRankingScoreDetails: strategy === 'last',
             attributesToRetrieve: ['id', 'title', 'brand', 'group', 'category_path', 'image', 'image_store', 'offers', 'min_price', 'max_price', 'store_count', 'in_stock_any', 'price_drop_pct', 'match_kind', 'match_slug'],
           },
           2500,
@@ -84,7 +88,9 @@ export async function GET(request: Request) {
         }
       }
       const total = performance.now() - t0
-      const body = { q, used: used === q ? undefined : used, total: r.estimatedTotalHits, hits: r.hits.map((h) => ({ ...h, offers: h.offers.slice(0, 6) })), facets: r.facetDistribution ?? {}, ms: r.processingTimeMs }
+      // never show unrelated products silently: say what matched, or that nothing did
+      const note: SearchNote | null = !q ? null : strategy === 'all' ? (r.hits.length ? null : { kind: 'none', words: tokenize(q) }) : droppedWords(used, r.hits[0])
+      const body = { q, used: used === q ? undefined : used, note, total: r.estimatedTotalHits, hits: r.hits.map(({ _rankingScoreDetails: _d, ...h }) => ({ ...h, offers: h.offers.slice(0, 6) })), facets: r.facetDistribution ?? {}, ms: r.processingTimeMs }
       if (CACHE.size > 500) CACHE.clear()
       CACHE.set(cacheKey, { at: Date.now(), body })
       return NextResponse.json(body, { headers: { ...headers, 'server-timing': `meili;dur=${r.processingTimeMs}, total;dur=${total.toFixed(1)}` } })
