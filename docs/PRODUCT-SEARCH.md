@@ -186,6 +186,31 @@ A store that stops listing the product disappears from the page after 3 days.
 Tables added for this: `search_stores` (registry), `search_categories` (tree + synonyms), `search_title_cache` (AI answers), `search_discovery_log` (6-hour counts).
 Index: `category_path` becomes a filterable, facetable attribute so the search page can show the category tree with counts.
 
+## 9b. When will "almost all products" be in? (measured 26 Nov)
+
+**Where we are.** 359,448 offers from 427 stores in Postgres (439 stores `active`, 89k on 23 Nov), 297k distinct products, 250,845 in Meilisearch (the rest are waiting for the sync or older than the 3-day freshness cut).
+The growth is **bursty, not steady**: new offers per day (`store_offers.created_at`) were 38k (20 Nov), 37k (21 Nov), then about 0.1k for three days, 242k (24 Nov), 28k (25 Nov), and 165k in the last 24 hours. Median day: ~0.1k; mean over 7 days: ~49k. The last hour added only 47, because every active store has finished its first full read and the crawler now only refreshes.
+So growth follows **new stores going active**, not crawl speed: 72, 31, 0, 0, 236, 97 stores went active on 20, 21, 22, 23, 24, 25 Nov. A new store brings on average ~820 offers (median under 300; 5 stores have 25k and one has 20k+).
+
+**What limits it, in order of impact**
+
+1. **Store discovery (the real limit).** 3,814 hosts were found and rejected (2,846 unreachable, 968 with no public PKR product feed), 439 became active: about 10 % pass. Discovery found ~1,400 hosts on 24 and 25 Nov, but only 2 on 22 and 23 Nov (the seeding job is throttled and its Google/Common Crawl sources dry up), so the supply of candidates is irregular. The candidate backlog is zero: the probe keeps up, there is nothing waiting.
+2. **Platform coverage.** Only Shopify (242 stores), WooCommerce (169) and sitemap JSON-LD (28) can be read. A shop on Magento, OpenCart or a custom platform is rejected as "no public PKR product feed". Those need one parser per platform; this is where most of the missing "long tail" sits.
+3. **Per-store cap.** Five big stores stop at 24,848-24,998 offers (Alfatah, Ameena, Chasevalue, Alkhaleej x2). That is the Shopify `products.json` limit of 100 pages x 250 products, so a store with more products is cut off. It needs a crawl per collection or the sitemap (`sitemap_products_N.xml`) to go past 25k. Several of these are grocery chains, so the missing share is real.
+4. **RAM, soon.** The doc planned a 16 GB upgrade at ~300k products. We have 297k distinct products and 250k in the index, the host has 8 GB with 2.7 GB available, Meilisearch uses 0.2 GB now (it memory-maps the index, so use grows with index size and rebuilds). Order the upgrade **before** the next discovery burst (a 240k-offer day is 2/3 of the whole catalogue added in 24 hours).
+5. **Crawl rate is not a limit.** 4 stores per tick, 6 pages of 250 per store per tick, one tick per minute: up to ~6,000 listings a minute for a Shopify store, far more than any store needs. Daily refresh of 439 stores takes minutes, not hours. Disk (36 GB free of 96 GB) is not a limit either.
+
+**Estimate** (one new store ≈ 500 offers on average for the long tail, which is smaller than the first big stores):
+
+| Scenario | Net new stores per day | Offers per day | 600k offers | ~1M offers ("almost all" Shopify/Woo Pakistan) |
+|---|---|---|---|---|
+| Today's pace (burst days included, ~50k/day mean) | ~15-20 | ~25-50k | about 5-10 days (early Dec) | about 15-25 days (mid to late Dec) |
+| Quiet pace (what 22-23 Nov looked like) | ~1 | ~0.5k | not reached | not reached |
+| With Shopify 25k cap fixed + 2 new platform parsers | ~20 | ~50k + ~100k one-off | about 5 days after the fixes | about 2-3 weeks after the fixes |
+
+Honest read: **600k offers by mid December is likely, ~1M by end of December / January is plausible only if discovery keeps running at the 24-25 Nov rate and the two limits (25k cap, non-Shopify/Woo platforms) are fixed.** "Every product in Pakistan" is not reachable from public feeds: marketplaces that block bots (Daraz, OLX), stores with no online catalogue and bot-blocking shops stay out (section 7). Realistic ceiling from public feeds is ~1-1.5M offers, roughly 800k-1M distinct products.
+Re-measure every Monday: `SELECT date_trunc('day', created_at)::date, count(*) FROM store_offers GROUP BY 1`, `SELECT state, count(*) FROM search_hosts GROUP BY 1`, and the per-day active count.
+
 ## 10. Progress log
 
 - 21 Nov: plan written. Findings: live DB is `zaviya_live2`; 13.7k offers from 3 stores already crawled; web and worker share the `zaviya_default` network, so the Meilisearch container is reachable by name.
@@ -193,3 +218,4 @@ Index: `category_path` becomes a filterable, facetable attribute so the search p
 - 21 Nov: PR #281 automatic engine (frontier, probe by PKR currency, Common Crawl + optional Google CSE seeding, bulk import). PR #282 owner-approved Google search in his own Chrome (max 60 a day, stops on CAPTCHA/consent), 10 stores per tick.
 - Next (owner: "use Chromium for searches and crawling"): the worker image already has Chromium + puppeteer-core. Add platform `render` for shops with no JSON feed: sitemap -> product pages -> JSON-LD Product/Offer read from the HTML, Chromium only when the HTML has none; one page at a time (~300 MB), robots.txt, ZaviyaBot user agent (never the default HeadlessChrome string spoofed to look like a person), stop on CAPTCHA. Server-side Google searching is not used: a datacenter IP is blocked at once and we do not rotate IPs.
 - 21 Nov: #283 admin view + 6-hour report + watchdog, #284 category tree by rules (~70 rules, no AI, "Other" counted), brand-name seeding (Common Crawl and crt.sh were unusable: 10 s gateway limit / no infix search). Render crawler (`platform jsonld`): sitemap -> product pages -> JSON-LD / og:price in PKR; Chromium only for empty JS shells.
+- 26 Nov: search no longer drops words silently. Part/accessory queries (speaker, charger, case, cover, battery, adapter, cable, keyboard...) need every word, so "macbook speakers" shows "No product matches all of..." instead of 64 laptops; other queries show "No exact match for 'x', showing 'y'" when Meilisearch ignored trailing words (`apps/web/src/lib/search/relevance.ts`). ETA for "almost all products" added in section 9b.

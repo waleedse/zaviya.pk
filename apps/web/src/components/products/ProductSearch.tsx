@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { formatPkr } from '@zaviya/shared'
+import { noteText, type SearchNote } from '@/lib/search/relevance'
 
 interface Offer { store: string; store_name: string; price: number; list_price: number | null; in_stock: boolean; url: string }
 interface Hit { id: string; title: string; brand: string | null; image: string | null; offers: Offer[]; min_price: number; max_price: number; store_count: number; in_stock_any: boolean; price_drop_pct: number }
-interface Res { used?: string; total: number; hits: Hit[]; facets: Record<string, Record<string, number>>; ms: number }
+interface Res { used?: string; note?: SearchNote | null; total: number; hits: Hit[]; facets: Record<string, Record<string, number>>; ms: number }
 
 /** Instant search as you type: debounced 80 ms, results come from our own Meilisearch through /api/search. */
 export function ProductSearch({ initialQuery }: { initialQuery: string }) {
@@ -94,6 +95,7 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
       {failed ? <p className="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">Search is slow right now, trying again…</p> : null}
       {!res && busy ? <p className="mt-6 text-neutral-500">Searching…</p> : null}
       {res?.used ? <p className="mt-3 text-sm text-neutral-500">Showing results for “{res.used}”</p> : null}
+      {res?.note ? <p role="status" className="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{noteText(res.note)}</p> : null}
       <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {(res?.hits ?? []).map((h) => (
           <li key={h.id} className="rounded-lg border p-3">
@@ -113,7 +115,7 @@ export function ProductSearch({ initialQuery }: { initialQuery: string }) {
           </li>
         ))}
       </ul>
-      {res && res.hits.length === 0 && q ? <p className="mt-6 text-neutral-600">Nothing found for “{q}” yet. We add stores every day.</p> : null}
+      {res && res.hits.length === 0 && q && !res.note ? <p className="mt-6 text-neutral-600">Nothing found for “{q}” yet. We add stores every day.</p> : null}
     </div>
   )
 }
