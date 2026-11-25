@@ -66,7 +66,7 @@ export function OffersTable({ offers }: { offers: ProductOffer[] }) {
                 {o.list_price ? <div className="text-xs text-fg-subtle line-through">{formatPkr(o.list_price)}</div> : null}
               </div>
               <div className="min-w-[70px] text-sm font-bold text-amber">{off >= 3 ? `−${off}%` : ''}</div>
-              <div className="min-w-[120px] text-sm text-fg-muted">{!Number.isFinite(bestInStock) ? '' : diff === 0 && o.in_stock ? 'Same as best' : diff > 0 ? `+${formatPkr(diff)}` : `${formatPkr(-diff)} less, no stock`}</div>
+              <div className="min-w-[120px] text-sm text-fg-muted">{!Number.isFinite(bestInStock) ? '' : diff === 0 ? (o.in_stock ? 'Same as best' : 'Same price, no stock') : diff > 0 ? `+${formatPkr(diff)}` : `${formatPkr(-diff)} less, no stock`}</div>
               <div className={`min-w-[90px] text-sm font-bold ${o.in_stock ? 'text-up' : 'text-down'}`}>{o.in_stock ? 'In stock' : 'Out of stock'}</div>
               <a href={o.url} target="_blank" rel="noopener nofollow sponsored" className={`inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-bold ${o.in_stock ? 'bg-accent text-accent-fg' : 'border border-border bg-surface text-fg'}`}>
                 {o.in_stock ? 'Go to store ↗' : 'Check store ↗'}

@@ -321,24 +321,28 @@ export const searchEndpoints: Endpoint[] = [
       if (!meiliConfigured()) return json({ items: [] })
       const parsed = await parseJson(req, z.object({ limit: z.number().int().min(1).max(5).optional() }))
       if ('error' in parsed) return parsed.error
+      try {
       const have = new Set((await run(req, sql`SELECT product_id FROM product_ai_notes WHERE created_at > now() - interval '7 days'`)).map((r) => String(r.product_id)))
       const r = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: ['store_count >= 2', 'in_stock_any = true'], sort: ['popularity:desc'], limit: 40 }, 10_000)
       const items = []
       for (const p of r.hits) {
         if (have.has(p.id)) continue
         const cat = p.category_path.at(-1) ?? ''
-        const sim = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: [`category_path = "${cat.replace(/"/g, '')}"`, `id != "${p.id}"`, 'in_stock_any = true'], sort: ['popularity:desc'], limit: 4 }, 10_000).catch(() => ({ hits: [] as ProductDoc[] }))
+        const sim = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: [`category_path = "${cat.replace(/"/g, '')}"`, 'in_stock_any = true'], sort: ['popularity:desc'], limit: 5 }, 10_000).catch(() => ({ hits: [] as ProductDoc[] }))
         items.push({
           id: p.id,
           title: p.title,
           brand: p.brand,
           category: p.category_path.at(-1) ?? 'Other',
           offers: p.offers.slice(0, 6).map((o) => ({ store: o.store_name, price: o.price, listPrice: o.list_price, inStock: o.in_stock })),
-          similar: sim.hits.map((h) => ({ title: h.title, price: h.min_price })),
+          similar: sim.hits.filter((h) => h.id !== p.id).slice(0, 4).map((h) => ({ title: h.title, price: h.min_price })),
         })
         if (items.length >= (parsed.data.limit ?? 2)) break
       }
       return json({ items })
+      } catch (e) {
+        return json({ items: [], error: String((e as Error).message).slice(0, 200) })
+      }
     },
   },
   {
