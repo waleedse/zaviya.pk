@@ -10,6 +10,7 @@ import { TOOLS } from '@/components/home/tools'
 import type { ArticleCard, RateTick } from '@zaviya/shared'
 import { localePath, t } from '@/lib/i18n'
 import { PageviewBeacon } from '@/components/analytics/PageviewBeacon'
+import { HideOnShop } from '@/components/layout/HideOnShop'
 
 export function FrontendShell({
   locale,
@@ -49,8 +50,10 @@ export function FrontendShell({
       <TopBar locale={locale} rates={rates} langHref={langHref} />
       <RatesStripMobile locale={locale} rates={rates} />
       <SiteHeader locale={locale} categories={categories} langHref={langHref} suggestions={trending} />
-      <TrendingStrip locale={locale} items={trending} />
-      <BreakingTicker items={breaking} locale={locale} label={tickerLabel} />
+      <HideOnShop>
+        <TrendingStrip locale={locale} items={trending} />
+        <BreakingTicker items={breaking} locale={locale} label={tickerLabel} />
+      </HideOnShop>
       <main id="main-content" className="min-h-[50vh]">
         {children}
       </main>

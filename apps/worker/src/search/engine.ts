@@ -76,8 +76,8 @@ export async function crawlPages(h: CrawlHost, name: string, deadline: number, r
     }
     const raw = h.platform === 'woo' ? (r.data as unknown[]) : ((r.data as { products?: unknown[] }).products ?? [])
     const items: Listing[] = h.platform === 'woo' ? parseWoo(raw as never) : parseShopify(raw as never, h.base_url, name)
-    for (let i = 0; i < items.length; i += 500) {
-      await request('POST', '/api/pipeline/search/import', { store: h.slug, items: items.slice(i, i + 500) }, { timeoutMs: 120_000 })
+    for (let i = 0; i < items.length; i += 250) {
+      await request('POST', '/api/pipeline/search/import', { store: h.slug, items: items.slice(i, i + 250) }, { timeoutMs: 120_000 })
     }
     listings += items.length
     const pageSize = h.platform === 'woo' ? 100 : PAGE

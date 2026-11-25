@@ -1,7 +1,7 @@
 import { decodeEntities } from '../phones/highlights.js'
 import { modelFrom } from '../appliances/collect.js'
 import { politeText } from './http.js'
-import type { Listing } from './parsers.js'
+import { htmlText, imageList, specList, type Listing } from './parsers.js'
 
 /**
  * Shops without a JSON feed (docs/PRODUCT-SEARCH.md section 7): product URLs come from the shop's sitemap, each product page is read for its
@@ -89,6 +89,14 @@ export function parseProductHtml(html: string, url: string): Listing | null {
         inStock: !/OutOfStock|SoldOut|Discontinued/i.test(String(offer.availability ?? '')),
         model: modelFrom(title),
         gtin: /^\d{8,14}$/.test(gtin) ? gtin : undefined,
+        images: imageList([o.image].flat().map((x: any) => (typeof x === 'string' ? x : x?.url))),
+        description: htmlText(o.description) || undefined,
+        specs: specList([
+          ...(str(o.brand, 60) ? [['Brand', str(o.brand, 60)] as [unknown, unknown]] : []),
+          ...(o.model ? [['Model', str(o.model, 80)] as [unknown, unknown]] : []),
+          ...(o.color ? [['Colour', str(o.color, 60)] as [unknown, unknown]] : []),
+          ...flat(o.additionalProperty).map((x) => [x.name, x.value] as [unknown, unknown]),
+        ]),
       }
     }
   }

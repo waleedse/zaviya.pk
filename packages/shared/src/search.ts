@@ -26,6 +26,12 @@ export interface ProductDoc {
   category_path: string[]
   image: string | null
   image_store: string | null
+  /** up to 6 distinct store pictures ({url, store name}); the first is `image` */
+  images?: { url: string; store: string }[]
+  /** the longest store description, plain text */
+  description?: string | null
+  /** name -> value pairs the stores list, merged (first store wins), at most 24 */
+  specs?: Record<string, string> | null
   offers: ProductOffer[]
   min_price: number
   max_price: number
@@ -89,7 +95,8 @@ export function searchSynonyms(): Record<string, string[]> {
 
 export function productsIndexSettings() {
   return {
-    searchableAttributes: ['title', 'brand', 'model', 'category_path', 'stores'],
+    // not 'stores': "airpods" matched every product of the store airpods.pk (26 Nov); the store filter covers store search
+    searchableAttributes: ['title', 'brand', 'model', 'category_path'],
     filterableAttributes: ['group', 'category_path', 'brand', 'stores', 'min_price', 'in_stock_any', 'store_count', 'price_drop_pct', 'updated_at'],
     sortableAttributes: ['min_price', 'popularity', 'updated_at', 'price_drop_pct', 'store_count'],
     // popularity right after words/typo (all query words must match first): the 'attribute' rule prefers a word at the start of the title, which put "iPhone 17 Handsfree" above "Apple iPhone 18 Pro". A phone (more stores, our own page, main category) outranks an accessory whose title also starts with the query
@@ -97,6 +104,8 @@ export function productsIndexSettings() {
     typoTolerance: { enabled: true, minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 } },
     synonyms: searchSynonyms(),
     pagination: { maxTotalHits: 2000 },
+    // the category tree has ~170 paths: every one needs its count from a single facet query
+    faceting: { maxValuesPerFacet: 500 },
     displayedAttributes: ['*'],
   }
 }

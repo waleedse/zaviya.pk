@@ -5,6 +5,10 @@ import { PRODUCTS_INDEX, TAXONOMY_VERSION, categorize, categoryLevels, docId, of
 import { keys as matchKeys, matchOffer } from './offers'
 import { meili, meiliConfigured, waitTask } from '@/lib/search/meili'
 import { discoveryReport, searchStatus } from '@/lib/search/status'
+import { refreshCategories } from '@/lib/search/categories'
+import { buildDoc } from '@/lib/search/build-doc'
+
+export { buildDoc }
 import { json, parseJson, requireBotOrAdmin } from './helpers'
 
 /**
@@ -44,58 +48,6 @@ async function loadNames(req: PayloadRequest) {
   return names.map
 }
 
-export function buildDoc(key: string, rows: Row[], storeName: (slug: string) => string = (x) => x): ProductDoc | null {
-  const offers = rows
-    .filter((r) => r.price_pkr != null)
-    .map((r) => ({
-      slug: String(r.slug),
-      store: String(r.store),
-      store_name: storeName(String(r.store)),
-      price: Number(r.price_pkr),
-      list_price: r.list_price_pkr != null && Number(r.list_price_pkr) > Number(r.price_pkr) ? Number(r.list_price_pkr) : null,
-      in_stock: r.in_stock !== false,
-      url: String(r.url),
-      image: (r.image_url as string | null) ?? null,
-      updated_at: Math.floor(new Date(r.seen_at ?? Date.now()).getTime() / 1000),
-    }))
-    .sort((a, b) => Number(b.in_stock) - Number(a.in_stock) || a.price - b.price)
-    .slice(0, 30)
-  if (!offers.length) return null
-  const best = rows.find((r) => Number(r.price_pkr) === offers[0]!.price && String(r.store) === offers[0]!.store) ?? rows[0]!
-  const withImage = rows.find((r) => r.image_url)
-  const prices = offers.map((o) => o.price)
-  const weekAgo = Date.now() - 7 * 86_400_000
-  let drop = 0
-  for (const r of rows) {
-    if (r.prev_price_pkr && r.price_changed_at && new Date(r.price_changed_at).getTime() > weekAgo && Number(r.price_pkr) < Number(r.prev_price_pkr)) {
-      drop = Math.max(drop, Math.round((1 - Number(r.price_pkr) / Number(r.prev_price_pkr)) * 100))
-    }
-  }
-  const stores = [...new Set(offers.map((o) => o.store))]
-  return {
-    id: docId(key),
-    title: String(best.title),
-    brand: (best.brand as string | null) ?? null,
-    model: (best.model as string | null) ?? null,
-    group: String(best.group),
-    category_path: categoryLevels(((best.cat as string | null) ?? null) === 'Other' ? null : ((best.cat as string | null) ?? null)),
-    image: (withImage?.image_url as string | null) ?? null,
-    image_store: withImage ? String(withImage.store) : null,
-    offers,
-    min_price: Math.min(...prices),
-    max_price: Math.max(...prices),
-    store_count: stores.length,
-    stores,
-    in_stock_any: offers.some((o) => o.in_stock),
-    match_kind: (best.match_kind as string | null) ?? null,
-    match_slug: (best.match_slug as string | null) ?? null,
-    price_drop_pct: drop,
-    // main products rank above their accessories ("iphone" shows phones before chargers); more stores and a match to our own page rank higher
-    popularity: stores.length * 10 + (offers.some((o) => o.in_stock) ? 5 : 0) + (best.match_slug ? 20 : 0) + (['mobiles', 'laptops', 'tablets', 'tvs', 'cameras', 'home-appliances', 'smartwatches'].includes(String(best.group)) ? 25 : 0) - (best.group === 'accessories' ? 10 : 0),
-    updated_at: Math.max(...offers.map((o) => o.updated_at)),
-  }
-}
-
 export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolean } = {}) {
   const started = Date.now()
   await ensureIndex()
@@ -126,7 +78,7 @@ export async function syncProducts(req: PayloadRequest, opts: { reindex?: boolea
     await run(req, sql`UPDATE store_offers o SET product_key = v.k FROM (VALUES ${sql.join(keyed.map((k) => sql`(${k.id}::int, ${k.key}::text)`), sql`, `)}) AS v(id, k) WHERE o.id = v.id AND o.product_key IS DISTINCT FROM v.k`)
     const all = await run(
       req,
-      sql`SELECT slug, store, title, brand, model, "group", cat, url, image_url, price_pkr, list_price_pkr, prev_price_pkr, price_changed_at, in_stock, match_kind, match_slug, seen_at, product_key FROM store_offers WHERE product_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) AND price_pkr IS NOT NULL AND seen_at > now() - ${`${FRESH_DAYS} days`}::interval`,
+      sql`SELECT slug, store, title, brand, model, "group", cat, url, image_url, images, description, specs, price_pkr, list_price_pkr, prev_price_pkr, price_changed_at, in_stock, match_kind, match_slug, seen_at, product_key FROM store_offers WHERE product_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) AND price_pkr IS NOT NULL AND seen_at > now() - ${`${FRESH_DAYS} days`}::interval`,
     )
     const byKey = new Map<string, Row[]>()
     for (const r of all) byKey.set(r.product_key, [...(byKey.get(r.product_key) ?? []), r])
@@ -191,6 +143,9 @@ const ItemBody = z.object({
         inStock: z.boolean().optional(),
         model: z.string().max(80).optional(),
         gtin: z.string().max(20).optional(),
+        images: z.array(z.string().max(500)).max(12).optional(),
+        description: z.string().max(2000).optional(),
+        specs: z.record(z.string().max(60), z.string().max(200)).optional(),
       }),
     )
     .min(1)
@@ -295,12 +250,12 @@ export const searchEndpoints: Endpoint[] = [
       const rows = [...bySlug.values()].map((it) => {
         const group = offerGroup(it.title, it.productType ?? '')
         const m = matchOffer({ title: it.title, brand: it.brand, group, model: it.model }, k)
-        return sql`(${it.slug}, ${store}, ${it.title}, ${it.brand ?? null}, ${group}, ${it.url}, ${it.imageUrl ?? null}, ${it.pricePkr}::numeric, ${it.listPricePkr ?? null}::numeric, ${it.inStock ?? null}::boolean, ${it.model ?? null}, ${m?.kind ?? null}, ${m?.slug ?? null}, ${it.productType ?? null}, ${it.gtin ?? null}, ${categorize(it.title, it.productType ?? '') ?? 'Other'})`
+        return sql`(${it.slug}, ${store}, ${it.title}, ${it.brand ?? null}, ${group}, ${it.url}, ${it.imageUrl ?? null}, ${it.pricePkr}::numeric, ${it.listPricePkr ?? null}::numeric, ${it.inStock ?? null}::boolean, ${it.model ?? null}, ${m?.kind ?? null}, ${m?.slug ?? null}, ${it.productType ?? null}, ${it.gtin ?? null}, ${categorize(it.title, it.productType ?? '') ?? 'Other'}, ${it.images?.filter((u) => /^https?:\/\//.test(u)).length ? JSON.stringify(it.images.filter((u) => /^https?:\/\//.test(u)).slice(0, 6)) : null}::jsonb, ${it.description ?? null}, ${it.specs && Object.keys(it.specs).length ? JSON.stringify(it.specs) : null}::jsonb)`
       })
       const res = await run(
         req,
-        sql`INSERT INTO store_offers (slug, store, title, brand, "group", url, image_url, price_pkr, list_price_pkr, in_stock, model, match_kind, match_slug, category_path, gtin, cat, seen_at, first_seen_at, price_changed_at, updated_at, created_at)
-          SELECT v.*, now(), now(), now(), now(), now() FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(slug, store, title, brand, grp, url, image_url, price, list_price, in_stock, model, match_kind, match_slug, category_path, gtin, cat)
+        sql`INSERT INTO store_offers (slug, store, title, brand, "group", url, image_url, price_pkr, list_price_pkr, in_stock, model, match_kind, match_slug, category_path, gtin, cat, images, description, specs, seen_at, first_seen_at, price_changed_at, updated_at, created_at)
+          SELECT v.*, now(), now(), now(), now(), now() FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(slug, store, title, brand, grp, url, image_url, price, list_price, in_stock, model, match_kind, match_slug, category_path, gtin, cat, images, description, specs)
           ON CONFLICT (slug) DO UPDATE SET
             title = EXCLUDED.title, brand = EXCLUDED.brand, "group" = EXCLUDED."group", url = EXCLUDED.url,
             image_url = coalesce(EXCLUDED.image_url, store_offers.image_url),
@@ -308,7 +263,8 @@ export const searchEndpoints: Endpoint[] = [
             price_changed_at = CASE WHEN EXCLUDED.price_pkr IS DISTINCT FROM store_offers.price_pkr AND store_offers.price_pkr IS NOT NULL THEN now() ELSE store_offers.price_changed_at END,
             price_pkr = EXCLUDED.price_pkr, list_price_pkr = EXCLUDED.list_price_pkr, in_stock = EXCLUDED.in_stock, model = EXCLUDED.model,
             match_kind = EXCLUDED.match_kind, match_slug = EXCLUDED.match_slug, category_path = coalesce(EXCLUDED.category_path, store_offers.category_path),
-            gtin = coalesce(EXCLUDED.gtin, store_offers.gtin), cat = EXCLUDED.cat, first_seen_at = coalesce(store_offers.first_seen_at, store_offers.created_at),
+            gtin = coalesce(EXCLUDED.gtin, store_offers.gtin), cat = EXCLUDED.cat,
+            images = coalesce(EXCLUDED.images, store_offers.images), description = coalesce(EXCLUDED.description, store_offers.description), specs = coalesce(EXCLUDED.specs, store_offers.specs), first_seen_at = coalesce(store_offers.first_seen_at, store_offers.created_at),
             seen_at = now(),
             -- only a real change makes the row "dirty" for the Meilisearch sync (re-reading an unchanged listing costs nothing downstream)
             updated_at = CASE WHEN EXCLUDED.price_pkr IS DISTINCT FROM store_offers.price_pkr OR EXCLUDED.in_stock IS DISTINCT FROM store_offers.in_stock OR EXCLUDED.title IS DISTINCT FROM store_offers.title OR store_offers.seen_at < now() - interval '1 day' THEN now() ELSE store_offers.updated_at END
@@ -339,12 +295,63 @@ export const searchEndpoints: Endpoint[] = [
         body = (await req.json!()) ?? {}
       } catch {}
       try {
-        return json({ ok: true, ...(await syncProducts(req, { reindex: Boolean(body.reindex) })) })
+        const synced = await syncProducts(req, { reindex: Boolean(body.reindex) })
+        // the category tree (counts, lowest price, picture) follows the index, every 30 minutes
+        let categories: unknown
+        try {
+          categories = await refreshCategories(req.payload.db.drizzle as never)
+        } catch (e) {
+          categories = { error: String((e as Error).message).slice(0, 200) }
+        }
+        return json({ ok: true, ...synced, categories })
       } catch (e) {
         const msg = String((e as Error).message).slice(0, 300)
         await run(req, sql`UPDATE search_sync_state SET last_error = ${msg} WHERE id = 1`).catch(() => {})
         return json({ ok: false, error: msg }, 502)
       }
+    },
+  },
+  {
+    // products that need a (new) AI note: popular, 2+ stores, no note in the last 7 days
+    path: '/pipeline/search/ai-todo',
+    method: 'post',
+    handler: async (req) => {
+      const denied = requireBotOrAdmin(req)
+      if (denied) return denied
+      if (!meiliConfigured()) return json({ items: [] })
+      const parsed = await parseJson(req, z.object({ limit: z.number().int().min(1).max(5).optional() }))
+      if ('error' in parsed) return parsed.error
+      const have = new Set((await run(req, sql`SELECT product_id FROM product_ai_notes WHERE created_at > now() - interval '7 days'`)).map((r) => String(r.product_id)))
+      const r = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: ['store_count >= 2', 'in_stock_any = true'], sort: ['popularity:desc'], limit: 40 }, 10_000)
+      const items = []
+      for (const p of r.hits) {
+        if (have.has(p.id)) continue
+        const cat = p.category_path.at(-1) ?? ''
+        const sim = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: [`category_path = "${cat.replace(/"/g, '')}"`, `id != "${p.id}"`, 'in_stock_any = true'], sort: ['popularity:desc'], limit: 4 }, 10_000).catch(() => ({ hits: [] as ProductDoc[] }))
+        items.push({
+          id: p.id,
+          title: p.title,
+          brand: p.brand,
+          category: p.category_path.at(-1) ?? 'Other',
+          offers: p.offers.slice(0, 6).map((o) => ({ store: o.store_name, price: o.price, listPrice: o.list_price, inStock: o.in_stock })),
+          similar: sim.hits.map((h) => ({ title: h.title, price: h.min_price })),
+        })
+        if (items.length >= (parsed.data.limit ?? 2)) break
+      }
+      return json({ items })
+    },
+  },
+  {
+    path: '/pipeline/search/ai-note',
+    method: 'post',
+    handler: async (req) => {
+      const denied = requireBotOrAdmin(req)
+      if (denied) return denied
+      const parsed = await parseJson(req, z.object({ productId: z.string().min(1).max(480), note: z.string().min(40).max(800), model: z.string().max(80).optional() }))
+      if ('error' in parsed) return parsed.error
+      const { productId, note, model } = parsed.data
+      await run(req, sql`INSERT INTO product_ai_notes (product_id, note, model, created_at) VALUES (${productId}, ${note}, ${model ?? null}, now()) ON CONFLICT (product_id) DO UPDATE SET note = EXCLUDED.note, model = EXCLUDED.model, created_at = now()`)
+      return json({ ok: true })
     },
   },
   {
