@@ -59,7 +59,7 @@ async function bestOffersRaw(min: number, max: number, limit = 8): Promise<DealC
     const r = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter: [`min_price >= ${min}`, `min_price <= ${max}`, 'in_stock_any = true', 'store_count >= 2'], sort: ['popularity:desc'], limit: 300, attributesToRetrieve: FIELDS }, 8000)
     return r.hits
       .map(card)
-      .filter((c): c is DealCard => c != null && c.offPct >= 5 && c.offPct <= 70)
+      .filter((c): c is DealCard => c != null && c.offPct >= 5 && c.offPct <= 50)
       .sort((a, b) => b.offPct - a.offPct)
       .slice(0, limit)
   }
@@ -74,7 +74,7 @@ async function onSaleRaw(limit = 48, cat?: string): Promise<DealCard[]> {
     const r = await meili<{ hits: ProductDoc[] }>('POST', `/indexes/${PRODUCTS_INDEX}/search`, { q: '', filter, sort: ['popularity:desc'], limit: 400, attributesToRetrieve: FIELDS }, 8000)
     return r.hits
       .map(card)
-      .filter((c): c is DealCard => c != null && c.offPct >= 10 && c.offPct <= 70)
+      .filter((c): c is DealCard => c != null && c.offPct >= 10 && c.offPct <= 50)
       .sort((a, b) => b.offPct - a.offPct)
       .slice(0, limit)
   }
