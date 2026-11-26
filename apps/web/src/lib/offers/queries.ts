@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache'
 import { sql } from '@payloadcms/db-postgres'
 import { RETAIL_STORES } from '@zaviya/shared'
 import { getPayloadClient } from '../payload'
@@ -73,28 +74,40 @@ export function sortOffers(offers: OfferView[]): OfferView[] {
 }
 
 /** Store prices that moved recently, biggest moves first: the "price changes" list people click */
-export async function recentOfferChanges(limit = 12, days = 7): Promise<OfferView[]> {
-  try {
-    const payload = await getPayloadClient()
-    const res = await payload.find({
-      collection: 'store-offers' as never,
-      where: { and: [{ prevPricePkr: { exists: true } }, { priceChangedAt: { greater_than: new Date(Date.now() - days * 86_400_000).toISOString() } }, { imageUrl: { exists: true } }] } as never,
-      limit: 200,
-      depth: 0,
-      sort: '-priceChangedAt',
-      overrideAccess: true,
-    })
-    const rows = (res.docs as unknown as Record<string, any>[]).map(toOfferView).filter((o) => o.pricePkr && o.prevPricePkr && o.pricePkr !== o.prevPricePkr)
-    rows.sort((a, b) => Math.abs(b.pricePkr! - b.prevPricePkr!) / b.prevPricePkr! - Math.abs(a.pricePkr! - a.prevPricePkr!) / a.prevPricePkr!)
-    return rows.slice(0, limit)
-  } catch {
-    return []
-  }
+async function recentOfferChangesRaw(limit = 12, days = 7): Promise<OfferView[]> {
+  const payload = await getPayloadClient()
+  const res = await payload.find({
+    collection: 'store-offers' as never,
+    where: { and: [{ prevPricePkr: { exists: true } }, { priceChangedAt: { greater_than: new Date(Date.now() - days * 86_400_000).toISOString() } }, { imageUrl: { exists: true } }] } as never,
+    limit: 200,
+    depth: 0,
+    sort: '-priceChangedAt',
+    overrideAccess: true,
+  })
+  const rows = (res.docs as unknown as Record<string, any>[]).map(toOfferView).filter((o) => o.pricePkr && o.prevPricePkr && o.pricePkr !== o.prevPricePkr)
+  rows.sort((a, b) => Math.abs(b.pricePkr! - b.prevPricePkr!) / b.prevPricePkr! - Math.abs(a.pricePkr! - a.prevPricePkr!) / a.prevPricePkr!)
+  return rows.slice(0, limit)
 }
+export const recentOfferChanges = cachedOk('recentOfferChanges', 600, [] as OfferView[], recentOfferChangesRaw)
 
 // ---------- shop pages: /prices/shop/<group> and /prices/item/<slug> (15 Nov 2026) ----------
 
 type Row = Record<string, any>
+
+/**
+ * Cache a heavy listing query across requests (the first visitor after expiry used to pay 2-7 s on a busy server).
+ * A failed query throws inside the cache, so a failure is never cached; the caller still gets the safe fallback.
+ */
+function cachedOk<A extends unknown[], R>(name: string, seconds: number, fallback: R, fn: (...a: A) => Promise<R>): (...a: A) => Promise<R> {
+  const c = unstable_cache(async (...a: A) => fn(...a), ['zaviya-offers', name], { revalidate: seconds })
+  return async (...a: A) => {
+    try {
+      return await c(...a)
+    } catch {
+      return fallback
+    }
+  }
+}
 async function rows(q: ReturnType<typeof sql>): Promise<Row[]> {
   const payload = await getPayloadClient()
   return ((await payload.db.drizzle.execute(q)) as unknown as { rows?: Row[] }).rows ?? []
@@ -130,47 +143,41 @@ export interface GroupSummary {
 }
 
 /** Listings per store category with the cheapest price and one picture (the most expensive in-stock item looks best) */
-export async function offerGroupSummaries(): Promise<GroupSummary[]> {
-  try {
-    const r = await rows(sql`
-      SELECT "group" AS slug, count(*)::int AS count,
-        -- "from" price: the 5th percentile, so a Rs 199 sleeve does not make laptops look "from Rs 199"
-        percentile_disc(0.05) WITHIN GROUP (ORDER BY price_pkr) AS min_price,
-        (array_agg(image_url ORDER BY coalesce(in_stock, true) DESC, price_pkr DESC) FILTER (WHERE image_url IS NOT NULL))[1] AS image_url
-      FROM store_offers WHERE ${FRESH} GROUP BY "group"`)
-    return r.map((x) => ({ slug: String(x.slug), count: Number(x.count), minPrice: x.min_price == null ? null : Number(x.min_price), imageUrl: x.image_url ?? null }))
-  } catch {
-    return []
-  }
+async function offerGroupSummariesRaw(): Promise<GroupSummary[]> {
+  const r = await rows(sql`
+    SELECT "group" AS slug, count(*)::int AS count,
+      -- "from" price: the 5th percentile, so a Rs 199 sleeve does not make laptops look "from Rs 199"
+      percentile_disc(0.05) WITHIN GROUP (ORDER BY price_pkr) AS min_price,
+      (array_agg(image_url ORDER BY coalesce(in_stock, true) DESC, price_pkr DESC) FILTER (WHERE image_url IS NOT NULL))[1] AS image_url
+    FROM store_offers WHERE ${FRESH} GROUP BY "group"`)
+  return r.map((x) => ({ slug: String(x.slug), count: Number(x.count), minPrice: x.min_price == null ? null : Number(x.min_price), imageUrl: x.image_url ?? null }))
 }
+export const offerGroupSummaries = cachedOk('offerGroupSummaries', 900, [] as GroupSummary[], offerGroupSummariesRaw)
 
 export type OfferSort = 'popular' | 'low' | 'high' | 'drops'
 export const OFFER_PAGE_SIZE = 48
 
 /** One page of a store category, with its brands for the filter chips */
-export async function offersInGroup(group: string, opts: { brand?: string; sort?: OfferSort; page?: number } = {}): Promise<{ items: OfferView[]; total: number; brands: { name: string; count: number }[] }> {
-  try {
-    const brandWhere = opts.brand ? sql` AND lower(brand) = ${opts.brand.toLowerCase()} AND position(lower(brand) in lower(title)) > 0` : sql``
-    const order =
-      opts.sort === 'low'
-        ? sql`price_pkr ASC`
-        : opts.sort === 'high'
-          ? sql`price_pkr DESC`
-          : opts.sort === 'drops'
-            ? sql`(prev_price_pkr IS NOT NULL AND price_pkr < prev_price_pkr) DESC, price_changed_at DESC NULLS LAST`
-            : // "popular": in stock, with a picture and a discount first, then the dearer (main) products before cheap add-ons
-              sql`coalesce(in_stock, true) DESC, (image_url IS NOT NULL) DESC, (list_price_pkr > price_pkr) DESC, price_pkr DESC`
-    const page = Math.max(1, opts.page ?? 1)
-    const [items, total, brands] = await Promise.all([
-      rows(sql`SELECT ${COLS} FROM store_offers WHERE ${FRESH} AND "group" = ${group}${brandWhere} ORDER BY ${order} LIMIT ${OFFER_PAGE_SIZE} OFFSET ${(page - 1) * OFFER_PAGE_SIZE}`),
-      rows(sql`SELECT count(*)::int AS n FROM store_offers WHERE ${FRESH} AND "group" = ${group}${brandWhere}`),
-      rows(sql`SELECT brand AS name, count(*)::int AS count FROM store_offers WHERE ${FRESH} AND "group" = ${group} AND brand IS NOT NULL AND brand <> '' AND position(lower(brand) in lower(title)) > 0 GROUP BY brand HAVING count(*) >= 2 ORDER BY count(*) DESC LIMIT 24`),
-    ])
-    return { items: items.map(fromRow), total: Number(total[0]?.n ?? 0), brands: brands.map((b) => ({ name: String(b.name), count: Number(b.count) })) }
-  } catch {
-    return { items: [], total: 0, brands: [] }
-  }
+async function offersInGroupRaw(group: string, opts: { brand?: string; sort?: OfferSort; page?: number } = {}): Promise<{ items: OfferView[]; total: number; brands: { name: string; count: number }[] }> {
+  const brandWhere = opts.brand ? sql` AND lower(brand) = ${opts.brand.toLowerCase()} AND position(lower(brand) in lower(title)) > 0` : sql``
+  const order =
+    opts.sort === 'low'
+      ? sql`price_pkr ASC`
+      : opts.sort === 'high'
+        ? sql`price_pkr DESC`
+        : opts.sort === 'drops'
+          ? sql`(prev_price_pkr IS NOT NULL AND price_pkr < prev_price_pkr) DESC, price_changed_at DESC NULLS LAST`
+          : // "popular": in stock, with a picture and a discount first, then the dearer (main) products before cheap add-ons
+            sql`coalesce(in_stock, true) DESC, (image_url IS NOT NULL) DESC, (list_price_pkr > price_pkr) DESC, price_pkr DESC`
+  const page = Math.max(1, opts.page ?? 1)
+  const [items, total, brands] = await Promise.all([
+    rows(sql`SELECT ${COLS} FROM store_offers WHERE ${FRESH} AND "group" = ${group}${brandWhere} ORDER BY ${order} LIMIT ${OFFER_PAGE_SIZE} OFFSET ${(page - 1) * OFFER_PAGE_SIZE}`),
+    rows(sql`SELECT count(*)::int AS n FROM store_offers WHERE ${FRESH} AND "group" = ${group}${brandWhere}`),
+    rows(sql`SELECT brand AS name, count(*)::int AS count FROM store_offers WHERE ${FRESH} AND "group" = ${group} AND brand IS NOT NULL AND brand <> '' AND position(lower(brand) in lower(title)) > 0 GROUP BY brand HAVING count(*) >= 2 ORDER BY count(*) DESC LIMIT 24`),
+  ])
+  return { items: items.map(fromRow), total: Number(total[0]?.n ?? 0), brands: brands.map((b) => ({ name: String(b.name), count: Number(b.count) })) }
 }
+export const offersInGroup = cachedOk('offersInGroup', 300, { items: [] as OfferView[], total: 0, brands: [] as { name: string; count: number }[] }, offersInGroupRaw)
 
 /** One listing, for its own page */
 export async function getOffer(slug: string): Promise<OfferView | null> {
@@ -233,18 +240,15 @@ export async function offerSitemapRows(limit = 20000): Promise<{ slug: string; g
 }
 
 /** Biggest real discounts on store websites right now (crossed-out price), a few per category so one shop can't fill the row */
-export async function topDiscounts(limit = 12): Promise<OfferView[]> {
-  try {
-    const r = await rows(sql`
-      SELECT * FROM (
-        SELECT ${COLS}, row_number() OVER (PARTITION BY "group" ORDER BY (list_price_pkr - price_pkr)::float / list_price_pkr DESC) AS rn
-        FROM store_offers
-        WHERE ${FRESH} AND coalesce(in_stock, true) AND image_url IS NOT NULL AND price_pkr >= 2000
-          AND list_price_pkr > price_pkr AND (list_price_pkr - price_pkr)::float / list_price_pkr BETWEEN 0.1 AND 0.7
-      ) t WHERE rn <= 3
-      ORDER BY (list_price_pkr - price_pkr)::float / list_price_pkr DESC LIMIT ${limit}`)
-    return r.map(fromRow)
-  } catch {
-    return []
-  }
+async function topDiscountsRaw(limit = 12): Promise<OfferView[]> {
+  const r = await rows(sql`
+    SELECT * FROM (
+      SELECT ${COLS}, row_number() OVER (PARTITION BY "group" ORDER BY (list_price_pkr - price_pkr)::float / list_price_pkr DESC) AS rn
+      FROM store_offers
+      WHERE ${FRESH} AND coalesce(in_stock, true) AND image_url IS NOT NULL AND price_pkr >= 2000
+        AND list_price_pkr > price_pkr AND (list_price_pkr - price_pkr)::float / list_price_pkr BETWEEN 0.1 AND 0.7
+    ) t WHERE rn <= 3
+    ORDER BY (list_price_pkr - price_pkr)::float / list_price_pkr DESC LIMIT ${limit}`)
+  return r.map(fromRow)
 }
+export const topDiscounts = cachedOk('topDiscounts', 600, [] as OfferView[], topDiscountsRaw)
