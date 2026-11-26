@@ -479,7 +479,7 @@ export async function createWorkerRuntime(
         // Product search: changed store offers -> Meilisearch (apps/web/src/endpoints/pipeline/search.ts); weekly full reindex
         if (job.name === 'search-report') return payload.request('POST', '/api/pipeline/search/report', {}, { timeoutMs: 60_000 })
         // AI buying notes for the most popular product pages (low LLM priority, 2 per run)
-        if (job.name === 'search-ai-notes') return runAiNotes({ request: (m, p, b, o) => payload.request(m, p, b, o), router })
+        if (job.name === 'search-ai-notes') return runAiNotes({ request: (m, p, b, o) => payload.request(m, p, b, o), router }, 1)
         if (job.name === 'search-sync') return payload.request('POST', '/api/pipeline/search/sync', { reindex: Boolean((job.data as { reindex?: boolean })?.reindex) }, { timeoutMs: 110_000 })
         // Product search engine: probe candidate stores, crawl active ones page by page (apps/worker/src/search/engine.ts)
         if (job.name === 'search-engine') return runSearchTick({ request: (m, p, b, o) => payload.request(m, p, b, o), kv: redis, bridge: bridge as never })

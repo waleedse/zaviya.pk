@@ -2,7 +2,7 @@ import type { LLMRouter } from '@zaviya/llm'
 
 /**
  * AI notes on product pages (26 Nov redesign): for the most popular products sold by 2+ stores, a short plain-language note on which store
- * deal is best and who the product suits. Low priority on the LLM budget ('seo' task), 2 products per run, each note kept 7 days.
+ * deal is best and who the product suits. Runs as a 'write_en' call so the Cursor/Claude plan engines take it first (the 'seo' task goes to local Ollama, which is off on the server, and every note was silently skipped); 1 product per run, each note kept 7 days.
  * The page always shows the rule-based pick too, and says the AI note can be wrong.
  */
 type Request = (method: string, path: string, body?: unknown, opts?: { timeoutMs?: number }) => Promise<unknown>
@@ -38,13 +38,13 @@ export function cleanNote(text: string): string | null {
   return t
 }
 
-export async function runAiNotes(deps: { request: Request; router: LLMRouter }, n = 2): Promise<{ written: number; skipped: number }> {
+export async function runAiNotes(deps: { request: Request; router: LLMRouter }, n = 1): Promise<{ written: number; skipped: number }> {
   const todo = ((await deps.request('POST', '/api/pipeline/search/ai-todo', { limit: n }, { timeoutMs: 30_000 })) as { items?: Todo[] }).items ?? []
   let written = 0
   let skipped = 0
   for (const p of todo) {
     try {
-      const res = await deps.router.chat('seo', { messages: [{ role: 'user', content: notePrompt(p) }], temperature: 0.3, maxTokens: 300, timeoutMs: 90_000 })
+      const res = await deps.router.chat('write_en', { messages: [{ role: 'user', content: notePrompt(p) }], temperature: 0.3, maxTokens: 300, timeoutMs: 90_000 })
       const note = cleanNote(res.content)
       if (!note) {
         skipped++
