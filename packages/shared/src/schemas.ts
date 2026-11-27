@@ -171,5 +171,12 @@ export const XPostSchema = z.object({
   url: z.string(),
   createdAt: z.string(),
   mediaUrls: z.array(z.string()).default([]),
+  /** Counters shown on the post (extension scrape); absent when X does not show them */
+  views: z.number().optional(),
+  likes: z.number().optional(),
+  reposts: z.number().optional(),
+  replies: z.number().optional(),
+  /** The post carries a video player */
+  hasVideo: z.boolean().optional(),
 })
 export type XPost = z.infer<typeof XPostSchema>

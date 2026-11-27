@@ -31,6 +31,7 @@ import { postX } from './social/x.js'
 /** How long an X post waits before trying again when the Chrome extension is offline */
 const X_OFFLINE_RETRY_MS = 15 * 60_000
 import { processQuoteJob, QUOTE_JOB, runQuoteRound, type QuoteJobData } from './social/quote-post.js'
+import { VIRAL_JOB, runViralRound } from './social/viral-radar.js'
 import { runSocialMetrics } from './social/metrics.js'
 import { redisKv, runCommentReplies } from './social/comments.js'
 import { redisKv as mailKv } from './mail/kv.js'
@@ -498,6 +499,8 @@ export async function createWorkerRuntime(
       async (job) => {
         // Quote cards: watch-list posts and quotes from published stories (one card per round)
         if (job.name === 'quote-round') return runQuoteRound({ env, payload, bridge, redis, socialQueue: queues.social })
+        // Viral radar: famous accounts' real videos, scored; VIRAL_RADAR=off|dry|live (default dry = log only)
+        if (job.name === VIRAL_JOB) return runViralRound({ env: { ...env, VIRAL_RADAR: process.env.VIRAL_RADAR }, payload, bridge, redis })
         if (!bridge.isOnline()) return { skipped: 'extension offline' }
         const { sources } = await payload.getSources()
         const xSource = sources.find((s) => s.key === 'x-discovery')
@@ -609,6 +612,12 @@ export async function scheduleIngestSources(runtime: WorkerRuntime): Promise<voi
     await runtime.queues.discover.removeJobScheduler('quote-round').catch(() => {})
   } else {
     await runtime.queues.discover.upsertJobScheduler('quote-round', { every: 45 * 60 * 1000 }, { name: 'quote-round', data: {} })
+  }
+  // Viral radar (social/viral-radar.ts): a round every 40 minutes; VIRAL_RADAR=off removes it, dry (default) only logs, live posts.
+  if (process.env.VIRAL_RADAR === 'off') {
+    await runtime.queues.discover.removeJobScheduler(VIRAL_JOB).catch(() => {})
+  } else {
+    await runtime.queues.discover.upsertJobScheduler(VIRAL_JOB, { every: 40 * 60 * 1000 }, { name: VIRAL_JOB, data: {} })
   }
   await runtime.queues.data.add('rates', {})
   // Mobile prices and specs (zaviya.pk/mobile-prices): daily refresh from the official Pakistan sites. PHONE_PRICES=0 turns it off.

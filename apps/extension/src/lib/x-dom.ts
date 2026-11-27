@@ -7,6 +7,14 @@ export function detectCheckpoint(): boolean {
   return /unusual activity|account locked|verify you are human|captcha/i.test(body)
 }
 
+/** "36924 views. View post analytics" / "85 Likes. Like" / "1.2K ..." -> a number, or undefined when the counter is not there */
+export function countFromLabel(label: string | null | undefined): number | undefined {
+  const m = (label ?? '').replace(/,/g, '').match(/^\s*(\d+(?:\.\d+)?)\s*([KkMm])?/)
+  if (!m) return undefined
+  const n = Number(m[1]) * (m[2] ? (m[2].toLowerCase() === 'k' ? 1_000 : 1_000_000) : 1)
+  return Number.isFinite(n) ? Math.round(n) : undefined
+}
+
 export function scrapeTimelinePosts(sinceId?: string, limit = 30): XPost[] {
   const articles = document.querySelectorAll('article[data-testid="tweet"]')
   const posts: XPost[] = []
@@ -39,6 +47,11 @@ export function scrapeTimelinePosts(sinceId?: string, limit = 30): XPost[] {
         url: `https://x.com/i/web/status/${id}`,
         createdAt: article.querySelector('time')?.getAttribute('datetime') ?? new Date().toISOString(),
         mediaUrls,
+        views: countFromLabel(article.querySelector('a[href$="/analytics"]')?.getAttribute('aria-label')),
+        likes: countFromLabel(article.querySelector('[data-testid="like"], [data-testid="unlike"]')?.getAttribute('aria-label')),
+        reposts: countFromLabel(article.querySelector('[data-testid="retweet"], [data-testid="unretweet"]')?.getAttribute('aria-label')),
+        replies: countFromLabel(article.querySelector('[data-testid="reply"]')?.getAttribute('aria-label')),
+        hasVideo: Boolean(article.querySelector('[data-testid="videoPlayer"], [data-testid="videoComponent"], video')),
       }),
     )
   }
