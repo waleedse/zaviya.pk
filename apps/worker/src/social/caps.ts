@@ -6,7 +6,7 @@ export type SocialPlatform = 'facebook' | 'instagram' | 'x'
  * Hard ceiling per platform while the audience is small (growth strategy 4.4, ZAV-115). The Settings value can lower
  * it but not raise it; lift this constant when the pages pass ~500 followers.
  */
-export const SOCIAL_CAP_CEILING: Record<SocialPlatform, number> = { facebook: 8, instagram: 5, x: 10 }
+export const SOCIAL_CAP_CEILING: Record<SocialPlatform, number> = { facebook: 8, instagram: 5, x: 14 }
 
 /** At least this long between two posts on one platform (breaking news is exempt) */
 export const MIN_GAP_MS = 45 * 60_000
