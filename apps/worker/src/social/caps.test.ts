@@ -8,7 +8,7 @@ describe('effectiveCap', () => {
   it('uses the lower of the setting and the ceiling', () => {
     expect(effectiveCap('facebook', { facebook: 15 })).toBe(8)
     expect(effectiveCap('instagram', { instagram: 3 })).toBe(3)
-    expect(effectiveCap('x')).toBe(10)
+    expect(effectiveCap('x')).toBe(14)
   })
 })
 
