@@ -49,6 +49,16 @@ export function dailyArticleCap(settings: { dailyCaps?: Record<string, number | 
 }
 /** Extra stories the schedule allows ahead of the clock, so a good hour is not starved. */
 export const CAP_BURST = 4
+/**
+ * Lookup stories are what readers come back for (gold, petrol, dollar rates, prize bonds, results, date sheets: docs/EDITOR-RULES.md section 8).
+ * They use the same extra slots as a trend-gap story, so they are not stuck behind the 40-a-day pace (28 Nov: gold and petrol waited for hours).
+ * The hard limit stays: daily cap + QUOTA_EXTRA_PER_DAY.
+ */
+const LOOKUP_TITLE =
+  /\b(gold|silver)\b[^.]{0,40}\b(rates?|prices?)\b|\b(petrol|diesel|hsd|lpg|cng)\b[^.]{0,40}\bprices?\b|\b(dollar|usd|rupee|currency|exchange)\b[^.]{0,30}\b(rates?|prices?)\b|\bprize bonds?\b|\b(results?|date sheet)\b|\b(price|rate)s? today\b/i
+export function isLookupTitle(title: string | undefined | null): boolean {
+  return Boolean(title) && LOOKUP_TITLE.test(title as string)
+}
 /** The cap-exempt desk (quotaOverdue) may add at most this many stories beyond the daily cap. */
 export const QUOTA_EXTRA_PER_DAY = 6
 /** Quiet hours in PKT: almost nobody reads, so at most OVERNIGHT_PER_HOUR stories an hour. */
