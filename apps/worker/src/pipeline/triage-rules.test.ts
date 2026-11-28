@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyTriageRules, computeWeightedScore } from './triage-rules.js'
+import { applyTriageRules, computeWeightedScore, isLookupTitle } from './triage-rules.js'
 import type { TriageResult } from '@zaviya/shared'
 
 const baseTriage: TriageResult = {
@@ -175,3 +175,12 @@ describe('dailyAllowance (6 Nov pacing)', () => {
   })
 })
 function ceil(n: number) { return Math.ceil(n) }
+
+describe('isLookupTitle (28 Nov: lookup stories use the extra slots)', () => {
+  it('matches rates, prices, results and date sheets', () => {
+    for (const t of ['Gold rate today in Pakistan: tola at Rs 479,000', 'Petrol price today cut Rs1 to Rs313 from midnight', 'Dollar rate today: USD to PKR in open market', 'Prize bond list 1500 results', 'BISE Sukkur class 9 result 2026', 'Matric date sheet announced']) expect(isLookupTitle(t)).toBe(true)
+  })
+  it('does not match ordinary news', () => {
+    for (const t of ['PM extends fuel relief to vehicles up to 1,000cc', 'Quetta Gladiators reject PSL franchise sale speculation', 'Karachi building collapse: Adil rescued alive']) expect(isLookupTitle(t)).toBe(false)
+  })
+})

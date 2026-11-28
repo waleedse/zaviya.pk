@@ -11,7 +11,7 @@ import type { WriteResult } from './write.js'
 import type { Priority, TriageResult } from '@zaviya/shared'
 import { logger } from '../logger.js'
 import { publishRank, rankOffsetMs, staleLowDeskStory } from './triage-order.js'
-import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
+import { capSlotWaitMs, dailyArticleCap, effectiveIntervalMin, isLookupTitle, QUOTA_EXTRA_PER_DAY } from './triage-rules.js'
 import { editorApproved, freshForApproved } from './pitch.js'
 import { isTrendGapCluster, isTrendMarked } from '../ingest/trend-gap-mark.js'
 import { CARD_VERSION } from './card-version.js'
@@ -231,7 +231,7 @@ async function finishGatedLocked(
 ): Promise<boolean> {
   // Daily cap (5 Nov): an approved story waits in the gate instead of going out over the cap.
   const gated = JSON.parse(raw) as { priority?: string; triage?: { trendGap?: boolean } }
-  if (action === 'publish' && gated.priority !== 'breaking' && (await dailyCapReached(deps.payload, Date.now(), Boolean(gated.triage?.trendGap)).catch(() => false))) {
+  if (action === 'publish' && gated.priority !== 'breaking' && (await dailyCapReached(deps.payload, Date.now(), Boolean(gated.triage?.trendGap) || isLookupTitle((JSON.parse(raw) as { write?: { en?: { title?: string } } }).write?.en?.title)).catch(() => false))) {
     logger.info({ articleId }, 'editor approved, but the daily cap is reached: the story keeps waiting')
     return true
   }
@@ -399,7 +399,7 @@ async function publishJob(data: PublishJobData, deps: PublishDeps, slot: { token
   // stories still being written, so on 12 Oct 236 non-breaking stories went out against a cap of 96.
   // AI and jobs must get a story at least every 4 hours: those skip the 15-minute queue when overdue.
   // A trend-gap story (ZG-21) uses the same extra slots as an overdue desk: it is never held back by the daily pace
-  const overdueCategory = isTrendGapCluster(cluster.items) || Boolean((triage as { trendGap?: boolean } | undefined)?.trendGap) || Boolean(triage?.category && QUOTA_CATEGORIES.includes(triage.category)
+  const overdueCategory = isLookupTitle(data.write?.en?.title) || isTrendGapCluster(cluster.items) || Boolean((triage as { trendGap?: boolean } | undefined)?.trendGap) || Boolean(triage?.category && QUOTA_CATEGORIES.includes(triage.category)
     ? await categoryOverdue(deps.payload, triage.category).catch(() => false)
     : false)
   // Only the holder of the publish slot may check the pace and publish; the others come back in 30-90 s (breaking and live updates are exempt).
